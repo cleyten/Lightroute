@@ -12,8 +12,8 @@ export default defineConfig(({ command }) => ({
         name: 'Lightroute',
         short_name: 'Lightroute',
         description: 'Gratis routeplanner voor wielrennen',
-        theme_color: '#d1342f',
-        background_color: '#ffffff',
+        theme_color: '#2424e8',
+        background_color: '#f6f3ec',
         display: 'standalone',
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },

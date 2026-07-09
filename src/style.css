@@ -1,9 +1,9 @@
 :root {
-  --color-bg: #ffffff;
-  --color-text: #1c1c1c;
-  --color-muted: #6b6b6b;
-  --color-accent: #d1342f;
-  --color-border: #e2e2e2;
+  --color-bg: #f6f3ec;
+  --color-text: #16161e;
+  --color-muted: #6f6c62;
+  --color-accent: #2424e8;
+  --color-border: #e3ded2;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
@@ -33,9 +33,31 @@ body,
   z-index: 1;
 }
 
-#sidebar h1 {
-  margin: 0 0 0.5rem;
-  font-size: 1.4rem;
+#brand {
+  margin-bottom: 0.5rem;
+}
+
+#brand h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--color-accent);
+}
+
+.brand-sub {
+  display: block;
+  text-align: right;
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-accent);
 }
 
 .hint {
@@ -251,7 +273,7 @@ body,
 }
 
 .saved-name:hover {
-  background: #f3f3f3;
+  background: #ece7da;
 }
 
 .saved-delete {

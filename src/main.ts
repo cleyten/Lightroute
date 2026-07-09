@@ -8,6 +8,7 @@ import { haversineMeters } from './geo';
 import { renderElevationChart, clearElevationChart } from './chart';
 import { surfaceBreakdown, renderSurfaceBar } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
+import { fetchRoundTrip } from './ors';
 
 type BikeType = 'race' | 'gravel' | 'mtb';
 
@@ -43,6 +44,8 @@ const bikeButtons = [...document.querySelectorAll<HTMLButtonElement>('#bike-type
 const trafficLabel = document.querySelector<HTMLElement>('#traffic-label')!;
 const trafficSelect = document.querySelector<HTMLSelectElement>('#traffic-select')!;
 const chartWrap = document.querySelector<HTMLElement>('#chart-wrap')!;
+const roundtripKm = document.querySelector<HTMLInputElement>('#roundtrip-km')!;
+const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')!;
 const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
 const surfaceEl = document.querySelector<HTMLElement>('#surface')!;
 
@@ -72,7 +75,7 @@ map.on('load', () => {
     source: 'route',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
-      'line-color': '#d1342f',
+      'line-color': '#2424e8',
       'line-width': 4,
       'line-opacity': 0.85,
     },
@@ -137,6 +140,40 @@ btnSave.addEventListener('click', async () => {
   routeNameInput.value = '';
   await refreshSavedList();
   setStatus(`Route "${name}" opgeslagen.`);
+});
+
+btnRoundtrip.addEventListener('click', async () => {
+  if (state.waypoints.length === 0) {
+    setStatus('Klik eerst één startpunt op de kaart.', true);
+    return;
+  }
+  const km = Number(roundtripKm.value);
+  if (!km || km < 5 || km > 100) {
+    setStatus('Kies een rondrit-afstand tussen 5 en 100 km.', true);
+    return;
+  }
+
+  // A round trip replaces any multi-point route; only the start point remains.
+  state.waypoints = [state.waypoints[0]];
+  rebuildMarkers();
+
+  const requestId = ++state.requestId;
+  setStatus('Rondrit genereren…');
+  try {
+    const route = await fetchRoundTrip(state.waypoints[0], km * 1000, settings.bike);
+    if (requestId !== state.requestId) return;
+    state.route = route;
+    setRouteData(route.geojson);
+    renderRouteDetails();
+    setStatus('Niet tevreden? Klik nogmaals op Genereer voor een andere lus.');
+  } catch (error) {
+    if (requestId !== state.requestId) return;
+    state.route = null;
+    setRouteData({ type: 'FeatureCollection', features: [] });
+    renderRouteDetails();
+    setStatus(error instanceof Error ? error.message : 'Er ging iets mis.', true);
+  }
+  updateControls();
 });
 
 bikeButtons.forEach((button) =>
@@ -358,7 +395,8 @@ function updateControls(): void {
   btnUndo.disabled = state.waypoints.length === 0;
   btnClear.disabled = state.waypoints.length === 0;
   btnExport.disabled = !state.route;
-  btnSave.disabled = !state.route;
+  // Saving stores waypoints for re-routing, which a generated loop doesn't have.
+  btnSave.disabled = !state.route || state.waypoints.length < 2;
 }
 
 syncProfileUi();

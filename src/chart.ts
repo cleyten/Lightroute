@@ -34,8 +34,8 @@ export function renderElevationChart(
       datasets: [
         {
           data,
-          borderColor: '#d1342f',
-          backgroundColor: 'rgba(209, 52, 47, 0.15)',
+          borderColor: '#2424e8',
+          backgroundColor: 'rgba(36, 36, 232, 0.15)',
           fill: true,
           pointRadius: 0,
           borderWidth: 1.5,
