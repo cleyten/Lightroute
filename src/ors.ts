@@ -21,7 +21,7 @@ export async function fetchRoundTrip(
   bike: string,
 ): Promise<RouteResult> {
   if (!ORS_KEY) {
-    throw new Error('Geen OpenRouteService-sleutel geconfigureerd (VITE_ORS_KEY).');
+    throw new Error('No OpenRouteService key configured (VITE_ORS_KEY).');
   }
 
   const profile = ORS_PROFILES[bike] ?? 'cycling-road';
@@ -54,7 +54,7 @@ export async function fetchRoundTrip(
   const data = (await response.json()) as FeatureCollection;
   const feature = data.features?.[0] as Feature<LineString> | undefined;
   if (!feature) {
-    throw new Error('Er kwam geen rondrit terug van de routeserver.');
+    throw new Error('The routing server returned no round trip.');
   }
 
   const coordinates = feature.geometry.coordinates as [number, number, number][];
@@ -87,13 +87,13 @@ function estimateAscent(coordinates: [number, number, number][]): number {
 
 function humanizeOrsError(status: number, body: string): string {
   if (status === 401 || status === 403) {
-    return 'De OpenRouteService-sleutel werd geweigerd. Controleer de sleutel of de domeinbeperking.';
+    return 'The OpenRouteService key was rejected. Check the key or its domain restriction.';
   }
   if (status === 429) {
-    return 'Het dagelijkse quotum van OpenRouteService is bereikt. Probeer het morgen opnieuw.';
+    return 'The OpenRouteService daily quota has been reached. Try again tomorrow.';
   }
   if (/2004/.test(body)) {
-    return 'De gevraagde afstand is te groot voor een rondrit (maximaal 100 km).';
+    return 'The requested distance is too long for a round trip (100 km maximum).';
   }
-  return `Rondrit genereren mislukt (fout ${status}).`;
+  return `Round trip generation failed (error ${status}).`;
 }

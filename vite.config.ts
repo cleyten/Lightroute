@@ -11,7 +11,7 @@ export default defineConfig(({ command }) => ({
       manifest: {
         name: 'Lightroute',
         short_name: 'Lightroute',
-        description: 'Gratis routeplanner voor wielrennen',
+        description: 'Free route planner for cycling',
         theme_color: '#2424e8',
         background_color: '#f6f3ec',
         display: 'standalone',

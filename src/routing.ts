@@ -42,7 +42,7 @@ export async function fetchRoute(
 
   const feature = data.features?.[0];
   if (!feature || feature.geometry.type !== 'LineString') {
-    throw new Error('Er kwam geen route terug van de routeserver.');
+    throw new Error('The routing server returned no route.');
   }
 
   const props = feature.properties ?? {};
@@ -58,7 +58,7 @@ export async function fetchRoute(
 function humanizeBrouterError(serverText: string): string {
   const detail = serverText.trim().slice(0, 200);
   if (/no track found|operation killed/i.test(detail)) {
-    return 'Geen route gevonden tussen deze punten. Kies punten dichter bij een weg.';
+    return 'No route found between these points. Choose points closer to a road.';
   }
-  return `Routeberekening mislukt: ${detail || 'onbekende fout van de routeserver'}`;
+  return `Routing failed: ${detail || 'unknown routing server error'}`;
 }

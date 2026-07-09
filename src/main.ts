@@ -128,7 +128,7 @@ btnExport.addEventListener('click', () => {
 btnSave.addEventListener('click', async () => {
   if (!state.route || state.waypoints.length < 2) return;
   const name =
-    routeNameInput.value.trim() || `Route ${new Date().toLocaleDateString('nl-NL')}`;
+    routeNameInput.value.trim() || `Route ${new Date().toISOString().slice(0, 10)}`;
   await saveRoute({
     name,
     waypoints: state.waypoints.map((wp) => [...wp] as LngLat),
@@ -139,17 +139,17 @@ btnSave.addEventListener('click', async () => {
   });
   routeNameInput.value = '';
   await refreshSavedList();
-  setStatus(`Route "${name}" opgeslagen.`);
+  setStatus(`Route "${name}" saved.`);
 });
 
 btnRoundtrip.addEventListener('click', async () => {
   if (state.waypoints.length === 0) {
-    setStatus('Klik eerst één startpunt op de kaart.', true);
+    setStatus('First click a start point on the map.', true);
     return;
   }
   const km = Number(roundtripKm.value);
   if (!km || km < 5 || km > 100) {
-    setStatus('Kies een rondrit-afstand tussen 5 en 100 km.', true);
+    setStatus('Choose a round trip distance between 5 and 100 km.', true);
     return;
   }
 
@@ -158,20 +158,20 @@ btnRoundtrip.addEventListener('click', async () => {
   rebuildMarkers();
 
   const requestId = ++state.requestId;
-  setStatus('Rondrit genereren…');
+  setStatus('Generating round trip…');
   try {
     const route = await fetchRoundTrip(state.waypoints[0], km * 1000, settings.bike);
     if (requestId !== state.requestId) return;
     state.route = route;
     setRouteData(route.geojson);
     renderRouteDetails();
-    setStatus('Niet tevreden? Klik nogmaals op Genereer voor een andere lus.');
+    setStatus('Not happy with it? Click Generate again for a different loop.');
   } catch (error) {
     if (requestId !== state.requestId) return;
     state.route = null;
     setRouteData({ type: 'FeatureCollection', features: [] });
     renderRouteDetails();
-    setStatus(error instanceof Error ? error.message : 'Er ging iets mis.', true);
+    setStatus(error instanceof Error ? error.message : 'Something went wrong.', true);
   }
   updateControls();
 });
@@ -285,7 +285,7 @@ async function recalculateRoute(): Promise<void> {
     return;
   }
 
-  setStatus('Route berekenen…');
+  setStatus('Calculating route…');
   try {
     const route = await fetchRoute(state.waypoints, currentProfile());
     if (requestId !== state.requestId) return; // a newer request superseded this one
@@ -298,7 +298,7 @@ async function recalculateRoute(): Promise<void> {
     state.route = null;
     setRouteData({ type: 'FeatureCollection', features: [] });
     renderRouteDetails();
-    setStatus(error instanceof Error ? error.message : 'Er ging iets mis.', true);
+    setStatus(error instanceof Error ? error.message : 'Something went wrong.', true);
   }
   updateControls();
 }
@@ -353,13 +353,13 @@ async function refreshSavedList(): Promise<void> {
     const label = document.createElement('button');
     label.className = 'saved-name';
     label.textContent = `${route.name} · ${(route.distanceMeters / 1000).toFixed(1)} km`;
-    label.title = 'Laad deze route';
+    label.title = 'Load this route';
     label.addEventListener('click', () => loadSaved(route));
 
     const remove = document.createElement('button');
     remove.className = 'saved-delete';
     remove.textContent = '✕';
-    remove.title = 'Verwijder';
+    remove.title = 'Delete';
     remove.addEventListener('click', async () => {
       await deleteRoute(route.id!);
       await refreshSavedList();

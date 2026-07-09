@@ -74,10 +74,10 @@ export function surfaceBreakdown(messages: string[][]): SurfaceTotals | null {
 }
 
 const LEGEND: { key: keyof Omit<SurfaceTotals, 'totalMeters'>; label: string; color: string }[] = [
-  { key: 'paved', label: 'Asfalt/verhard', color: '#4a4a4a' },
-  { key: 'cobbles', label: 'Klinkers', color: '#c9822b' },
-  { key: 'unpaved', label: 'Onverhard', color: '#8a6f47' },
-  { key: 'unknown', label: 'Onbekend', color: '#c4c4c4' },
+  { key: 'paved', label: 'Paved', color: '#4a4a4a' },
+  { key: 'cobbles', label: 'Cobbles', color: '#c9822b' },
+  { key: 'unpaved', label: 'Unpaved', color: '#8a6f47' },
+  { key: 'unknown', label: 'Unknown', color: '#c4c4c4' },
 ];
 
 export function renderSurfaceBar(container: HTMLElement, totals: SurfaceTotals): void {

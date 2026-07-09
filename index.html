@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
@@ -13,29 +13,29 @@
       <aside id="sidebar">
         <header id="brand">
           <h1>Lightroute</h1>
-          <span class="brand-sub">Routeplanner</span>
+          <span class="brand-sub">Route planner</span>
         </header>
-        <p class="hint">Klik op de kaart voor routepunten. Sleep een punt om de route te verleggen, klik op de lijn voor een tussenpunt.</p>
+        <p class="hint">Click the map to add route points. Drag a point to reroute, click the line to insert a via point.</p>
         <div class="segmented" id="bike-type">
           <button data-bike="race">Race</button>
           <button data-bike="gravel">Gravel</button>
           <button data-bike="mtb">MTB</button>
         </div>
         <label class="field" id="traffic-label">
-          Drukte vermijden
+          Avoid traffic
           <select id="traffic-select">
-            <option value="0">Niet (snelste route)</option>
-            <option value="1">Rustige wegen</option>
-            <option value="2">Zeer rustige wegen</option>
+            <option value="0">No (fastest route)</option>
+            <option value="1">Quiet roads</option>
+            <option value="2">Very quiet roads</option>
           </select>
         </label>
         <div id="stats">
           <div class="stat">
-            <span class="stat-label">Afstand</span>
+            <span class="stat-label">Distance</span>
             <span class="stat-value" id="stat-distance">–</span>
           </div>
           <div class="stat">
-            <span class="stat-label">Hoogtemeters</span>
+            <span class="stat-label">Elevation gain</span>
             <span class="stat-value" id="stat-ascend">–</span>
           </div>
         </div>
@@ -44,23 +44,23 @@
         </div>
         <div id="surface" hidden></div>
         <div id="controls">
-          <button id="btn-undo" disabled>Laatste punt weg</button>
-          <button id="btn-clear" disabled>Alles wissen</button>
-          <button id="btn-export" class="primary" disabled>Exporteer GPX</button>
+          <button id="btn-undo" disabled>Undo last point</button>
+          <button id="btn-clear" disabled>Clear all</button>
+          <button id="btn-export" class="primary" disabled>Export GPX</button>
         </div>
         <label class="field" id="roundtrip-field">
-          Rondrit vanaf punt 1
+          Round trip from point 1
           <span class="save-row">
             <input id="roundtrip-km" type="number" min="10" max="100" step="5" placeholder="km" />
-            <button id="btn-roundtrip">Genereer</button>
+            <button id="btn-roundtrip">Generate</button>
           </span>
         </label>
         <div id="save-section">
           <label class="field">
-            Route opslaan
+            Save route
             <span class="save-row">
-              <input id="route-name" type="text" placeholder="Naam" />
-              <button id="btn-save" disabled>Opslaan</button>
+              <input id="route-name" type="text" placeholder="Name" />
+              <button id="btn-save" disabled>Save</button>
             </span>
           </label>
           <ul id="saved-list"></ul>
