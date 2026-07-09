@@ -1,0 +1,152 @@
+:root {
+  --color-bg: #ffffff;
+  --color-text: #1c1c1c;
+  --color-muted: #6b6b6b;
+  --color-accent: #d1342f;
+  --color-border: #e2e2e2;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+}
+
+#app {
+  display: flex;
+}
+
+#sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  padding: 1.25rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+  z-index: 1;
+}
+
+#sidebar h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.4rem;
+}
+
+.hint {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+#stats {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.stat {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+
+.stat-value {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+#controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#controls button {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+#controls button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+#controls button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#controls button.primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+#status {
+  min-height: 1.2em;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+#status.error {
+  color: var(--color-accent);
+}
+
+#map {
+  flex: 1;
+  min-width: 0;
+}
+
+.waypoint-marker {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+/* Narrow screens (phone): sidebar becomes a panel below the map. */
+@media (max-width: 700px) {
+  #app {
+    flex-direction: column-reverse;
+  }
+
+  #sidebar {
+    width: 100%;
+    border-right: none;
+    border-top: 1px solid var(--color-border);
+    max-height: 45%;
+  }
+
+  #map {
+    min-height: 0;
+  }
+}
