@@ -46,6 +46,7 @@ const trafficSelect = document.querySelector<HTMLSelectElement>('#traffic-select
 const chartWrap = document.querySelector<HTMLElement>('#chart-wrap')!;
 const roundtripKm = document.querySelector<HTMLInputElement>('#roundtrip-km')!;
 const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')!;
+const roundtripHilly = document.querySelector<HTMLInputElement>('#roundtrip-hilly')!;
 const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
 const surfaceEl = document.querySelector<HTMLElement>('#surface')!;
 
@@ -160,7 +161,12 @@ btnRoundtrip.addEventListener('click', async () => {
   const requestId = ++state.requestId;
   setStatus('Generating round trip…');
   try {
-    const route = await fetchRoundTrip(state.waypoints[0], km * 1000, settings.bike);
+    const route = await fetchRoundTrip(
+      state.waypoints[0],
+      km * 1000,
+      settings.bike,
+      roundtripHilly.checked,
+    );
     if (requestId !== state.requestId) return;
     state.route = route;
     setRouteData(route.geojson);

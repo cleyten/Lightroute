@@ -217,6 +217,25 @@ body,
   font-weight: 600;
 }
 
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
 #save-section {
   margin-top: 0.75rem;
 }

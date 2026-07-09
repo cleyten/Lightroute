@@ -48,13 +48,17 @@
           <button id="btn-clear" disabled>Clear all</button>
           <button id="btn-export" class="primary" disabled>Export GPX</button>
         </div>
-        <label class="field" id="roundtrip-field">
+        <div class="field" id="roundtrip-field">
           Round trip from point 1
           <span class="save-row">
-            <input id="roundtrip-km" type="number" min="10" max="100" step="5" placeholder="km" />
+            <input id="roundtrip-km" type="number" min="10" max="100" step="5" placeholder="km" aria-label="Round trip distance in km" />
             <button id="btn-roundtrip">Generate</button>
           </span>
-        </label>
+          <label class="checkbox">
+            <input type="checkbox" id="roundtrip-hilly" />
+            Prefer hills
+          </label>
+        </div>
         <div id="save-section">
           <label class="field">
             Save route
