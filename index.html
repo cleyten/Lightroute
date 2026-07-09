@@ -12,7 +12,20 @@
     <div id="app">
       <aside id="sidebar">
         <h1>Lightroute</h1>
-        <p class="hint">Klik op de kaart om routepunten te plaatsen. Vanaf twee punten wordt de route berekend.</p>
+        <p class="hint">Klik op de kaart voor routepunten. Sleep een punt om de route te verleggen, klik op de lijn voor een tussenpunt.</p>
+        <div class="segmented" id="bike-type">
+          <button data-bike="race">Race</button>
+          <button data-bike="gravel">Gravel</button>
+          <button data-bike="mtb">MTB</button>
+        </div>
+        <label class="field" id="traffic-label">
+          Drukte vermijden
+          <select id="traffic-select">
+            <option value="0">Niet (snelste route)</option>
+            <option value="1">Rustige wegen</option>
+            <option value="2">Zeer rustige wegen</option>
+          </select>
+        </label>
         <div id="stats">
           <div class="stat">
             <span class="stat-label">Afstand</span>
@@ -23,10 +36,24 @@
             <span class="stat-value" id="stat-ascend">–</span>
           </div>
         </div>
+        <div id="chart-wrap" hidden>
+          <canvas id="elevation-chart"></canvas>
+        </div>
+        <div id="surface" hidden></div>
         <div id="controls">
           <button id="btn-undo" disabled>Laatste punt weg</button>
           <button id="btn-clear" disabled>Alles wissen</button>
           <button id="btn-export" class="primary" disabled>Exporteer GPX</button>
+        </div>
+        <div id="save-section">
+          <label class="field">
+            Route opslaan
+            <span class="save-row">
+              <input id="route-name" type="text" placeholder="Naam" />
+              <button id="btn-save" disabled>Opslaan</button>
+            </span>
+          </label>
+          <ul id="saved-list"></ul>
         </div>
         <p id="status" role="status"></p>
       </aside>

@@ -12,6 +12,8 @@ export interface RouteResult {
   coordinates: [number, number, number][];
   distanceMeters: number;
   ascendMeters: number;
+  /** BRouter per-segment data rows (header row first); used for the surface breakdown. */
+  messages: string[][];
 }
 
 const BROUTER_URL = 'https://brouter.de/brouter';
@@ -49,6 +51,7 @@ export async function fetchRoute(
     coordinates: feature.geometry.coordinates as [number, number, number][],
     distanceMeters: Number(props['track-length'] ?? 0),
     ascendMeters: Number(props['filtered ascend'] ?? 0),
+    messages: (props['messages'] as string[][]) ?? [],
   };
 }
 
