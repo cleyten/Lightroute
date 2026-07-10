@@ -393,7 +393,7 @@ function selectLoop(index: number): void {
   // on screen until the user actually drags a point, which reroutes through
   // these waypoints via BRouter.
   const coords = option.route.coordinates;
-  state.waypoints = extractLoopWaypoints(coords, waypointCountFor(option.route.distanceMeters));
+  state.waypoints = extractLoopWaypoints(coords);
   state.closed = true;
   rebuildMarkers();
 
@@ -411,24 +411,80 @@ function selectLoop(index: number): void {
   map.fitBounds(bounds, { padding: 60 });
 }
 
-/** Waypoint count for an editable loop: roughly one per 8 km, 4 to 8. */
-function waypointCountFor(distanceMeters: number): number {
-  return Math.min(8, Math.max(4, Math.round(distanceMeters / 8000)));
-}
+/** Minimum spacing between editable waypoints (avoids clustering). */
+const WP_MIN_GAP_M = 1500;
+/** Maximum spacing: guarantees at least one waypoint per 5 km. */
+const WP_MAX_GAP_M = 5000;
+/** A vertex counts as a turn above this bearing change (degrees). */
+const WP_TURN_DEG = 30;
 
-/** Samples evenly spaced waypoints along a track; the first is the start. */
-function extractLoopWaypoints(coords: [number, number, number][], count: number): LngLat[] {
+/**
+ * Picks editable waypoints along a generated loop. Within each 1.5-5 km
+ * window it places the waypoint on the sharpest turn (so dragging reshapes
+ * real corners and junctions); if the stretch is straight it falls back to
+ * the 5 km mark. The first waypoint is always the start.
+ */
+function extractLoopWaypoints(coords: [number, number, number][]): LngLat[] {
   const cum = cumulativeDistances(coords);
   const total = cum[cum.length - 1];
-  const waypoints: LngLat[] = [];
-  let seg = 0;
-  for (let k = 0; k < count; k++) {
-    const target = (total * k) / count;
-    while (seg < cum.length - 1 && cum[seg] < target) seg++;
-    const c = coords[Math.min(seg, coords.length - 1)];
-    waypoints.push([c[0], c[1]]);
+  const waypoints: LngLat[] = [[coords[0][0], coords[0][1]]];
+  if (total <= WP_MAX_GAP_M) return waypoints;
+
+  const turns = turnMagnitudes(coords, cum);
+  let lastDist = 0;
+  // Keep placing until the closing leg (last point back to start) is <= 5 km.
+  while (total - lastDist > WP_MAX_GAP_M) {
+    const windowStart = lastDist + WP_MIN_GAP_M;
+    const windowEnd = Math.min(lastDist + WP_MAX_GAP_M, total - WP_MIN_GAP_M);
+
+    let placeIdx = -1;
+    let bestTurn = WP_TURN_DEG;
+    for (let i = 0; i < coords.length; i++) {
+      if (cum[i] < windowStart) continue;
+      if (cum[i] > windowEnd) break;
+      if (turns[i] > bestTurn) {
+        bestTurn = turns[i];
+        placeIdx = i;
+      }
+    }
+    if (placeIdx < 0) placeIdx = indexAtDistance(cum, windowEnd); // straight: 5 km mark
+
+    waypoints.push([coords[placeIdx][0], coords[placeIdx][1]]);
+    lastDist = cum[placeIdx];
   }
   return waypoints;
+}
+
+/** Bearing change (0-180 deg) at each vertex, over an ~80 m window each side. */
+function turnMagnitudes(coords: [number, number, number][], cum: number[]): number[] {
+  const WINDOW_M = 80;
+  const out = new Array(coords.length).fill(0);
+  for (let i = 1; i < coords.length - 1; i++) {
+    let back = i;
+    while (back > 0 && cum[i] - cum[back] < WINDOW_M) back--;
+    let fwd = i;
+    while (fwd < coords.length - 1 && cum[fwd] - cum[i] < WINDOW_M) fwd++;
+    if (back === i || fwd === i) continue;
+    out[i] = bearingChange(bearingDeg(coords[back], coords[i]), bearingDeg(coords[i], coords[fwd]));
+  }
+  return out;
+}
+
+function bearingDeg(a: [number, number, number], b: [number, number, number]): number {
+  const x = (b[0] - a[0]) * Math.cos((a[1] * Math.PI) / 180);
+  const y = b[1] - a[1];
+  return (Math.atan2(x, y) * 180) / Math.PI;
+}
+
+function bearingChange(a: number, b: number): number {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
+function indexAtDistance(cum: number[], distance: number): number {
+  let i = 0;
+  while (i < cum.length - 1 && cum[i] < distance) i++;
+  return i;
 }
 
 /** Honest message when no loop passed the quality gates, with an escape hatch. */
@@ -736,17 +792,61 @@ function rebuildMarkers(): void {
     const el = document.createElement('div');
     el.className = 'waypoint-marker';
     el.textContent = String(index + 1);
+    el.title =
+      index === 0
+        ? 'Point 1 (start). Drag to move; click to close the loop.'
+        : 'Drag to move; click to remove this point.';
     const marker = new maplibregl.Marker({ element: el, draggable: true })
       .setLngLat(waypoint)
       .addTo(map);
+
+    // Distinguish a click (remove/close) from a drag (move): a drag fires
+    // dragstart, which suppresses the click that the browser fires on release.
+    let dragged = false;
+    marker.on('dragstart', () => {
+      dragged = true;
+    });
     marker.on('dragend', () => {
       const markerIndex = state.markers.indexOf(marker);
       const position = marker.getLngLat();
       state.waypoints[markerIndex] = [position.lng, position.lat];
       void recalculateRoute();
     });
+    el.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (dragged) {
+        dragged = false;
+        return;
+      }
+      const markerIndex = state.markers.indexOf(marker);
+      if (markerIndex === 0) {
+        // Point 1 is the start/anchor: a click closes an open loop but never
+        // deletes the point (use Clear to start over).
+        if (!state.closed && state.waypoints.length >= 3) void closeLoop();
+        return;
+      }
+      removeWaypoint(markerIndex);
+    });
     return marker;
   });
+}
+
+/** Removes one waypoint by index, keeping a routable minimum. */
+function removeWaypoint(index: number): void {
+  if (index < 0 || index >= state.waypoints.length) return;
+  const floor = state.closed ? 3 : 2;
+  if (state.waypoints.length <= floor) {
+    setStatus(
+      state.closed
+        ? 'A loop needs at least 3 points. Use Clear to start over.'
+        : 'Use Undo or Clear to remove the last points.',
+      true,
+    );
+    return;
+  }
+  state.waypoints.splice(index, 1);
+  rebuildMarkers();
+  void recalculateRoute();
 }
 
 /** Inserts a via-point into the leg it deviates least from (straight-line heuristic). */
