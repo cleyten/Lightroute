@@ -46,6 +46,8 @@ const state = {
 
 const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
 const statAscend = document.querySelector<HTMLElement>('#stat-ascend')!;
+const statsSection = document.querySelector<HTMLElement>('#stats')!;
+const routeEmpty = document.querySelector<HTMLElement>('#route-empty')!;
 const statusEl = document.querySelector<HTMLElement>('#status')!;
 const btnUndo = document.querySelector<HTMLButtonElement>('#btn-undo')!;
 const btnClear = document.querySelector<HTMLButtonElement>('#btn-clear')!;
@@ -233,10 +235,11 @@ map.on('load', () => {
     mapstyleEl.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
       btn.addEventListener('click', () => {
         setBasemap(btn.dataset.style ?? 'clean');
-        mapstyleEl
-          .querySelectorAll('button')
-          .forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
+        mapstyleEl.querySelectorAll('button').forEach((b) => {
+          const active = b === btn;
+          b.classList.toggle('active', active);
+          b.setAttribute('aria-pressed', String(active));
+        });
       });
     });
   }
@@ -853,9 +856,11 @@ function currentProfile(): string {
 }
 
 function syncProfileUi(): void {
-  bikeButtons.forEach((button) =>
-    button.classList.toggle('active', button.dataset.bike === settings.bike),
-  );
+  bikeButtons.forEach((button) => {
+    const active = button.dataset.bike === settings.bike;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
   trafficLabel.hidden = settings.bike !== 'race';
   trafficSelect.value = String(settings.traffic);
 }
@@ -996,6 +1001,8 @@ function renderRouteDetails(): void {
   // Any route change invalidates café results found for the previous route.
   clearCafes();
   cafesEl.hidden = !state.route;
+  statsSection.hidden = !state.route;
+  routeEmpty.hidden = !!state.route;
 
   if (state.route) {
     statDistance.textContent = `${(state.route.distanceMeters / 1000).toFixed(1)} km`;
@@ -1194,6 +1201,7 @@ void refreshSavedList();
     snap = Math.max(0, Math.min(2, index));
     sheetEl.style.transition = animate ? '' : 'none';
     sheetEl.style.transform = `translateY(${offsets()[snap]}px)`;
+    handleEl.setAttribute('aria-expanded', String(snap > 0));
     if (fab) {
       fab.style.opacity = snap === 0 ? '1' : '0';
       fab.style.pointerEvents = snap === 0 ? 'auto' : 'none';
@@ -1256,6 +1264,21 @@ void refreshSavedList();
   };
   handleEl.addEventListener('pointerup', endDrag);
   handleEl.addEventListener('pointercancel', endDrag);
+
+  // Keyboard: Enter/Space cycles up, arrows step between snap levels.
+  handleEl.addEventListener('keydown', (e) => {
+    if (!isMobile()) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      apply(snap >= 2 ? 0 : snap + 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      apply(snap + 1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      apply(snap - 1);
+    }
+  });
 
   // Raise to half the first time a route appears so the stats come into view.
   if (distEl) {

@@ -11,7 +11,7 @@
   <body>
     <div id="app">
       <aside id="sidebar">
-        <div id="sheet-handle" aria-hidden="true"></div>
+        <div id="sheet-handle" role="button" tabindex="0" aria-label="Expand or collapse the panel" aria-expanded="false"></div>
         <div id="sheet-body">
         <header id="brand">
           <h1>Lightroute</h1>
@@ -23,7 +23,9 @@
           <div id="search-box">
             <span class="save-row">
               <input id="search-input" type="text" placeholder="Search address or place" autocomplete="off" aria-label="Search address or place" />
-              <button id="btn-locate" title="Use my GPS location">📍</button>
+              <button id="btn-locate" type="button" title="Use my GPS location" aria-label="Use my GPS location">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+              </button>
             </span>
             <ul id="search-results" hidden></ul>
           </div>
@@ -32,9 +34,9 @@
         <section class="group">
           <span class="group-label">Bike &amp; traffic</span>
           <div class="segmented" id="bike-type">
-            <button data-bike="race">Race</button>
-            <button data-bike="gravel">Gravel</button>
-            <button data-bike="mtb">MTB</button>
+            <button type="button" data-bike="race" aria-pressed="false">Race</button>
+            <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
+            <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
           </div>
           <label class="field" id="traffic-label">
             Avoid traffic
@@ -67,7 +69,8 @@
 
         <section class="group" id="route-group">
           <span class="group-label">Route</span>
-          <div id="stats">
+          <p id="route-empty" class="empty-note">Add points on the map, or generate a round trip, to see distance, elevation and climbs.</p>
+          <div id="stats" hidden>
             <div class="stat">
               <span class="stat-label">Distance</span>
               <span class="stat-value" id="stat-distance">–</span>
@@ -116,11 +119,13 @@
         </div>
       </aside>
       <div id="map"></div>
-      <button id="gps-fab" class="gps-fab" type="button" aria-label="Use my GPS location">📍</button>
+      <button id="gps-fab" class="gps-fab" type="button" aria-label="Use my GPS location">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+      </button>
       <div id="mapstyle" class="mapstyle" role="group" aria-label="Map style" hidden>
-        <button data-style="clean" class="active">Clean</button>
-        <button data-style="terrain">Terrain</button>
-        <button data-style="cycling">Cycling</button>
+        <button type="button" data-style="clean" class="active" aria-pressed="true">Clean</button>
+        <button type="button" data-style="terrain" aria-pressed="false">Terrain</button>
+        <button type="button" data-style="cycling" aria-pressed="false">Cycling</button>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

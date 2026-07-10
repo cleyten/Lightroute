@@ -71,6 +71,12 @@
   box-sizing: border-box;
 }
 
+/* The `hidden` attribute must win over element display rules
+   (e.g. #stats and #wind-chip set display: flex). */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body,
 #app {
@@ -423,6 +429,20 @@ select {
 .save-row input {
   flex: 1;
   margin-top: 0;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+#search-input {
+  padding-left: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a978c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.2-4.2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.55rem center;
+  background-size: 15px;
 }
 
 .save-row button {
@@ -660,11 +680,14 @@ select {
 }
 
 #btn-locate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.45rem 0.6rem;
-  font-size: 1rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
+  color: var(--color-text);
   cursor: pointer;
 }
 
@@ -889,6 +912,22 @@ button.generate:disabled {
   font-size: 0.8rem;
   color: var(--color-muted);
   padding: 0.25rem 0;
+}
+
+.empty-note {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--color-muted);
+  margin: 0.15rem 0 0.25rem;
+}
+
+/* Subtle press feedback on the main action buttons. */
+button.generate:active:not(:disabled),
+#controls button:active:not(:disabled),
+.save-actions button:active:not(:disabled),
+.save-row button:active:not(:disabled),
+.mapstyle button:active {
+  transform: translateY(1px);
 }
 
 /* Phone: full-screen map with a draggable bottom sheet over it. */
