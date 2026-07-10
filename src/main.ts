@@ -136,6 +136,11 @@ function isDarkMode(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
+// Route line color per basemap. CyclOSM already draws cycle lanes in blue, so
+// the route switches to magenta there to stay distinguishable; blue elsewhere.
+const ROUTE_COLOR = '#2424e8';
+const ROUTE_COLOR_CYCLING = '#e5007d';
+
 let currentBasemap = 'clean';
 
 function setBasemap(style: string): void {
@@ -157,6 +162,13 @@ function setBasemap(style: string): void {
     map.addLayer({ id: 'basemap-raster', type: 'raster', source: 'basemap-raster' }, beforeId);
   }
   currentBasemap = style;
+  if (map.getLayer('route-line')) {
+    map.setPaintProperty(
+      'route-line',
+      'line-color',
+      style === 'cycling' ? ROUTE_COLOR_CYCLING : ROUTE_COLOR,
+    );
+  }
 }
 
 // When the OS theme flips, re-apply the clean basemap to swap light/dark.
@@ -194,7 +206,7 @@ map.on('load', () => {
     source: 'route',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
-      'line-color': '#2424e8',
+      'line-color': ROUTE_COLOR,
       'line-width': 4,
       'line-opacity': 0.95,
     },
