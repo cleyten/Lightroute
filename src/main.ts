@@ -1162,6 +1162,118 @@ function updateControls(): void {
 syncProfileUi();
 void refreshSavedList();
 
+// --- Mobile bottom sheet ---
+// On phones the panel is a draggable sheet over a full-screen map. Dragging
+// the handle snaps it between peek / half / full; tapping the handle cycles up.
+(() => {
+  const sheet = document.querySelector<HTMLElement>('#sidebar');
+  const handle = document.querySelector<HTMLElement>('#sheet-handle');
+  if (!sheet || !handle) return;
+  const sheetEl = sheet;
+  const handleEl = handle;
+  const fab = document.querySelector<HTMLElement>('#gps-fab');
+  const locateEl = document.querySelector<HTMLButtonElement>('#btn-locate');
+  const distEl = document.querySelector<HTMLElement>('#stat-distance');
+
+  const isMobile = () => window.matchMedia('(max-width: 700px)').matches;
+  let snap = 0; // 0 = peek, 1 = half, 2 = full
+
+  // Offsets in px to translate the sheet down by, per snap level.
+  function offsets(): number[] {
+    const h = sheetEl.offsetHeight;
+    const peekVisible = 250;
+    return [Math.max(0, h - peekVisible), Math.round(h * 0.45), 0];
+  }
+
+  function currentY(): number {
+    const m = /translateY\(([-\d.]+)px\)/.exec(sheetEl.style.transform);
+    return m ? parseFloat(m[1]) : offsets()[snap];
+  }
+
+  function apply(index: number, animate = true): void {
+    snap = Math.max(0, Math.min(2, index));
+    sheetEl.style.transition = animate ? '' : 'none';
+    sheetEl.style.transform = `translateY(${offsets()[snap]}px)`;
+    if (fab) {
+      fab.style.opacity = snap === 0 ? '1' : '0';
+      fab.style.pointerEvents = snap === 0 ? 'auto' : 'none';
+    }
+  }
+
+  // Clear inline styles on desktop so the sheet transform never leaks there.
+  function reset(): void {
+    if (isMobile()) {
+      apply(snap, false);
+    } else {
+      sheetEl.style.transform = '';
+      sheetEl.style.transition = '';
+      if (fab) {
+        fab.style.opacity = '';
+        fab.style.pointerEvents = '';
+      }
+    }
+  }
+
+  let dragging = false;
+  let startY = 0;
+  let startOffset = 0;
+
+  handleEl.addEventListener('pointerdown', (e) => {
+    if (!isMobile()) return;
+    dragging = true;
+    startY = e.clientY;
+    startOffset = currentY();
+    sheetEl.style.transition = 'none';
+    handleEl.setPointerCapture(e.pointerId);
+  });
+  handleEl.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const h = sheetEl.offsetHeight;
+    const y = Math.min(Math.max(0, startOffset + (e.clientY - startY)), h - 80);
+    sheetEl.style.transform = `translateY(${y}px)`;
+  });
+  const endDrag = (): void => {
+    if (!dragging) return;
+    dragging = false;
+    sheetEl.style.transition = '';
+    const y = currentY();
+    // A tap (barely moved) cycles peek -> half -> full -> peek.
+    if (Math.abs(y - startOffset) < 6) {
+      apply(snap >= 2 ? 0 : snap + 1);
+      return;
+    }
+    const offs = offsets();
+    let best = 0;
+    let bestDist = Infinity;
+    offs.forEach((o, i) => {
+      const d = Math.abs(o - y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    apply(best);
+  };
+  handleEl.addEventListener('pointerup', endDrag);
+  handleEl.addEventListener('pointercancel', endDrag);
+
+  // Raise to half the first time a route appears so the stats come into view.
+  if (distEl) {
+    const observer = new MutationObserver(() => {
+      const text = distEl.textContent ?? '';
+      if (isMobile() && snap === 0 && text && text !== '–') apply(1);
+    });
+    observer.observe(distEl, { childList: true, characterData: true, subtree: true });
+  }
+
+  if (fab && locateEl) {
+    fab.addEventListener('click', () => locateEl.click());
+  }
+
+  window.addEventListener('resize', reset);
+  reset();
+})();
+
 // Dev-only handle for verification in the browser console; stripped from
 // the production build by the `import.meta.env.DEV` guard.
 if (import.meta.env.DEV) {

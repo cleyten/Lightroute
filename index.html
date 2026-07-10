@@ -11,6 +11,8 @@
   <body>
     <div id="app">
       <aside id="sidebar">
+        <div id="sheet-handle" aria-hidden="true"></div>
+        <div id="sheet-body">
         <header id="brand">
           <h1>Lightroute</h1>
           <span class="brand-sub">Route planner</span>
@@ -111,8 +113,10 @@
         </section>
 
         <p id="status" role="status"></p>
+        </div>
       </aside>
       <div id="map"></div>
+      <button id="gps-fab" class="gps-fab" type="button" aria-label="Use my GPS location">📍</button>
       <div id="mapstyle" class="mapstyle" role="group" aria-label="Map style" hidden>
         <button data-style="clean" class="active">Clean</button>
         <button data-style="terrain">Terrain</button>

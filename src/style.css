@@ -159,6 +159,15 @@ body,
   color: #fff;
 }
 
+/* The drag handle and GPS FAB only exist on the mobile bottom sheet. */
+#sheet-handle {
+  display: none;
+}
+
+.gps-fab {
+  display: none;
+}
+
 /* Interactive elements share one transition and one focus ring. */
 button,
 input,
@@ -882,36 +891,84 @@ button.generate:disabled {
   padding: 0.25rem 0;
 }
 
-/* Narrow screens (phone): revert to a stacked panel below the map.
-   Phase 3 replaces this with a proper bottom sheet. */
+/* Phone: full-screen map with a draggable bottom sheet over it. */
 @media (max-width: 700px) {
-  #app {
-    display: flex;
-    flex-direction: column-reverse;
-  }
-
-  #map {
-    position: static;
-    flex: 1;
-    min-height: 0;
-  }
-
   #sidebar {
-    position: static;
     top: auto;
-    left: auto;
-    bottom: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
-    max-height: 45%;
+    height: 92vh;
+    max-height: 92vh;
+    padding: 0;
     border: none;
-    border-top: 1px solid var(--color-border);
-    border-radius: 0;
-    box-shadow: none;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -6px 24px rgba(24, 24, 50, 0.18);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(64vh);
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 3;
+  }
+
+  #sheet-handle {
+    display: block;
+    flex: 0 0 auto;
+    height: 26px;
+    position: relative;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  #sheet-handle::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--color-border);
+  }
+
+  #sheet-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 1rem;
+  }
+
+  #brand {
+    padding-top: 0.15rem;
   }
 
   .mapstyle {
     left: 0.75rem;
-    bottom: auto;
+    right: auto;
     top: 0.75rem;
+    bottom: auto;
+  }
+
+  .gps-fab {
+    display: flex;
+    position: fixed;
+    right: 1rem;
+    bottom: calc(30vh + 1rem);
+    z-index: 4;
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    background: var(--color-panel);
+    color: var(--color-accent-fg);
+    font-size: 1.25rem;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: opacity 0.2s ease;
   }
 }
