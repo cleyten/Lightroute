@@ -41,7 +41,7 @@ const HEAL_PROFILES: Record<string, string> = {
 };
 
 /** Number of candidate loops generated per batch. */
-const CANDIDATES = 6;
+const CANDIDATES = 8;
 /** Max options offered to the user. */
 const MAX_OPTIONS = 3;
 /** Reject candidates that re-ride more than this share of their distance. */
@@ -50,6 +50,8 @@ const MAX_OVERLAP = 0.1;
 const MIN_UNPAVED: Record<string, number> = { gravel: 0.22, mtb: 0.3 };
 /** Two candidates sharing more than this are considered the same loop. */
 const MAX_SIMILARITY = 0.62;
+
+export type HillPreference = 'avoid' | 'mix' | 'prefer';
 
 export interface LoopOption {
   route: RouteResult;
@@ -82,7 +84,7 @@ export async function generateRoundTrips(
   minMeters: number,
   maxMeters: number,
   bike: string,
-  preferHills: boolean,
+  hills: HillPreference,
 ): Promise<RoundTripResult> {
   // ORS wants a single target length; aim for the middle of the range.
   const targetMeters = (minMeters + maxMeters) / 2;
@@ -97,7 +99,7 @@ export async function generateRoundTrips(
   ]);
 
   let evaluated = firstBatch.map((route) =>
-    evaluateCandidate(route, minMeters, maxMeters, bike, preferHills, grid, wind),
+    evaluateCandidate(route, minMeters, maxMeters, bike, hills, grid, wind),
   );
 
   // ORS treats the length as a loose target and often overshoots. If too few
@@ -112,7 +114,7 @@ export async function generateRoundTrips(
       const secondBatch = await fetchCandidates(start, corrected, bike);
       evaluated = evaluated.concat(
         secondBatch.map((route) =>
-          evaluateCandidate(route, minMeters, maxMeters, bike, preferHills, grid, wind),
+          evaluateCandidate(route, minMeters, maxMeters, bike, hills, grid, wind),
         ),
       );
     } catch {
@@ -120,7 +122,14 @@ export async function generateRoundTrips(
     }
   }
 
-  const passed = dedupe(evaluated.filter((c) => c.rejection === null)).slice(0, MAX_OPTIONS);
+  // ORS round trips can't be biased toward elevation, so all candidates are
+  // generated the same way. We can only pick the flattest (avoid) or hilliest
+  // (prefer) of the ones that pass the quality gates; in uniformly hilly areas
+  // the achievable spread is small. "mix" just ranks by overall quality.
+  const passing = evaluated
+    .filter((c) => c.rejection === null)
+    .sort((a, b) => hillsSortValue(b, hills) - hillsSortValue(a, hills));
+  const passed = dedupe(passing).slice(0, MAX_OPTIONS);
   const rejected = evaluated
     .filter((c) => c.rejection !== null)
     .sort((a, b) => b.score - a.score);
@@ -138,7 +147,7 @@ function evaluateCandidate(
   minMeters: number,
   maxMeters: number,
   bike: string,
-  preferHills: boolean,
+  hills: HillPreference,
   grid: Awaited<ReturnType<typeof fetchNetworkGrid>>,
   wind: WindInfo | null,
 ): LoopOption {
@@ -155,7 +164,7 @@ function evaluateCandidate(
     rejection = 'distance';
   } else if (overlap > MAX_OVERLAP) {
     rejection = 'overlap';
-  } else if (roundness < (preferHills ? 0.15 : 0.22)) {
+  } else if (roundness < (hills === 'prefer' ? 0.15 : 0.22)) {
     rejection = 'shape';
   } else if (MIN_UNPAVED[bike] !== undefined && unpaved !== null && unpaved < MIN_UNPAVED[bike]) {
     rejection = 'surface';
@@ -169,10 +178,6 @@ function evaluateCandidate(
   let score = roundness - overshoot * 8 - overlap * 6;
   if (network !== null) score += network * 1.2;
   score += windBonus(wind, bearing);
-  if (preferHills) {
-    // Meters of climbing per km; ~10 m/km is seriously hilly for NL/BE.
-    score += (route.ascendMeters / (route.distanceMeters / 1000) / 10) * 1.5;
-  }
   if (unpaved !== null && MIN_UNPAVED[bike] !== undefined) score += unpaved * 0.8;
   if (unpaved !== null && bike === 'race') score -= unpaved * 1.5;
 
@@ -192,11 +197,22 @@ function evaluateCandidate(
   };
 }
 
-/** Drops near-duplicate loops, keeping the better-scoring one. */
+/** Meters of climbing per km; used to order loops by the hills preference. */
+function ascentPerKm(option: LoopOption): number {
+  return option.route.ascendMeters / (option.route.distanceMeters / 1000);
+}
+
+/** Sort value (higher = offered first) for the chosen hills preference. */
+function hillsSortValue(option: LoopOption, hills: HillPreference): number {
+  if (hills === 'prefer') return ascentPerKm(option);
+  if (hills === 'avoid') return -ascentPerKm(option);
+  return option.score;
+}
+
+/** Drops near-duplicate loops, keeping the first (caller pre-sorts best-first). */
 function dedupe(options: LoopOption[]): LoopOption[] {
-  const sorted = [...options].sort((a, b) => b.score - a.score);
   const kept: { option: LoopOption; edges: Set<string> }[] = [];
-  for (const option of sorted) {
+  for (const option of options) {
     const edges = edgeSet(option.route.coordinates);
     if (kept.every((k) => routeSimilarity(k.edges, edges) < MAX_SIMILARITY)) {
       kept.push({ option, edges });

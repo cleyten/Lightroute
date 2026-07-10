@@ -16,9 +16,12 @@ import { fetchCafes, type Cafe } from './cafes';
 
 type BikeType = 'race' | 'gravel' | 'mtb';
 
+type HillPreference = 'avoid' | 'mix' | 'prefer';
+
 interface Settings {
   bike: BikeType;
   traffic: number; // 0 = fastest, 1 = low traffic, 2 = very low traffic (race only)
+  hills: HillPreference; // round-trip elevation preference
 }
 
 const SETTINGS_KEY = 'lightroute-settings';
@@ -57,6 +60,7 @@ const btnSave = document.querySelector<HTMLButtonElement>('#btn-save')!;
 const routeNameInput = document.querySelector<HTMLInputElement>('#route-name')!;
 const savedList = document.querySelector<HTMLUListElement>('#saved-list')!;
 const bikeButtons = [...document.querySelectorAll<HTMLButtonElement>('#bike-type button')];
+const hillsButtons = [...document.querySelectorAll<HTMLButtonElement>('#hills-type button')];
 const trafficLabel = document.querySelector<HTMLElement>('#traffic-label')!;
 const trafficSelect = document.querySelector<HTMLSelectElement>('#traffic-select')!;
 const chartWrap = document.querySelector<HTMLElement>('#chart-wrap')!;
@@ -65,7 +69,6 @@ const roundtripMax = document.querySelector<HTMLInputElement>('#roundtrip-max')!
 const rangeValue = document.querySelector<HTMLElement>('#range-value')!;
 const rangeTrack = document.querySelector<HTMLElement>('#range-track')!;
 const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')!;
-const roundtripHilly = document.querySelector<HTMLInputElement>('#roundtrip-hilly')!;
 const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
 const surfaceEl = document.querySelector<HTMLElement>('#surface')!;
 const loopOptionsEl = document.querySelector<HTMLElement>('#loop-options')!;
@@ -390,7 +393,7 @@ btnRoundtrip.addEventListener('click', async () => {
       minKm * 1000,
       maxKm * 1000,
       settings.bike,
-      roundtripHilly.checked,
+      settings.hills,
     );
     if (requestId !== state.requestId) return;
 
@@ -814,6 +817,15 @@ bikeButtons.forEach((button) =>
   }),
 );
 
+// Hills preference only affects the next round trip, so no reroute here.
+hillsButtons.forEach((button) =>
+  button.addEventListener('click', () => {
+    settings.hills = button.dataset.hills as HillPreference;
+    persistSettings();
+    syncProfileUi();
+  }),
+);
+
 trafficSelect.addEventListener('change', () => {
   settings.traffic = Number(trafficSelect.value);
   persistSettings();
@@ -836,13 +848,14 @@ function loadSettings(): Settings {
         return {
           bike: parsed.bike,
           traffic: [0, 1, 2].includes(parsed.traffic) ? parsed.traffic : 0,
+          hills: ['avoid', 'mix', 'prefer'].includes(parsed.hills) ? parsed.hills : 'mix',
         };
       }
     }
   } catch {
     // Corrupt settings fall through to the defaults.
   }
-  return { bike: 'race', traffic: 0 };
+  return { bike: 'race', traffic: 0, hills: 'mix' };
 }
 
 function persistSettings(): void {
@@ -858,6 +871,11 @@ function currentProfile(): string {
 function syncProfileUi(): void {
   bikeButtons.forEach((button) => {
     const active = button.dataset.bike === settings.bike;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  hillsButtons.forEach((button) => {
+    const active = button.dataset.hills === settings.hills;
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
   });

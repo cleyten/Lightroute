@@ -46,6 +46,12 @@
               <option value="2">Very quiet roads</option>
             </select>
           </label>
+          <span class="field">Round-trip hills</span>
+          <div class="segmented" id="hills-type">
+            <button type="button" data-hills="avoid" aria-pressed="false">Avoid</button>
+            <button type="button" data-hills="mix" aria-pressed="true">Mix</button>
+            <button type="button" data-hills="prefer" aria-pressed="false">Prefer</button>
+          </div>
         </section>
 
         <section class="group">
@@ -58,10 +64,6 @@
               <input id="roundtrip-max" type="range" min="5" max="100" step="5" value="50" aria-label="Maximum round trip distance in km" />
             </div>
             <button id="btn-roundtrip" class="primary generate">Generate round trip</button>
-            <label class="checkbox">
-              <input type="checkbox" id="roundtrip-hilly" />
-              Prefer hills
-            </label>
             <div id="wind-chip" hidden></div>
             <div id="loop-options" hidden></div>
           </div>

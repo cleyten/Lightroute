@@ -275,6 +275,10 @@ select {
   color: var(--color-muted);
 }
 
+#hills-type {
+  margin-top: 0.3rem;
+}
+
 .field select,
 .field input {
   display: block;
