@@ -57,21 +57,42 @@ export interface OrsSurfaceExtra {
 }
 
 /**
- * Surface totals for an ORS route. `cumulative` is the running distance per
- * coordinate, so a value row [from, to, code] covers
- * cumulative[to] - cumulative[from] meters.
+ * Expands ORS extra rows ([fromCoord, toCoord, code]) into one surface code
+ * per route segment (coordinate i to i+1), so the codes can be spliced in
+ * step with the geometry during cleanup.
  */
-export function surfaceFromOrsExtras(
+export function extrasToSegmentCodes(
   extra: OrsSurfaceExtra | undefined,
+  coordCount: number,
+): (number | null)[] | null {
+  if (!extra?.values?.length || coordCount < 2) return null;
+  const codes: (number | null)[] = new Array(coordCount - 1).fill(null);
+  for (const [from, to, code] of extra.values) {
+    for (let i = Math.max(0, from); i < Math.min(to, codes.length); i++) {
+      codes[i] = code;
+    }
+  }
+  return codes;
+}
+
+/**
+ * Surface totals from per-segment codes. `cumulative` is the running
+ * distance per coordinate, so segment i covers
+ * cumulative[i+1] - cumulative[i] meters.
+ */
+export function surfaceFromSegmentCodes(
+  codes: (number | null)[] | null,
   cumulative: number[],
 ): SurfaceTotals | null {
-  if (!extra?.values?.length) return null;
+  if (!codes?.length) return null;
   const totals: SurfaceTotals = { paved: 0, cobbles: 0, unpaved: 0, unknown: 0, totalMeters: 0 };
-  for (const [from, to, code] of extra.values) {
-    const meters = (cumulative[to] ?? 0) - (cumulative[from] ?? 0);
+  for (let i = 0; i < codes.length && i + 1 < cumulative.length; i++) {
+    const meters = cumulative[i + 1] - cumulative[i];
     if (meters <= 0) continue;
     totals.totalMeters += meters;
-    if (ORS_PAVED.has(code)) totals.paved += meters;
+    const code = codes[i];
+    if (code === null) totals.unknown += meters;
+    else if (ORS_PAVED.has(code)) totals.paved += meters;
     else if (ORS_COBBLES.has(code)) totals.cobbles += meters;
     else if (ORS_UNPAVED.has(code)) totals.unpaved += meters;
     else totals.unknown += meters;

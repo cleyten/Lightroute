@@ -16,7 +16,13 @@ import { cumulativeDistances } from './geo';
 import { overlapRatio, loopRoundness, initialBearing, edgeSet, routeSimilarity } from './loops';
 import { fetchNetworkGrid, networkCoverage } from './network';
 import { fetchWind, windBonus, windNote, type WindInfo } from './wind';
-import { surfaceFromOrsExtras, unpavedFraction, type OrsSurfaceExtra } from './surface';
+import {
+  extrasToSegmentCodes,
+  surfaceFromSegmentCodes,
+  unpavedFraction,
+  type OrsSurfaceExtra,
+} from './surface';
+import { cleanLoopGeometry } from './cleanup';
 
 const ORS_KEY: string = import.meta.env.VITE_ORS_KEY ?? '';
 const ORS_BASE = 'https://api.openrouteservice.org/v2/directions';
@@ -292,17 +298,34 @@ async function fetchOneRoundTrip(
     throw new Error('The routing server returned no round trip.');
   }
 
-  const coordinates = feature.geometry.coordinates as [number, number, number][];
-  const summary = (feature.properties?.summary ?? {}) as { distance?: number };
+  const rawCoordinates = feature.geometry.coordinates as [number, number, number][];
   const extras = feature.properties?.extras as { surface?: OrsSurfaceExtra } | undefined;
 
+  // Splice dead-end spurs and small self-intersection curls out of the raw
+  // geometry; distance, ascent and surface are recomputed from the result.
+  const cleaned = cleanLoopGeometry(
+    rawCoordinates,
+    extrasToSegmentCodes(extras?.surface, rawCoordinates.length),
+  );
+  const coordinates = cleaned.coords;
+  const cumulative = cumulativeDistances(coordinates);
+
   return {
-    geojson: data,
+    geojson: {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates },
+        },
+      ],
+    },
     coordinates,
-    distanceMeters: summary.distance ?? 0,
+    distanceMeters: cumulative[cumulative.length - 1],
     ascendMeters: estimateAscent(coordinates),
     messages: [], // ORS provides no BRouter-style way tags; surface comes from extras.
-    surface: surfaceFromOrsExtras(extras?.surface, cumulativeDistances(coordinates)),
+    surface: surfaceFromSegmentCodes(cleaned.segCodes, cumulative),
   };
 }
 
