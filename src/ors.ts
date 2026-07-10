@@ -27,8 +27,6 @@ const ORS_PROFILES: Record<string, string> = {
   mtb: 'cycling-mountain',
 };
 
-/** Default hard limit on distance deviation; the UI slider overrides it. */
-export const DEFAULT_MAX_DEVIATION = 0.12;
 /** Number of candidate loops generated per batch. */
 const CANDIDATES = 6;
 /** Max options offered to the user. */
@@ -68,23 +66,25 @@ export interface RoundTripResult {
 
 export async function generateRoundTrips(
   start: LngLat,
-  lengthMeters: number,
+  minMeters: number,
+  maxMeters: number,
   bike: string,
   preferHills: boolean,
-  maxDeviation: number = DEFAULT_MAX_DEVIATION,
 ): Promise<RoundTripResult> {
+  // ORS wants a single target length; aim for the middle of the range.
+  const targetMeters = (minMeters + maxMeters) / 2;
   // The loop of length L fits inside a circle of diameter L/pi around the
   // start; fetch the cycle network for that area (plus margin) in parallel
   // with the first candidate batch.
-  const networkRadius = Math.min(lengthMeters / Math.PI / 2 + 3000, 20000);
+  const networkRadius = Math.min(maxMeters / Math.PI / 2 + 3000, 20000);
   const [firstBatch, grid, wind] = await Promise.all([
-    fetchCandidates(start, lengthMeters, bike),
+    fetchCandidates(start, targetMeters, bike),
     fetchNetworkGrid(start, networkRadius),
     fetchWind(start),
   ]);
 
   let evaluated = firstBatch.map((route) =>
-    evaluateCandidate(route, lengthMeters, bike, preferHills, grid, wind, maxDeviation),
+    evaluateCandidate(route, minMeters, maxMeters, bike, preferHills, grid, wind),
   );
 
   // ORS treats the length as a loose target and often overshoots. If too few
@@ -92,12 +92,14 @@ export async function generateRoundTrips(
   // the first batch was off (e.g. all loops 15% long -> ask for 15% less).
   if (evaluated.filter((c) => c.rejection === null).length < 2) {
     const median = medianDistance(firstBatch);
-    const corrected = Math.round(lengthMeters * Math.min(Math.max(lengthMeters / median, 0.7), 1.3));
+    const corrected = Math.round(
+      targetMeters * Math.min(Math.max(targetMeters / median, 0.7), 1.3),
+    );
     try {
       const secondBatch = await fetchCandidates(start, corrected, bike);
       evaluated = evaluated.concat(
         secondBatch.map((route) =>
-          evaluateCandidate(route, lengthMeters, bike, preferHills, grid, wind, maxDeviation),
+          evaluateCandidate(route, minMeters, maxMeters, bike, preferHills, grid, wind),
         ),
       );
     } catch {
@@ -120,12 +122,12 @@ export async function generateRoundTrips(
 
 function evaluateCandidate(
   route: RouteResult,
-  targetMeters: number,
+  minMeters: number,
+  maxMeters: number,
   bike: string,
   preferHills: boolean,
   grid: Awaited<ReturnType<typeof fetchNetworkGrid>>,
   wind: WindInfo | null,
-  maxDeviation: number,
 ): LoopOption {
   const coords = route.coordinates;
   const overlap = overlapRatio(coords);
@@ -133,11 +135,10 @@ function evaluateCandidate(
   const unpaved = unpavedFraction(route.surface ?? null);
   const network = grid ? networkCoverage(grid, coords) : null;
   const bearing = initialBearing(coords);
-  const deviation = Math.abs(route.distanceMeters - targetMeters) / targetMeters;
 
   // Hard quality gates. The rejection text feeds the "nothing found" message.
   let rejection: string | null = null;
-  if (deviation > maxDeviation) {
+  if (route.distanceMeters < minMeters || route.distanceMeters > maxMeters) {
     rejection = 'distance';
   } else if (overlap > MAX_OVERLAP) {
     rejection = 'overlap';
@@ -147,8 +148,12 @@ function evaluateCandidate(
     rejection = 'surface';
   }
 
-  // Deviations within 40% of the tolerance carry no penalty at all.
-  let score = roundness - Math.max(0, deviation - maxDeviation * 0.4) * 8 - overlap * 6;
+  // Any distance inside the requested range is equally fine; outside it,
+  // penalize by how far out it lies (matters for ranking fallback loops).
+  const overshoot =
+    Math.max(0, minMeters - route.distanceMeters, route.distanceMeters - maxMeters) /
+    ((minMeters + maxMeters) / 2);
+  let score = roundness - overshoot * 8 - overlap * 6;
   if (network !== null) score += network * 1.2;
   score += windBonus(wind, bearing);
   if (preferHills) {
@@ -187,7 +192,7 @@ const REASON_TEXT: Record<string, string> = {
   overlap: 'every loop found here doubles back on itself too much',
   shape: 'only awkwardly shaped loops were found here',
   surface: 'not enough unpaved roads were found for a loop of this length',
-  distance: 'no loop close enough to this distance was found',
+  distance: 'no loop within the distance range was found',
 };
 
 function dominantReason(rejected: LoopOption[]): string {

@@ -69,17 +69,15 @@
         </div>
         <div class="field" id="roundtrip-field">
           Round trip from point 1
-          <span class="save-row">
-            <input id="roundtrip-km" type="number" min="10" max="100" step="5" placeholder="km" aria-label="Round trip distance in km" />
+          <span class="save-row range-row">
+            <input id="roundtrip-min" type="number" min="5" max="100" step="5" placeholder="min km" aria-label="Minimum round trip distance in km" />
+            <span class="range-sep">–</span>
+            <input id="roundtrip-max" type="number" min="5" max="100" step="5" placeholder="max km" aria-label="Maximum round trip distance in km" />
             <button id="btn-roundtrip">Generate</button>
           </span>
           <label class="checkbox">
             <input type="checkbox" id="roundtrip-hilly" />
             Prefer hills
-          </label>
-          <label class="field slider-field">
-            Distance tolerance: ±<span id="margin-value">12</span>%
-            <input type="range" id="roundtrip-margin" min="5" max="25" step="1" value="12" />
           </label>
           <div id="wind-chip" hidden></div>
           <div id="loop-options" hidden></div>

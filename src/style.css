@@ -531,9 +531,17 @@ body,
   color: var(--color-muted);
 }
 
-.slider-field input[type='range'] {
-  padding: 0;
-  accent-color: var(--color-accent);
+.range-row {
+  align-items: center;
+}
+
+.range-row input {
+  min-width: 0;
+}
+
+.range-sep {
+  color: var(--color-muted);
+  flex-shrink: 0;
 }
 
 #cafes {

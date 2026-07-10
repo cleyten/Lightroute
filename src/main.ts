@@ -54,7 +54,8 @@ const bikeButtons = [...document.querySelectorAll<HTMLButtonElement>('#bike-type
 const trafficLabel = document.querySelector<HTMLElement>('#traffic-label')!;
 const trafficSelect = document.querySelector<HTMLSelectElement>('#traffic-select')!;
 const chartWrap = document.querySelector<HTMLElement>('#chart-wrap')!;
-const roundtripKm = document.querySelector<HTMLInputElement>('#roundtrip-km')!;
+const roundtripMin = document.querySelector<HTMLInputElement>('#roundtrip-min')!;
+const roundtripMax = document.querySelector<HTMLInputElement>('#roundtrip-max')!;
 const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')!;
 const roundtripHilly = document.querySelector<HTMLInputElement>('#roundtrip-hilly')!;
 const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
@@ -66,8 +67,6 @@ const climbsList = document.querySelector<HTMLUListElement>('#climbs-list')!;
 const searchInput = document.querySelector<HTMLInputElement>('#search-input')!;
 const searchResults = document.querySelector<HTMLUListElement>('#search-results')!;
 const btnLocate = document.querySelector<HTMLButtonElement>('#btn-locate')!;
-const marginSlider = document.querySelector<HTMLInputElement>('#roundtrip-margin')!;
-const marginValue = document.querySelector<HTMLElement>('#margin-value')!;
 const cafesEl = document.querySelector<HTMLElement>('#cafes')!;
 const cafeKmInput = document.querySelector<HTMLInputElement>('#cafe-km')!;
 const btnCafes = document.querySelector<HTMLButtonElement>('#btn-cafes')!;
@@ -225,9 +224,10 @@ btnRoundtrip.addEventListener('click', async () => {
     setStatus('First click a start point on the map.', true);
     return;
   }
-  const km = Number(roundtripKm.value);
-  if (!km || km < 5 || km > 100) {
-    setStatus('Choose a round trip distance between 5 and 100 km.', true);
+  const minKm = Number(roundtripMin.value);
+  const maxKm = Number(roundtripMax.value);
+  if (!minKm || !maxKm || minKm < 5 || maxKm > 100 || minKm >= maxKm) {
+    setStatus('Enter a distance range like 40 – 55 km (5 to 100 km, min below max).', true);
     return;
   }
 
@@ -241,10 +241,10 @@ btnRoundtrip.addEventListener('click', async () => {
   try {
     const result = await generateRoundTrips(
       state.waypoints[0],
-      km * 1000,
+      minKm * 1000,
+      maxKm * 1000,
       settings.bike,
       roundtripHilly.checked,
-      Number(marginSlider.value) / 100,
     );
     if (requestId !== state.requestId) return;
 
@@ -457,12 +457,6 @@ btnLocate.addEventListener('click', () => {
     () => setStatus('Could not get your location. Check the location permission.', true),
     { timeout: 10000, maximumAge: 60000 },
   );
-});
-
-// --- Round-trip distance tolerance slider -----------------------------------
-
-marginSlider.addEventListener('input', () => {
-  marginValue.textContent = marginSlider.value;
 });
 
 // --- Cafés along the route ---------------------------------------------------
