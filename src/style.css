@@ -1,10 +1,70 @@
 :root {
+  /* Surfaces */
   --color-bg: #f6f3ec;
-  --color-text: #16161e;
+  --color-panel: #fffdf7;
+  --color-surface: #efece3;
+  --color-hover: #e8e3d6;
+  /* Text */
+  --color-text: #181820;
   --color-muted: #6f6c62;
+  /* Lines */
+  --color-border: #e4dfd3;
+  --color-line-soft: #efebe1;
+  /* Accent (brand blue). `-fg` is the readable variant for text on the page. */
   --color-accent: #2424e8;
-  --color-border: #e3ded2;
+  --color-accent-fg: #2424e8;
+  --color-accent-tint: #eceafe;
+  /* Semantic */
+  --color-climb: #e8571a;
+  --color-cafe: #8a5a2b;
+  /* Shape */
+  --radius: 12px;
+  --radius-sm: 9px;
+  --shadow-sm: 0 3px 12px rgba(24, 24, 50, 0.1);
+  --shadow: 0 8px 30px rgba(24, 24, 50, 0.13), 0 2px 8px rgba(24, 24, 50, 0.07);
+
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light dark;
+}
+
+/* Dark mode follows the OS unless the page is explicitly forced to light. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: #0f0f18;
+    --color-panel: #1a1a25;
+    --color-surface: #20202c;
+    --color-hover: #262633;
+    --color-text: #f1eee6;
+    --color-muted: #9c988c;
+    --color-border: #2b2b39;
+    --color-line-soft: #232330;
+    --color-accent: #2424e8;
+    --color-accent-fg: #a9a9ff;
+    --color-accent-tint: #23233b;
+    --color-climb: #ff7a44;
+    --color-cafe: #c39058;
+    --shadow-sm: 0 3px 12px rgba(0, 0, 0, 0.45);
+    --shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Manual override wins over the media query in both directions. */
+:root[data-theme='dark'] {
+  --color-bg: #0f0f18;
+  --color-panel: #1a1a25;
+  --color-surface: #20202c;
+  --color-hover: #262633;
+  --color-text: #f1eee6;
+  --color-muted: #9c988c;
+  --color-border: #2b2b39;
+  --color-line-soft: #232330;
+  --color-accent: #2424e8;
+  --color-accent-fg: #a9a9ff;
+  --color-accent-tint: #23233b;
+  --color-climb: #ff7a44;
+  --color-cafe: #c39058;
+  --shadow-sm: 0 3px 12px rgba(0, 0, 0, 0.45);
+  --shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -33,6 +93,26 @@ body,
   z-index: 1;
 }
 
+/* Interactive elements share one transition and one focus ring. */
+button,
+input,
+select {
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    color 0.15s ease, box-shadow 0.15s ease;
+}
+
+:where(button, input, select, a):focus-visible {
+  outline: 2px solid var(--color-accent-fg);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
 #brand {
   margin-bottom: 0.5rem;
 }
@@ -45,7 +125,7 @@ body,
   text-transform: uppercase;
   letter-spacing: -0.03em;
   line-height: 1;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .brand-sub {
@@ -57,7 +137,7 @@ body,
   font-style: italic;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .hint {
@@ -71,7 +151,7 @@ body,
   gap: 0;
   margin: 0.75rem 0 0.5rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
@@ -80,13 +160,17 @@ body,
   padding: 0.5rem 0;
   font-size: 0.85rem;
   border: none;
-  background: var(--color-bg);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
 }
 
 .segmented button + button {
   border-left: 1px solid var(--color-border);
+}
+
+.segmented button:hover:not(.active) {
+  background: var(--color-hover);
 }
 
 .segmented button.active {
@@ -112,14 +196,14 @@ body,
   padding: 0.45rem 0.5rem;
   font-size: 0.9rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   color: var(--color-text);
 }
 
 #stats {
   display: flex;
-  gap: 1rem;
+  gap: 0.6rem;
   margin: 1rem 0;
 }
 
@@ -156,20 +240,22 @@ body,
   margin-right: 0.3rem;
 }
 
+/* Map overlay: fixed brand blue so it stays consistent with the route line
+   regardless of the UI theme. */
 .hover-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   background: #fff;
-  border: 3px solid var(--color-accent);
+  border: 3px solid #2424e8;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .stat {
   flex: 1;
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
 }
 
 .stat-label {
@@ -181,8 +267,10 @@ body,
 }
 
 .stat-value {
-  font-size: 1.15rem;
-  font-weight: 600;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 #controls {
@@ -195,14 +283,15 @@ body,
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
 }
 
 #controls button:hover:not(:disabled) {
   border-color: var(--color-accent);
+  background: var(--color-hover);
 }
 
 #controls button:disabled {
@@ -255,10 +344,15 @@ body,
   padding: 0.45rem 0.75rem;
   font-size: 0.85rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
+}
+
+.save-row button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-hover);
 }
 
 .save-row button:disabled {
@@ -292,7 +386,7 @@ body,
 }
 
 .saved-name:hover {
-  background: #ece7da;
+  background: var(--color-hover);
 }
 
 .saved-delete {
@@ -305,7 +399,7 @@ body,
 }
 
 .saved-delete:hover {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 #status {
@@ -315,7 +409,7 @@ body,
 }
 
 #status.error {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 #map {
@@ -323,11 +417,12 @@ body,
   min-width: 0;
 }
 
+/* Map overlay: fixed brand blue (see .hover-dot). */
 .waypoint-marker {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--color-accent);
+  background: #2424e8;
   color: #fff;
   font-size: 0.8rem;
   font-weight: 700;
@@ -353,7 +448,7 @@ body,
 
 .wind-arrow {
   display: inline-block;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-size: 0.9rem;
   line-height: 1;
 }
@@ -373,14 +468,15 @@ body,
   padding: 0.5rem 0.6rem;
   font-size: 0.85rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
 }
 
 .loop-option:hover {
   border-color: var(--color-accent);
+  background: var(--color-hover);
 }
 
 .loop-option.active {
@@ -413,7 +509,7 @@ body,
   text-transform: none;
   letter-spacing: normal;
   font-size: 0.75rem;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 #climbs {
@@ -447,19 +543,19 @@ body,
   font-size: 0.8rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: var(--color-bg);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
   text-align: left;
 }
 
 .climb-item:hover {
-  border-color: #e8571a;
+  border-color: var(--color-climb);
 }
 
 .climb-item.active {
-  border-color: #e8571a;
-  box-shadow: inset 0 0 0 1px #e8571a;
+  border-color: var(--color-climb);
+  box-shadow: inset 0 0 0 1px var(--color-climb);
 }
 
 .climb-where {
@@ -470,7 +566,7 @@ body,
 .climb-gain {
   margin-left: auto;
   font-weight: 600;
-  color: #e8571a;
+  color: var(--color-climb);
 }
 
 #search-box {
@@ -481,13 +577,14 @@ body,
   padding: 0.45rem 0.6rem;
   font-size: 1rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   cursor: pointer;
 }
 
 #btn-locate:hover {
   border-color: var(--color-accent);
+  background: var(--color-hover);
 }
 
 #search-results {
@@ -495,7 +592,7 @@ body,
   margin: 0.35rem 0 0;
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
@@ -508,7 +605,7 @@ body,
   font-size: 0.85rem;
   border: none;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg);
+  background: var(--color-surface);
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
@@ -519,7 +616,7 @@ body,
 }
 
 .search-result:hover {
-  background: #ece7da;
+  background: var(--color-hover);
 }
 
 .search-label {
@@ -580,7 +677,7 @@ body,
   height: 18px;
   border-radius: 50%;
   background: var(--color-accent);
-  border: 2px solid #fff;
+  border: 2px solid var(--color-panel);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   cursor: grab;
 }
@@ -591,7 +688,7 @@ body,
   height: 14px;
   border-radius: 50%;
   background: var(--color-accent);
-  border: 2px solid #fff;
+  border: 2px solid var(--color-panel);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   cursor: grab;
 }
@@ -604,15 +701,17 @@ button.generate {
   font-size: 0.95rem;
   font-weight: 600;
   border: 1px solid var(--color-accent);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent);
   color: #fff;
   cursor: pointer;
+  box-shadow: 0 4px 14px rgba(36, 36, 232, 0.28);
 }
 
 button.generate:disabled {
   opacity: 0.55;
   cursor: default;
+  box-shadow: none;
 }
 
 .save-actions {
@@ -626,14 +725,15 @@ button.generate:disabled {
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
 }
 
 .save-actions button:hover:not(:disabled) {
   border-color: var(--color-accent);
+  background: var(--color-hover);
 }
 
 .save-actions button:disabled {
@@ -672,14 +772,14 @@ button.generate:disabled {
   font-size: 0.8rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: var(--color-bg);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
   text-align: left;
 }
 
 .cafe-item:hover {
-  border-color: #8a5a2b;
+  border-color: var(--color-cafe);
 }
 
 .cafe-where {
@@ -695,7 +795,7 @@ button.generate:disabled {
 }
 
 .cafe-detour {
-  color: #8a5a2b;
+  color: var(--color-cafe);
   font-weight: 600;
 }
 

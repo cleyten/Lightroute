@@ -30,6 +30,11 @@ export function renderElevationChart(
     y: coordinates[i][2] ?? 0,
   }));
 
+  // Read theme colors from CSS variables so the axes adapt to light/dark mode.
+  const css = getComputedStyle(document.documentElement);
+  const tickColor = css.getPropertyValue('--color-muted').trim() || '#6f6c62';
+  const gridColor = css.getPropertyValue('--color-border').trim() || '#e4dfd3';
+
   // Climb ranges in km along the track, for per-segment coloring.
   const climbRanges = climbs.map((c) => [c.startKm, c.startKm + c.lengthM / 1000]);
   const inClimb = (km: number) =>
@@ -79,10 +84,14 @@ export function renderElevationChart(
         x: {
           type: 'linear',
           min: 0,
-          ticks: { maxTicksLimit: 6, callback: (v) => `${v} km` },
+          ticks: { maxTicksLimit: 6, callback: (v) => `${v} km`, color: tickColor },
+          grid: { color: gridColor },
+          border: { color: gridColor },
         },
         y: {
-          ticks: { maxTicksLimit: 5, callback: (v) => `${v} m` },
+          ticks: { maxTicksLimit: 5, callback: (v) => `${v} m`, color: tickColor },
+          grid: { color: gridColor },
+          border: { color: gridColor },
         },
       },
       onHover: (_event, elements) => {
