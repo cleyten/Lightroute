@@ -116,9 +116,9 @@ body,
 .group-label {
   display: block;
   margin: 0 0 0.55rem;
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.08em;
   color: var(--color-muted);
   font-weight: 700;
 }
@@ -248,12 +248,15 @@ select {
   font-weight: 600;
 }
 
+/* Shared micro-label typography: uppercase, bold, muted but readable.
+   Used by field labels, stat labels, section labels and group labels. */
 .field {
   display: block;
   margin: 0.5rem 0;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   color: var(--color-muted);
 }
 
@@ -261,9 +264,12 @@ select {
 .field input {
   display: block;
   width: 100%;
-  margin-top: 0.25rem;
+  margin-top: 0.3rem;
   padding: 0.45rem 0.5rem;
   font-size: 0.9rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -330,8 +336,9 @@ select {
 .stat-label {
   display: block;
   font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   color: var(--color-muted);
 }
 
@@ -588,10 +595,11 @@ select {
 .section-label {
   display: block;
   font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   color: var(--color-muted);
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.35rem;
 }
 
 #climbs-list {
