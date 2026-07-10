@@ -3,6 +3,7 @@
 // the route as GeoJSON with per-point elevation as the third coordinate.
 
 import type { FeatureCollection } from 'geojson';
+import type { SurfaceTotals } from './surface';
 
 export type LngLat = [number, number];
 
@@ -14,6 +15,8 @@ export interface RouteResult {
   ascendMeters: number;
   /** BRouter per-segment data rows (header row first); used for the surface breakdown. */
   messages: string[][];
+  /** Pre-computed surface totals (ORS routes); BRouter routes derive them from messages. */
+  surface?: SurfaceTotals | null;
 }
 
 const BROUTER_URL = 'https://brouter.de/brouter';

@@ -339,6 +339,140 @@ body,
   cursor: pointer;
 }
 
+#wind-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-muted);
+}
+
+.wind-arrow {
+  display: inline-block;
+  color: var(--color-accent);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+#loop-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.loop-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.loop-option:hover {
+  border-color: var(--color-accent);
+}
+
+.loop-option.active {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.loop-option.fallback {
+  border-style: dashed;
+}
+
+.loop-title {
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+}
+
+.loop-detail {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.loop-wind {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.75rem;
+  color: var(--color-accent);
+}
+
+#climbs {
+  margin: 0 0 0.75rem;
+}
+
+.section-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+  margin-bottom: 0.3rem;
+}
+
+#climbs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.climb-item {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.climb-item:hover {
+  border-color: #e8571a;
+}
+
+.climb-item.active {
+  border-color: #e8571a;
+  box-shadow: inset 0 0 0 1px #e8571a;
+}
+
+.climb-where {
+  color: var(--color-muted);
+  min-width: 3.6rem;
+}
+
+.climb-gain {
+  margin-left: auto;
+  font-weight: 600;
+  color: #e8571a;
+}
+
 /* Narrow screens (phone): sidebar becomes a panel below the map. */
 @media (max-width: 700px) {
   #app {

@@ -8,7 +8,9 @@ import { haversineMeters } from './geo';
 import { renderElevationChart, clearElevationChart } from './chart';
 import { surfaceBreakdown, renderSurfaceBar } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
-import { fetchRoundTrip } from './ors';
+import { generateRoundTrips, rejectionText, type LoopOption } from './ors';
+import { detectClimbs, type Climb } from './climbs';
+import { compassLabel, type WindInfo } from './wind';
 
 type BikeType = 'race' | 'gravel' | 'mtb';
 
@@ -29,6 +31,11 @@ const state = {
   route: null as RouteResult | null,
   // Incremented per routing request so stale responses can be ignored.
   requestId: 0,
+  // Round-trip suggestions currently on offer, and the selected one.
+  loopOptions: [] as LoopOption[],
+  selectedLoop: -1,
+  climbs: [] as Climb[],
+  selectedClimb: -1,
 };
 
 const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
@@ -49,6 +56,10 @@ const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')
 const roundtripHilly = document.querySelector<HTMLInputElement>('#roundtrip-hilly')!;
 const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
 const surfaceEl = document.querySelector<HTMLElement>('#surface')!;
+const loopOptionsEl = document.querySelector<HTMLElement>('#loop-options')!;
+const windChipEl = document.querySelector<HTMLElement>('#wind-chip')!;
+const climbsEl = document.querySelector<HTMLElement>('#climbs')!;
+const climbsList = document.querySelector<HTMLUListElement>('#climbs-list')!;
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -79,6 +90,22 @@ map.on('load', () => {
       'line-color': '#2424e8',
       'line-width': 4,
       'line-opacity': 0.85,
+    },
+  });
+  // Highlight layer for a selected climb, drawn on top of the route.
+  map.addSource('climb-highlight', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+  map.addLayer({
+    id: 'climb-line',
+    type: 'line',
+    source: 'climb-highlight',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': '#e8571a',
+      'line-width': 5,
+      'line-opacity': 0.95,
     },
   });
   map.on('mouseenter', 'route-line', () => {
@@ -159,28 +186,142 @@ btnRoundtrip.addEventListener('click', async () => {
   rebuildMarkers();
 
   const requestId = ++state.requestId;
-  setStatus('Generating round trip…');
+  setStatus('Generating and checking loops… (this can take ~15 s)');
+  btnRoundtrip.disabled = true;
   try {
-    const route = await fetchRoundTrip(
+    const result = await generateRoundTrips(
       state.waypoints[0],
       km * 1000,
       settings.bike,
       roundtripHilly.checked,
     );
     if (requestId !== state.requestId) return;
-    state.route = route;
-    setRouteData(route.geojson);
-    renderRouteDetails();
-    setStatus('Not happy with it? Click Generate again for a different loop.');
+
+    renderWindChip(result.wind);
+    if (result.options.length > 0) {
+      state.loopOptions = result.options;
+      renderLoopOptions();
+      selectLoop(0);
+      setStatus(
+        result.options.length > 1
+          ? 'Pick a loop below, or Generate again for new ones.'
+          : 'One good loop found. Generate again for new ones.',
+      );
+    } else {
+      state.loopOptions = [];
+      state.route = null;
+      setRouteData({ type: 'FeatureCollection', features: [] });
+      renderRouteDetails();
+      renderNoLoopFound(result.failReason, result.fallback);
+    }
   } catch (error) {
     if (requestId !== state.requestId) return;
+    state.loopOptions = [];
+    renderLoopOptions();
     state.route = null;
     setRouteData({ type: 'FeatureCollection', features: [] });
     renderRouteDetails();
     setStatus(error instanceof Error ? error.message : 'Something went wrong.', true);
+  } finally {
+    if (requestId === state.requestId) btnRoundtrip.disabled = false;
   }
   updateControls();
 });
+
+/** Renders the quality-passed loops as selectable options. */
+function renderLoopOptions(): void {
+  loopOptionsEl.innerHTML = '';
+  loopOptionsEl.hidden = state.loopOptions.length === 0;
+  state.loopOptions.forEach((option, index) => {
+    const button = document.createElement('button');
+    button.className = 'loop-option';
+    button.classList.toggle('active', index === state.selectedLoop);
+
+    const parts = [
+      `${(option.route.distanceMeters / 1000).toFixed(1)} km`,
+      `${Math.round(option.route.ascendMeters)} m up`,
+    ];
+    if (option.unpaved !== null) parts.push(`${Math.round(option.unpaved * 100)}% unpaved`);
+    if (option.network !== null && option.network > 0.15) {
+      parts.push(`${Math.round(option.network * 100)}% on cycle routes`);
+    }
+    const title = document.createElement('span');
+    title.className = 'loop-title';
+    title.textContent = `Loop ${index + 1}`;
+    const detail = document.createElement('span');
+    detail.className = 'loop-detail';
+    detail.textContent = parts.join(' · ');
+    button.append(title, detail);
+    if (option.windNote) {
+      const wind = document.createElement('span');
+      wind.className = 'loop-wind';
+      wind.textContent = option.windNote;
+      button.append(wind);
+    }
+    button.addEventListener('click', () => selectLoop(index));
+    loopOptionsEl.append(button);
+  });
+}
+
+function selectLoop(index: number): void {
+  const option = state.loopOptions[index];
+  if (!option) return;
+  state.selectedLoop = index;
+  state.route = option.route;
+  setRouteData(option.route.geojson);
+  renderRouteDetails();
+  updateControls();
+  [...loopOptionsEl.children].forEach((el, i) =>
+    el.classList.toggle('active', i === index),
+  );
+
+  const coords = option.route.coordinates;
+  const bounds = coords.reduce(
+    (acc, c) => acc.extend([c[0], c[1]]),
+    new maplibregl.LngLatBounds([coords[0][0], coords[0][1]], [coords[0][0], coords[0][1]]),
+  );
+  map.fitBounds(bounds, { padding: 60 });
+}
+
+/** Honest message when no loop passed the quality gates, with an escape hatch. */
+function renderNoLoopFound(reason: string | null, fallback: LoopOption | null): void {
+  setStatus(`No good loop found: ${reason ?? 'nothing suitable here'}. Try another distance or start point.`, true);
+  loopOptionsEl.innerHTML = '';
+  loopOptionsEl.hidden = fallback === null;
+  if (!fallback) return;
+
+  const button = document.createElement('button');
+  button.className = 'loop-option fallback';
+  const title = document.createElement('span');
+  title.className = 'loop-title';
+  title.textContent = 'Show best match anyway';
+  const detail = document.createElement('span');
+  detail.className = 'loop-detail';
+  detail.textContent =
+    `${(fallback.route.distanceMeters / 1000).toFixed(1)} km · but ${rejectionText(fallback)}`;
+  button.append(title, detail);
+  button.addEventListener('click', () => {
+    state.loopOptions = [fallback];
+    renderLoopOptions();
+    selectLoop(0);
+    setStatus('This loop did not pass the quality check; treat it as a rough suggestion.');
+  });
+  loopOptionsEl.append(button);
+}
+
+function renderWindChip(wind: WindInfo | null): void {
+  windChipEl.hidden = wind === null;
+  if (!wind) return;
+  windChipEl.innerHTML = '';
+  const arrow = document.createElement('span');
+  arrow.className = 'wind-arrow';
+  arrow.textContent = '➤';
+  // The arrow glyph points east; rotate it to where the wind blows TO.
+  arrow.style.transform = `rotate(${Math.round(wind.fromDeg + 90)}deg)`;
+  const label = document.createElement('span');
+  label.textContent = ` Wind now: ${Math.round(wind.speedKmh)} km/h from ${compassLabel(wind.fromDeg)}`;
+  windChipEl.append(arrow, label);
+}
 
 bikeButtons.forEach((button) =>
   button.addEventListener('click', () => {
@@ -282,6 +423,13 @@ function insertViaPoint(point: LngLat): void {
 async function recalculateRoute(): Promise<void> {
   const requestId = ++state.requestId;
 
+  // Manual routing replaces any round-trip suggestions.
+  if (state.loopOptions.length > 0) {
+    state.loopOptions = [];
+    state.selectedLoop = -1;
+    renderLoopOptions();
+  }
+
   if (state.waypoints.length < 2) {
     state.route = null;
     setRouteData({ type: 'FeatureCollection', features: [] });
@@ -314,23 +462,33 @@ function setRouteData(data: FeatureCollection): void {
   source?.setData(data);
 }
 
-/** Renders stats, elevation chart and surface bar for the current route (or clears them). */
+/** Renders stats, elevation chart, surface bar and climbs for the current route (or clears them). */
 function renderRouteDetails(): void {
   if (state.route) {
     statDistance.textContent = `${(state.route.distanceMeters / 1000).toFixed(1)} km`;
     statAscend.textContent = `${Math.round(state.route.ascendMeters)} m`;
 
-    chartWrap.hidden = false;
-    renderElevationChart(chartCanvas, state.route.coordinates, (index) => {
-      const [lng, lat] = state.route!.coordinates[index];
-      hoverMarker.setLngLat([lng, lat]);
-      if (!hoverMarkerVisible) {
-        hoverMarker.addTo(map);
-        hoverMarkerVisible = true;
-      }
-    });
+    state.climbs = detectClimbs(state.route.coordinates);
+    state.selectedClimb = -1;
+    setClimbHighlight(null);
+    renderClimbsList();
 
-    const totals = surfaceBreakdown(state.route.messages);
+    chartWrap.hidden = false;
+    renderElevationChart(
+      chartCanvas,
+      state.route.coordinates,
+      (index) => {
+        const [lng, lat] = state.route!.coordinates[index];
+        hoverMarker.setLngLat([lng, lat]);
+        if (!hoverMarkerVisible) {
+          hoverMarker.addTo(map);
+          hoverMarkerVisible = true;
+        }
+      },
+      state.climbs,
+    );
+
+    const totals = state.route.surface ?? surfaceBreakdown(state.route.messages);
     if (totals) {
       surfaceEl.hidden = false;
       renderSurfaceBar(surfaceEl, totals);
@@ -342,12 +500,74 @@ function renderRouteDetails(): void {
     statAscend.textContent = '–';
     chartWrap.hidden = true;
     surfaceEl.hidden = true;
+    climbsEl.hidden = true;
+    state.climbs = [];
+    state.selectedClimb = -1;
+    setClimbHighlight(null);
     clearElevationChart();
     if (hoverMarkerVisible) {
       hoverMarker.remove();
       hoverMarkerVisible = false;
     }
   }
+}
+
+/** Lists detected climbs; clicking one highlights it on the map and zooms to it. */
+function renderClimbsList(): void {
+  climbsEl.hidden = state.climbs.length === 0;
+  climbsList.innerHTML = '';
+  state.climbs.forEach((climb, index) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.className = 'climb-item';
+    button.innerHTML =
+      `<span class="climb-where">km ${climb.startKm.toFixed(1)}</span>` +
+      `<span>${(climb.lengthM / 1000).toFixed(1)} km at ${climb.avgPct.toFixed(1)}%</span>` +
+      `<span class="climb-gain">+${Math.round(climb.gainM)} m</span>`;
+    button.title = `Steepest 100 m: ${climb.maxPct.toFixed(0)}%`;
+    button.addEventListener('click', () => {
+      if (state.selectedClimb === index) {
+        state.selectedClimb = -1;
+        setClimbHighlight(null);
+      } else {
+        state.selectedClimb = index;
+        setClimbHighlight(climb);
+        const coords = state.route!.coordinates.slice(climb.startIndex, climb.endIndex + 1);
+        const bounds = coords.reduce(
+          (acc, c) => acc.extend([c[0], c[1]]),
+          new maplibregl.LngLatBounds([coords[0][0], coords[0][1]], [coords[0][0], coords[0][1]]),
+        );
+        map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+      }
+      [...climbsList.querySelectorAll('.climb-item')].forEach((el, i) =>
+        el.classList.toggle('active', i === state.selectedClimb),
+      );
+    });
+    item.append(button);
+    climbsList.append(item);
+  });
+}
+
+function setClimbHighlight(climb: Climb | null): void {
+  const source = map.getSource('climb-highlight') as maplibregl.GeoJSONSource | undefined;
+  if (!source) return;
+  if (!climb || !state.route) {
+    source.setData({ type: 'FeatureCollection', features: [] });
+    return;
+  }
+  source.setData({
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: state.route.coordinates.slice(climb.startIndex, climb.endIndex + 1),
+        },
+      },
+    ],
+  });
 }
 
 async function refreshSavedList(): Promise<void> {

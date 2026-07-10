@@ -43,6 +43,10 @@
           <canvas id="elevation-chart"></canvas>
         </div>
         <div id="surface" hidden></div>
+        <div id="climbs" hidden>
+          <span class="section-label">Climbs</span>
+          <ul id="climbs-list"></ul>
+        </div>
         <div id="controls">
           <button id="btn-undo" disabled>Undo last point</button>
           <button id="btn-clear" disabled>Clear all</button>
@@ -58,6 +62,8 @@
             <input type="checkbox" id="roundtrip-hilly" />
             Prefer hills
           </label>
+          <div id="wind-chip" hidden></div>
+          <div id="loop-options" hidden></div>
         </div>
         <div id="save-section">
           <label class="field">

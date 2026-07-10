@@ -1,17 +1,20 @@
 // Elevation profile chart (distance vs. elevation) rendered with Chart.js.
 import { Chart } from 'chart.js/auto';
 import { cumulativeDistances } from './geo';
+import type { Climb } from './climbs';
 
 let chart: Chart | null = null;
 
 /**
  * Draws the elevation profile. `onHover` receives the index into the
- * ORIGINAL coordinates array so the caller can highlight that point on the map.
+ * ORIGINAL coordinates array so the caller can highlight that point on the
+ * map. Stretches inside a detected climb are drawn in orange.
  */
 export function renderElevationChart(
   canvas: HTMLCanvasElement,
   coordinates: [number, number, number][],
   onHover: (coordinateIndex: number) => void,
+  climbs: Climb[] = [],
 ): void {
   // Downsample long tracks; the chart stays readable and fast.
   const stride = Math.max(1, Math.ceil(coordinates.length / 600));
@@ -27,6 +30,11 @@ export function renderElevationChart(
     y: coordinates[i][2] ?? 0,
   }));
 
+  // Climb ranges in km along the track, for per-segment coloring.
+  const climbRanges = climbs.map((c) => [c.startKm, c.startKm + c.lengthM / 1000]);
+  const inClimb = (km: number) =>
+    climbRanges.some(([from, to]) => km >= from && km <= to);
+
   chart?.destroy();
   chart = new Chart(canvas, {
     type: 'line',
@@ -40,6 +48,14 @@ export function renderElevationChart(
           pointRadius: 0,
           borderWidth: 1.5,
           tension: 0.1,
+          segment: {
+            borderColor: (ctx) =>
+              inClimb((ctx.p0 as { parsed: { x: number } }).parsed.x) ? '#e8571a' : '#2424e8',
+            backgroundColor: (ctx) =>
+              inClimb((ctx.p0 as { parsed: { x: number } }).parsed.x)
+                ? 'rgba(232, 87, 26, 0.18)'
+                : 'rgba(36, 36, 232, 0.15)',
+          },
         },
       ],
     },

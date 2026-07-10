@@ -45,6 +45,51 @@ const UNPAVED = new Set([
   'rock',
 ]);
 
+// ORS surface codes (extra_info "surface") mapped to our categories.
+// See openrouteservice docs, "Extra info: surface".
+const ORS_PAVED = new Set([1, 3, 4, 6, 7]); // Paved, Asphalt, Concrete, Metal, Wood
+const ORS_COBBLES = new Set([5, 14, 18]); // Cobblestone, Paving Stones, Grass Paver
+const ORS_UNPAVED = new Set([2, 8, 9, 10, 11, 12, 13, 15, 16, 17]);
+
+export interface OrsSurfaceExtra {
+  /** Rows of [fromCoordIndex, toCoordIndex, surfaceCode]. */
+  values: [number, number, number][];
+}
+
+/**
+ * Surface totals for an ORS route. `cumulative` is the running distance per
+ * coordinate, so a value row [from, to, code] covers
+ * cumulative[to] - cumulative[from] meters.
+ */
+export function surfaceFromOrsExtras(
+  extra: OrsSurfaceExtra | undefined,
+  cumulative: number[],
+): SurfaceTotals | null {
+  if (!extra?.values?.length) return null;
+  const totals: SurfaceTotals = { paved: 0, cobbles: 0, unpaved: 0, unknown: 0, totalMeters: 0 };
+  for (const [from, to, code] of extra.values) {
+    const meters = (cumulative[to] ?? 0) - (cumulative[from] ?? 0);
+    if (meters <= 0) continue;
+    totals.totalMeters += meters;
+    if (ORS_PAVED.has(code)) totals.paved += meters;
+    else if (ORS_COBBLES.has(code)) totals.cobbles += meters;
+    else if (ORS_UNPAVED.has(code)) totals.unpaved += meters;
+    else totals.unknown += meters;
+  }
+  return totals.totalMeters > 0 ? totals : null;
+}
+
+/**
+ * Unpaved share of the surface we know about (0..1), or null when too much
+ * of the route has unknown surface for the number to mean anything.
+ */
+export function unpavedFraction(totals: SurfaceTotals | null): number | null {
+  if (!totals) return null;
+  const known = totals.totalMeters - totals.unknown;
+  if (known < totals.totalMeters * 0.4) return null;
+  return (totals.unpaved + totals.cobbles * 0.3) / known;
+}
+
 export function surfaceBreakdown(messages: string[][]): SurfaceTotals | null {
   if (messages.length < 2) return null;
   const header = messages[0];
