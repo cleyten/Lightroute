@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
 import { fetchRoute, type LngLat, type RouteResult } from './routing';
 import { downloadGpx } from './gpx';
-import { haversineMeters } from './geo';
+import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
 import { renderElevationChart, clearElevationChart } from './chart';
 import { surfaceBreakdown, renderSurfaceBar } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
@@ -39,6 +39,9 @@ const state = {
   climbs: [] as Climb[],
   selectedClimb: -1,
   cafes: [] as Cafe[],
+  // Route returns to waypoint 1 (a closed loop): set by generating a round
+  // trip or by clicking near point 1.
+  closed: false,
 };
 
 const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
@@ -46,6 +49,7 @@ const statAscend = document.querySelector<HTMLElement>('#stat-ascend')!;
 const statusEl = document.querySelector<HTMLElement>('#status')!;
 const btnUndo = document.querySelector<HTMLButtonElement>('#btn-undo')!;
 const btnClear = document.querySelector<HTMLButtonElement>('#btn-clear')!;
+const btnReverse = document.querySelector<HTMLButtonElement>('#btn-reverse')!;
 const btnExport = document.querySelector<HTMLButtonElement>('#btn-export')!;
 const btnSave = document.querySelector<HTMLButtonElement>('#btn-save')!;
 const routeNameInput = document.querySelector<HTMLInputElement>('#route-name')!;
@@ -168,6 +172,11 @@ map.on('click', (event) => {
   if (map.getLayer('cafe-dots')) {
     if (map.queryRenderedFeatures(event.point, { layers: ['cafe-dots'] }).length > 0) return;
   }
+  // Clicking near point 1 closes an open route into a loop.
+  if (!state.closed && state.waypoints.length >= 3 && nearFirstWaypoint(event.point)) {
+    void closeLoop();
+    return;
+  }
   // A click on the route line inserts a via-point instead of appending.
   if (state.waypoints.length >= 2 && map.getLayer('route-line')) {
     const pad = 6;
@@ -185,17 +194,72 @@ map.on('click', (event) => {
   void recalculateRoute();
 });
 
+/** True when a screen point is within grabbing distance of waypoint 1. */
+function nearFirstWaypoint(point: maplibregl.Point): boolean {
+  if (state.waypoints.length === 0) return false;
+  const first = map.project(state.waypoints[0]);
+  return Math.hypot(point.x - first.x, point.y - first.y) <= 16;
+}
+
+/** Closes the current open route so it returns to point 1. */
+async function closeLoop(): Promise<void> {
+  state.closed = true;
+  await recalculateRoute();
+  if (state.route) {
+    setStatus('Loop closed. Drag points to adjust, or Reverse direction for the way back.');
+  }
+}
+
 btnUndo.addEventListener('click', () => {
-  state.waypoints.pop();
+  // Undo reopens a closed loop first, then removes points one by one.
+  if (state.closed) {
+    state.closed = false;
+  } else {
+    state.waypoints.pop();
+  }
   rebuildMarkers();
   void recalculateRoute();
 });
 
 btnClear.addEventListener('click', () => {
   state.waypoints = [];
+  state.closed = false;
   rebuildMarkers();
   void recalculateRoute();
 });
+
+btnReverse.addEventListener('click', () => {
+  if (!state.route) return;
+  const reversed = [...state.route.coordinates].reverse();
+  state.route = {
+    ...state.route,
+    coordinates: reversed,
+    ascendMeters: elevationGain(reversed),
+    geojson: lineFeatureCollection(reversed),
+  };
+  // Keep waypoints in step with the new direction so later edits reroute
+  // correctly. For a closed loop, point 1 stays the start; only the order
+  // of the points in between flips.
+  if (state.closed && state.waypoints.length > 2) {
+    state.waypoints = [state.waypoints[0], ...state.waypoints.slice(1).reverse()];
+  } else {
+    state.waypoints.reverse();
+  }
+  rebuildMarkers();
+  setRouteData(state.route.geojson);
+  renderRouteDetails();
+  setStatus('Direction reversed. Export GPX now follows the route the other way round.');
+});
+
+/** Wraps a coordinate list in the FeatureCollection the map source expects. */
+function lineFeatureCollection(coordinates: [number, number, number][]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: [
+      { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } },
+    ],
+  };
+}
 
 btnExport.addEventListener('click', () => {
   if (!state.route) return;
@@ -215,6 +279,7 @@ btnSave.addEventListener('click', async () => {
     traffic: settings.traffic,
     distanceMeters: state.route.distanceMeters,
     createdAt: new Date().toISOString(),
+    closed: state.closed,
   });
   routeNameInput.value = '';
   await refreshSavedList();
@@ -235,6 +300,7 @@ btnRoundtrip.addEventListener('click', async () => {
 
   // A round trip replaces any multi-point route; only the start point remains.
   state.waypoints = [state.waypoints[0]];
+  state.closed = false;
   rebuildMarkers();
 
   const requestId = ++state.requestId;
@@ -321,6 +387,16 @@ function selectLoop(index: number): void {
   if (!option) return;
   state.selectedLoop = index;
   state.route = option.route;
+
+  // Turn the generated loop into an editable route: drop a handful of
+  // draggable waypoints along it and mark it closed. The ORS geometry stays
+  // on screen until the user actually drags a point, which reroutes through
+  // these waypoints via BRouter.
+  const coords = option.route.coordinates;
+  state.waypoints = extractLoopWaypoints(coords, waypointCountFor(option.route.distanceMeters));
+  state.closed = true;
+  rebuildMarkers();
+
   setRouteData(option.route.geojson);
   renderRouteDetails();
   updateControls();
@@ -328,12 +404,31 @@ function selectLoop(index: number): void {
     el.classList.toggle('active', i === index),
   );
 
-  const coords = option.route.coordinates;
   const bounds = coords.reduce(
     (acc, c) => acc.extend([c[0], c[1]]),
     new maplibregl.LngLatBounds([coords[0][0], coords[0][1]], [coords[0][0], coords[0][1]]),
   );
   map.fitBounds(bounds, { padding: 60 });
+}
+
+/** Waypoint count for an editable loop: roughly one per 8 km, 4 to 8. */
+function waypointCountFor(distanceMeters: number): number {
+  return Math.min(8, Math.max(4, Math.round(distanceMeters / 8000)));
+}
+
+/** Samples evenly spaced waypoints along a track; the first is the start. */
+function extractLoopWaypoints(coords: [number, number, number][], count: number): LngLat[] {
+  const cum = cumulativeDistances(coords);
+  const total = cum[cum.length - 1];
+  const waypoints: LngLat[] = [];
+  let seg = 0;
+  for (let k = 0; k < count; k++) {
+    const target = (total * k) / count;
+    while (seg < cum.length - 1 && cum[seg] < target) seg++;
+    const c = coords[Math.min(seg, coords.length - 1)];
+    waypoints.push([c[0], c[1]]);
+  }
+  return waypoints;
 }
 
 /** Honest message when no loop passed the quality gates, with an escape hatch. */
@@ -684,6 +779,7 @@ async function recalculateRoute(): Promise<void> {
   }
 
   if (state.waypoints.length < 2) {
+    state.closed = false;
     state.route = null;
     setRouteData({ type: 'FeatureCollection', features: [] });
     renderRouteDetails();
@@ -692,9 +788,14 @@ async function recalculateRoute(): Promise<void> {
     return;
   }
 
+  // A closed loop routes back to point 1 by repeating it as the final target.
+  const routingWaypoints = state.closed
+    ? [...state.waypoints, state.waypoints[0]]
+    : state.waypoints;
+
   setStatus('Calculating route…');
   try {
-    const route = await fetchRoute(state.waypoints, currentProfile());
+    const route = await fetchRoute(routingWaypoints, currentProfile());
     if (requestId !== state.requestId) return; // a newer request superseded this one
     state.route = route;
     setRouteData(route.geojson);
@@ -855,6 +956,7 @@ async function refreshSavedList(): Promise<void> {
 
 function loadSaved(route: SavedRoute): void {
   state.waypoints = route.waypoints.map((wp) => [...wp] as LngLat);
+  state.closed = route.closed ?? false;
   settings.bike = (['race', 'gravel', 'mtb'].includes(route.bike) ? route.bike : 'race') as BikeType;
   settings.traffic = [0, 1, 2].includes(route.traffic) ? route.traffic : 0;
   persistSettings();
@@ -875,12 +977,18 @@ function setStatus(message: string, isError = false): void {
 }
 
 function updateControls(): void {
-  btnUndo.disabled = state.waypoints.length === 0;
+  btnUndo.disabled = state.waypoints.length === 0 && !state.closed;
   btnClear.disabled = state.waypoints.length === 0;
+  btnReverse.disabled = !state.route;
   btnExport.disabled = !state.route;
-  // Saving stores waypoints for re-routing, which a generated loop doesn't have.
   btnSave.disabled = !state.route || state.waypoints.length < 2;
 }
 
 syncProfileUi();
 void refreshSavedList();
+
+// Dev-only handle for verification in the browser console; stripped from
+// the production build by the `import.meta.env.DEV` guard.
+if (import.meta.env.DEV) {
+  (window as unknown as { __lr: unknown }).__lr = { map, state };
+}

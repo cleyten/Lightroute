@@ -11,6 +11,8 @@ export interface SavedRoute {
   traffic: number;
   distanceMeters: number;
   createdAt: string;
+  /** Route returns to waypoint 1 (a closed loop). */
+  closed?: boolean;
 }
 
 const DB_NAME = 'lightroute';

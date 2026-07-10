@@ -24,3 +24,24 @@ export function cumulativeDistances(coords: Coord[]): number[] {
   }
   return out;
 }
+
+/**
+ * Total positive elevation gain over a track, ignoring sub-2m jitter.
+ * Recomputed after reversing a route, since a descent one way is a climb
+ * the other way, so the gain is direction-dependent.
+ */
+export function elevationGain(coords: [number, number, number][]): number {
+  let gain = 0;
+  let reference = coords[0]?.[2] ?? 0;
+  for (const [, , elevation] of coords) {
+    const value = elevation ?? reference;
+    const delta = value - reference;
+    if (delta >= 2) {
+      gain += delta;
+      reference = value;
+    } else if (delta <= -2) {
+      reference = value;
+    }
+  }
+  return gain;
+}

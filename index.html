@@ -15,7 +15,7 @@
           <h1>Lightroute</h1>
           <span class="brand-sub">Route planner</span>
         </header>
-        <p class="hint">Click the map to add route points. Drag a point to reroute, click the line to insert a via point.</p>
+        <p class="hint">Click the map to add route points. Drag a point to reroute, click the line to insert a via point, click near point 1 to close the loop.</p>
         <div id="search-box">
           <span class="save-row">
             <input id="search-input" type="text" placeholder="Search address or place" autocomplete="off" aria-label="Search address or place" />
@@ -65,6 +65,7 @@
         <div id="controls">
           <button id="btn-undo" disabled>Undo last point</button>
           <button id="btn-clear" disabled>Clear all</button>
+          <button id="btn-reverse" disabled>Reverse direction</button>
         </div>
         <div class="field" id="roundtrip-field">
           Round trip from point 1
