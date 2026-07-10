@@ -80,11 +80,59 @@ const cafesList = document.querySelector<HTMLUListElement>('#cafes-list')!;
 
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.openfreemap.org/styles/liberty',
+  style: 'https://tiles.openfreemap.org/styles/positron',
   center: [5.3, 51.9], // Netherlands
   zoom: 7,
 });
 map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+// Basemap switcher. "clean" is the vector positron base; terrain and cycling
+// are raster layers drawn on top of it but below the route overlays.
+const RASTER_BASEMAPS: Record<
+  string,
+  { tiles: string[]; attribution: string; maxzoom: number }
+> = {
+  terrain: {
+    tiles: [
+      'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+      'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
+      'https://c.tile.opentopomap.org/{z}/{x}/{y}.png',
+    ],
+    attribution:
+      'Map data: © OpenStreetMap contributors, SRTM | © OpenTopoMap (CC-BY-SA)',
+    maxzoom: 17,
+  },
+  cycling: {
+    tiles: [
+      'https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+      'https://b.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+      'https://c.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+    ],
+    attribution: 'CyclOSM | Map data: © OpenStreetMap contributors',
+    maxzoom: 20,
+  },
+};
+let currentBasemap = 'clean';
+
+function setBasemap(style: string): void {
+  if (style === currentBasemap) return;
+  if (map.getLayer('basemap-raster')) map.removeLayer('basemap-raster');
+  if (map.getSource('basemap-raster')) map.removeSource('basemap-raster');
+  const cfg = RASTER_BASEMAPS[style];
+  if (cfg) {
+    map.addSource('basemap-raster', {
+      type: 'raster',
+      tiles: cfg.tiles,
+      tileSize: 256,
+      maxzoom: cfg.maxzoom,
+      attribution: cfg.attribution,
+    });
+    // Keep the raster below the route overlays so the route stays on top.
+    const beforeId = map.getLayer('route-casing') ? 'route-casing' : undefined;
+    map.addLayer({ id: 'basemap-raster', type: 'raster', source: 'basemap-raster' }, beforeId);
+  }
+  currentBasemap = style;
+}
 
 // Dot shown on the map while hovering the elevation chart.
 const hoverDotEl = document.createElement('div');
@@ -98,6 +146,18 @@ map.on('load', () => {
     type: 'geojson',
     data: { type: 'FeatureCollection', features: [] },
   });
+  // White casing under the route so it reads on any basemap.
+  map.addLayer({
+    id: 'route-casing',
+    type: 'line',
+    source: 'route',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': '#ffffff',
+      'line-width': 7,
+      'line-opacity': 0.9,
+    },
+  });
   map.addLayer({
     id: 'route-line',
     type: 'line',
@@ -106,7 +166,7 @@ map.on('load', () => {
     paint: {
       'line-color': '#2424e8',
       'line-width': 4,
-      'line-opacity': 0.85,
+      'line-opacity': 0.95,
     },
   });
   // Café markers along the current route.
@@ -165,6 +225,21 @@ map.on('load', () => {
   map.on('mouseleave', 'route-line', () => {
     map.getCanvas().style.cursor = '';
   });
+
+  // Wire the basemap switcher now that the overlay layers exist.
+  const mapstyleEl = document.querySelector<HTMLDivElement>('#mapstyle');
+  if (mapstyleEl) {
+    mapstyleEl.hidden = false;
+    mapstyleEl.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        setBasemap(btn.dataset.style ?? 'clean');
+        mapstyleEl
+          .querySelectorAll('button')
+          .forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  }
 });
 
 map.on('click', (event) => {

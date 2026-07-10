@@ -79,18 +79,84 @@ body,
 }
 
 #app {
-  display: flex;
+  position: relative;
+  overflow: hidden;
 }
 
+#map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Desktop: the panel floats over a full-bleed map. */
 #sidebar {
-  width: 300px;
-  flex-shrink: 0;
-  padding: 1.25rem;
-  background: var(--color-bg);
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  bottom: 1rem;
+  width: 330px;
+  max-height: calc(100% - 2rem);
+  padding: 0;
+  background: var(--color-panel);
   color: var(--color-text);
-  border-right: 1px solid var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   overflow-y: auto;
-  z-index: 1;
+  z-index: 2;
+}
+
+/* Grouped sections inside the panel. */
+.group {
+  padding: 0.85rem 1.15rem;
+  border-top: 1px solid var(--color-line-soft);
+}
+
+.group-label {
+  display: block;
+  margin: 0 0 0.55rem;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+/* Map style switcher, floating bottom-left of the map beside the panel. */
+.mapstyle {
+  position: absolute;
+  left: calc(330px + 2rem);
+  bottom: 1rem;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.mapstyle button {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.32rem 0.62rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.mapstyle button:hover:not(.active) {
+  background: var(--color-hover);
+}
+
+.mapstyle button.active {
+  background: var(--color-accent);
+  color: #fff;
 }
 
 /* Interactive elements share one transition and one focus ring. */
@@ -114,7 +180,8 @@ select {
 }
 
 #brand {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.15rem;
+  padding: 1.05rem 1.15rem 0;
 }
 
 #brand h1 {
@@ -144,6 +211,8 @@ select {
   color: var(--color-muted);
   font-size: 0.85rem;
   line-height: 1.4;
+  padding: 0 1.15rem;
+  margin: 0 0 0.35rem;
 }
 
 .segmented {
@@ -326,7 +395,7 @@ select {
 }
 
 #save-section {
-  margin-top: 0.75rem;
+  margin-top: 0;
 }
 
 .save-row {
@@ -805,20 +874,36 @@ button.generate:disabled {
   padding: 0.25rem 0;
 }
 
-/* Narrow screens (phone): sidebar becomes a panel below the map. */
+/* Narrow screens (phone): revert to a stacked panel below the map.
+   Phase 3 replaces this with a proper bottom sheet. */
 @media (max-width: 700px) {
   #app {
+    display: flex;
     flex-direction: column-reverse;
   }
 
-  #sidebar {
-    width: 100%;
-    border-right: none;
-    border-top: 1px solid var(--color-border);
-    max-height: 45%;
+  #map {
+    position: static;
+    flex: 1;
+    min-height: 0;
   }
 
-  #map {
-    min-height: 0;
+  #sidebar {
+    position: static;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    width: 100%;
+    max-height: 45%;
+    border: none;
+    border-top: 1px solid var(--color-border);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .mapstyle {
+    left: 0.75rem;
+    bottom: auto;
+    top: 0.75rem;
   }
 }

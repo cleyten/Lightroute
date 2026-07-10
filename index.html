@@ -16,74 +16,89 @@
           <span class="brand-sub">Route planner</span>
         </header>
         <p class="hint">Click the map to add points. Drag a point to reroute, click the line to insert one, click a point to remove it, click point 1 to close the loop.</p>
-        <div id="search-box">
-          <span class="save-row">
-            <input id="search-input" type="text" placeholder="Search address or place" autocomplete="off" aria-label="Search address or place" />
-            <button id="btn-locate" title="Use my GPS location">📍</button>
-          </span>
-          <ul id="search-results" hidden></ul>
-        </div>
-        <div class="segmented" id="bike-type">
-          <button data-bike="race">Race</button>
-          <button data-bike="gravel">Gravel</button>
-          <button data-bike="mtb">MTB</button>
-        </div>
-        <label class="field" id="traffic-label">
-          Avoid traffic
-          <select id="traffic-select">
-            <option value="0">No (fastest route)</option>
-            <option value="1">Quiet roads</option>
-            <option value="2">Very quiet roads</option>
-          </select>
-        </label>
-        <div id="stats">
-          <div class="stat">
-            <span class="stat-label">Distance</span>
-            <span class="stat-value" id="stat-distance">–</span>
+
+        <section class="group">
+          <div id="search-box">
+            <span class="save-row">
+              <input id="search-input" type="text" placeholder="Search address or place" autocomplete="off" aria-label="Search address or place" />
+              <button id="btn-locate" title="Use my GPS location">📍</button>
+            </span>
+            <ul id="search-results" hidden></ul>
           </div>
-          <div class="stat">
-            <span class="stat-label">Elevation gain</span>
-            <span class="stat-value" id="stat-ascend">–</span>
+        </section>
+
+        <section class="group">
+          <span class="group-label">Bike &amp; traffic</span>
+          <div class="segmented" id="bike-type">
+            <button data-bike="race">Race</button>
+            <button data-bike="gravel">Gravel</button>
+            <button data-bike="mtb">MTB</button>
           </div>
-        </div>
-        <div id="chart-wrap" hidden>
-          <canvas id="elevation-chart"></canvas>
-        </div>
-        <div id="surface" hidden></div>
-        <div id="climbs" hidden>
-          <span class="section-label">Climbs</span>
-          <ul id="climbs-list"></ul>
-        </div>
-        <div id="cafes" hidden>
-          <span class="section-label">Coffee stop</span>
-          <span class="save-row">
-            <input id="cafe-km" type="number" min="0" step="5" placeholder="around km (optional)" aria-label="Find cafés around this km mark" />
-            <button id="btn-cafes">Find cafés</button>
-          </span>
-          <ul id="cafes-list"></ul>
-        </div>
-        <div id="controls">
-          <button id="btn-undo" disabled>Undo last point</button>
-          <button id="btn-clear" disabled>Clear all</button>
-          <button id="btn-reverse" disabled>Reverse direction</button>
-        </div>
-        <div class="field" id="roundtrip-field">
-          Round trip from point 1
-          <span class="range-label"><span id="range-value">30 – 50</span> km</span>
-          <div class="dual-range">
-            <div class="range-track" id="range-track"></div>
-            <input id="roundtrip-min" type="range" min="5" max="100" step="5" value="30" aria-label="Minimum round trip distance in km" />
-            <input id="roundtrip-max" type="range" min="5" max="100" step="5" value="50" aria-label="Maximum round trip distance in km" />
-          </div>
-          <button id="btn-roundtrip" class="primary generate">Generate round trip</button>
-          <label class="checkbox">
-            <input type="checkbox" id="roundtrip-hilly" />
-            Prefer hills
+          <label class="field" id="traffic-label">
+            Avoid traffic
+            <select id="traffic-select">
+              <option value="0">No (fastest route)</option>
+              <option value="1">Quiet roads</option>
+              <option value="2">Very quiet roads</option>
+            </select>
           </label>
-          <div id="wind-chip" hidden></div>
-          <div id="loop-options" hidden></div>
-        </div>
-        <div id="save-section">
+        </section>
+
+        <section class="group">
+          <div class="field" id="roundtrip-field">
+            Round trip from point 1
+            <span class="range-label"><span id="range-value">30 – 50</span> km</span>
+            <div class="dual-range">
+              <div class="range-track" id="range-track"></div>
+              <input id="roundtrip-min" type="range" min="5" max="100" step="5" value="30" aria-label="Minimum round trip distance in km" />
+              <input id="roundtrip-max" type="range" min="5" max="100" step="5" value="50" aria-label="Maximum round trip distance in km" />
+            </div>
+            <button id="btn-roundtrip" class="primary generate">Generate round trip</button>
+            <label class="checkbox">
+              <input type="checkbox" id="roundtrip-hilly" />
+              Prefer hills
+            </label>
+            <div id="wind-chip" hidden></div>
+            <div id="loop-options" hidden></div>
+          </div>
+        </section>
+
+        <section class="group" id="route-group">
+          <span class="group-label">Route</span>
+          <div id="stats">
+            <div class="stat">
+              <span class="stat-label">Distance</span>
+              <span class="stat-value" id="stat-distance">–</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Elevation gain</span>
+              <span class="stat-value" id="stat-ascend">–</span>
+            </div>
+          </div>
+          <div id="chart-wrap" hidden>
+            <canvas id="elevation-chart"></canvas>
+          </div>
+          <div id="surface" hidden></div>
+          <div id="climbs" hidden>
+            <span class="section-label">Climbs</span>
+            <ul id="climbs-list"></ul>
+          </div>
+          <div id="cafes" hidden>
+            <span class="section-label">Coffee stop</span>
+            <span class="save-row">
+              <input id="cafe-km" type="number" min="0" step="5" placeholder="around km (optional)" aria-label="Find cafés around this km mark" />
+              <button id="btn-cafes">Find cafés</button>
+            </span>
+            <ul id="cafes-list"></ul>
+          </div>
+          <div id="controls">
+            <button id="btn-undo" disabled>Undo last point</button>
+            <button id="btn-clear" disabled>Clear all</button>
+            <button id="btn-reverse" disabled>Reverse direction</button>
+          </div>
+        </section>
+
+        <section class="group" id="save-section">
           <label class="field">
             Route name
             <input id="route-name" type="text" placeholder="Name" />
@@ -93,10 +108,16 @@
             <button id="btn-export" class="primary" disabled>Export GPX</button>
           </div>
           <ul id="saved-list"></ul>
-        </div>
+        </section>
+
         <p id="status" role="status"></p>
       </aside>
       <div id="map"></div>
+      <div id="mapstyle" class="mapstyle" role="group" aria-label="Map style" hidden>
+        <button data-style="clean" class="active">Clean</button>
+        <button data-style="terrain">Terrain</button>
+        <button data-style="cycling">Cycling</button>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
