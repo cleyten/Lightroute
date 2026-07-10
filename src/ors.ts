@@ -22,7 +22,7 @@ import {
   unpavedFraction,
   type OrsSurfaceExtra,
 } from './surface';
-import { cleanLoopGeometry } from './cleanup';
+import { cleanLoopGeometry, healWiggles, findWiggles } from './cleanup';
 
 const ORS_KEY: string = import.meta.env.VITE_ORS_KEY ?? '';
 const ORS_BASE = 'https://api.openrouteservice.org/v2/directions';
@@ -31,6 +31,13 @@ const ORS_PROFILES: Record<string, string> = {
   race: 'cycling-road',
   gravel: 'cycling-regular',
   mtb: 'cycling-mountain',
+};
+
+/** BRouter profiles used to re-route (heal) detour wiggles per bike type. */
+const HEAL_PROFILES: Record<string, string> = {
+  race: 'fastbike',
+  gravel: 'gravel',
+  mtb: 'mtb',
 };
 
 /** Number of candidate loops generated per batch. */
@@ -169,6 +176,10 @@ function evaluateCandidate(
   if (unpaved !== null && MIN_UNPAVED[bike] !== undefined) score += unpaved * 0.8;
   if (unpaved !== null && bike === 'race') score -= unpaved * 1.5;
 
+  // Wiggles that survived healing had no shorter through-road, so they are
+  // rideable; still, prefer candidates that flow without such knots.
+  score -= findWiggles(coords).length * 0.35;
+
   return {
     route,
     overlap,
@@ -302,12 +313,20 @@ async function fetchOneRoundTrip(
   const extras = feature.properties?.extras as { surface?: OrsSurfaceExtra } | undefined;
 
   // Splice dead-end spurs and small self-intersection curls out of the raw
-  // geometry; distance, ascent and surface are recomputed from the result.
+  // geometry, then heal residential-block detours by re-routing them through
+  // BRouter; distance, ascent and surface are recomputed from the result.
   const cleaned = cleanLoopGeometry(
     rawCoordinates,
     extrasToSegmentCodes(extras?.surface, rawCoordinates.length),
   );
-  const coordinates = cleaned.coords;
+  const healed = await healWiggles(
+    cleaned.coords,
+    cleaned.segCodes,
+    HEAL_PROFILES[bike] ?? 'fastbike',
+  );
+  // Healing can join roads in ways that create a fresh micro-artifact.
+  const final = cleanLoopGeometry(healed.coords, healed.segCodes);
+  const coordinates = final.coords;
   const cumulative = cumulativeDistances(coordinates);
 
   return {
@@ -325,7 +344,7 @@ async function fetchOneRoundTrip(
     distanceMeters: cumulative[cumulative.length - 1],
     ascendMeters: estimateAscent(coordinates),
     messages: [], // ORS provides no BRouter-style way tags; surface comes from extras.
-    surface: surfaceFromSegmentCodes(cleaned.segCodes, cumulative),
+    surface: surfaceFromSegmentCodes(final.segCodes, cumulative),
   };
 }
 

@@ -7,6 +7,7 @@
 // instead of rejecting the candidate they are spliced out of the geometry.
 
 import { projectToMeters } from './loops';
+import { fetchRoute, type RouteResult } from './routing';
 
 /** Max length of an out-and-back excursion that gets removed (meters). */
 const SPUR_MAX_M = 2200;
@@ -234,6 +235,138 @@ function removeOneCurl(
     }
   }
   return null;
+}
+
+// --- Detour wiggles ---------------------------------------------------------
+// The third artifact: the route dives into a residential block and zigzags
+// through it purely to pad distance, leaving from and returning to nearly
+// the same spot without ever backtracking or self-crossing, so neither the
+// spur nor the curl pass catches it. Detection: a sub-path much longer than
+// the distance between its endpoints. Repair: re-route the two endpoints
+// through BRouter with the bike's own profile; the replacement is only
+// accepted when it is substantially shorter, which by definition means a
+// real through-road exists. When no shortcut exists (an honestly winding
+// road), the geometry is left alone.
+
+/** Max length of a wiggle sub-path (meters). */
+const WIGGLE_MAX_M = 2500;
+const WIGGLE_MIN_M = 350;
+/** Endpoints must be this close for the sub-path to count as a detour. */
+const WIGGLE_ENDPOINT_M = 400;
+/** Path length over endpoint distance must exceed this. */
+const WIGGLE_RATIO = 2.8;
+/** A heal must save at least this many meters (and be relatively shorter). */
+const HEAL_MIN_SAVING_M = 300;
+const HEAL_MAX_SHARE = 0.9;
+/** Max wiggles healed per candidate. */
+const MAX_HEALS = 3;
+/** Point offsets to widen the excision window per attempt: the wiggle's own
+ *  endpoints often sit inside the neighborhood; a wider window puts them on
+ *  the through-road before and after it. */
+const HEAL_OFFSETS = [0, 12];
+
+export interface Wiggle {
+  i: number;
+  j: number;
+  pathLen: number;
+  directLen: number;
+}
+
+/** Finds non-overlapping detour wiggles, in route order. */
+export function findWiggles(coords: Coord[]): Wiggle[] {
+  const pts = projectToMeters(coords) as [number, number][];
+  const cum = planarCumulative(pts);
+  const out: Wiggle[] = [];
+  let i = 1;
+  while (i < pts.length - 5) {
+    let best: Wiggle | null = null;
+    for (let j = i + 5; j < pts.length - 1 && cum[j] - cum[i] <= WIGGLE_MAX_M; j++) {
+      const pathLen = cum[j] - cum[i];
+      if (pathLen < WIGGLE_MIN_M) continue;
+      const directLen = Math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]);
+      if (directLen < WIGGLE_ENDPOINT_M && pathLen / Math.max(directLen, 50) > WIGGLE_RATIO) {
+        best = { i, j, pathLen, directLen };
+      }
+    }
+    if (best) {
+      out.push(best);
+      i = best.j;
+    } else {
+      i++;
+    }
+  }
+  return out;
+}
+
+export interface HealResult {
+  coords: Coord[];
+  segCodes: (number | null)[] | null;
+  healedMeters: number;
+}
+
+/**
+ * Replaces detour wiggles with a direct re-route between their endpoints.
+ * Processes from the end of the route backwards so earlier indices stay
+ * valid after each splice. Surface codes for spliced stretches are unknown.
+ */
+export async function healWiggles(
+  coords: Coord[],
+  segCodes: (number | null)[] | null,
+  brouterProfile: string,
+): Promise<HealResult> {
+  const wiggles = findWiggles(coords)
+    .sort((a, b) => b.pathLen - a.pathLen)
+    .slice(0, MAX_HEALS)
+    .sort((a, b) => b.i - a.i);
+
+  let outCoords = coords;
+  let outCodes = segCodes;
+  let healed = 0;
+
+  const pts = projectToMeters(coords) as [number, number][];
+  const cum = planarCumulative(pts);
+  // Wiggles are processed back-to-front; indices at or below `limit` still
+  // refer to the same points in the spliced array as in the original.
+  let limit = coords.length - 2;
+
+  for (const w of wiggles) {
+    if (w.j >= limit) continue;
+    for (const offset of HEAL_OFFSETS) {
+      const i = Math.max(1, w.i - offset);
+      const j = Math.min(limit, w.j + offset);
+      const excisedM = cum[j] - cum[i];
+
+      let shortcut: RouteResult;
+      try {
+        shortcut = await fetchRoute(
+          [
+            [outCoords[i][0], outCoords[i][1]],
+            [outCoords[j][0], outCoords[j][1]],
+          ],
+          brouterProfile,
+        );
+      } catch {
+        break; // BRouter unavailable; keep the original geometry.
+      }
+      if (shortcut.coordinates.length < 2) continue;
+      const saving = excisedM - shortcut.distanceMeters;
+      if (saving < HEAL_MIN_SAVING_M || shortcut.distanceMeters > excisedM * HEAL_MAX_SHARE) {
+        continue; // no meaningfully shorter through-road via this window
+      }
+
+      const br = shortcut.coordinates;
+      outCoords = outCoords.slice(0, i).concat(br, outCoords.slice(j + 1));
+      if (outCodes) {
+        outCodes = outCodes
+          .slice(0, i - 1)
+          .concat(new Array(br.length + 1).fill(null), outCodes.slice(j + 1));
+      }
+      healed += saving;
+      limit = i - 1;
+      break;
+    }
+  }
+  return { coords: outCoords, segCodes: outCodes, healedMeters: healed };
 }
 
 /** Area (m²) enclosed by the sub-path i..j, closed back to i (shoelace). */
