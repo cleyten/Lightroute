@@ -65,16 +65,16 @@
         <div id="controls">
           <button id="btn-undo" disabled>Undo last point</button>
           <button id="btn-clear" disabled>Clear all</button>
-          <button id="btn-export" class="primary" disabled>Export GPX</button>
         </div>
         <div class="field" id="roundtrip-field">
           Round trip from point 1
-          <span class="save-row range-row">
-            <input id="roundtrip-min" type="number" min="5" max="100" step="5" placeholder="min km" aria-label="Minimum round trip distance in km" />
-            <span class="range-sep">–</span>
-            <input id="roundtrip-max" type="number" min="5" max="100" step="5" placeholder="max km" aria-label="Maximum round trip distance in km" />
-            <button id="btn-roundtrip">Generate</button>
-          </span>
+          <span class="range-label"><span id="range-value">30 – 50</span> km</span>
+          <div class="dual-range">
+            <div class="range-track" id="range-track"></div>
+            <input id="roundtrip-min" type="range" min="5" max="100" step="5" value="30" aria-label="Minimum round trip distance in km" />
+            <input id="roundtrip-max" type="range" min="5" max="100" step="5" value="50" aria-label="Maximum round trip distance in km" />
+          </div>
+          <button id="btn-roundtrip" class="primary generate">Generate round trip</button>
           <label class="checkbox">
             <input type="checkbox" id="roundtrip-hilly" />
             Prefer hills
@@ -84,12 +84,13 @@
         </div>
         <div id="save-section">
           <label class="field">
-            Save route
-            <span class="save-row">
-              <input id="route-name" type="text" placeholder="Name" />
-              <button id="btn-save" disabled>Save</button>
-            </span>
+            Route name
+            <input id="route-name" type="text" placeholder="Name" />
           </label>
+          <div class="save-actions">
+            <button id="btn-save" disabled>Save</button>
+            <button id="btn-export" class="primary" disabled>Export GPX</button>
+          </div>
           <ul id="saved-list"></ul>
         </div>
         <p id="status" role="status"></p>

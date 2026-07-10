@@ -56,6 +56,8 @@ const trafficSelect = document.querySelector<HTMLSelectElement>('#traffic-select
 const chartWrap = document.querySelector<HTMLElement>('#chart-wrap')!;
 const roundtripMin = document.querySelector<HTMLInputElement>('#roundtrip-min')!;
 const roundtripMax = document.querySelector<HTMLInputElement>('#roundtrip-max')!;
+const rangeValue = document.querySelector<HTMLElement>('#range-value')!;
+const rangeTrack = document.querySelector<HTMLElement>('#range-track')!;
 const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')!;
 const roundtripHilly = document.querySelector<HTMLInputElement>('#roundtrip-hilly')!;
 const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
@@ -226,8 +228,8 @@ btnRoundtrip.addEventListener('click', async () => {
   }
   const minKm = Number(roundtripMin.value);
   const maxKm = Number(roundtripMax.value);
-  if (!minKm || !maxKm || minKm < 5 || maxKm > 100 || minKm >= maxKm) {
-    setStatus('Enter a distance range like 40 – 55 km (5 to 100 km, min below max).', true);
+  if (!minKm || !maxKm || minKm >= maxKm) {
+    setStatus('Drag the two handles to set a distance range first.', true);
     return;
   }
 
@@ -458,6 +460,37 @@ btnLocate.addEventListener('click', () => {
     { timeout: 10000, maximumAge: 60000 },
   );
 });
+
+// --- Round-trip distance range slider ----------------------------------------
+
+/** Keeps the two thumbs apart and paints the label and the selected track segment. */
+function syncRangeSlider(moved: 'min' | 'max'): void {
+  const step = Number(roundtripMin.step) || 5;
+  let min = Number(roundtripMin.value);
+  let max = Number(roundtripMax.value);
+  if (min > max - step) {
+    if (moved === 'min') {
+      min = max - step;
+      roundtripMin.value = String(min);
+    } else {
+      max = min + step;
+      roundtripMax.value = String(max);
+    }
+  }
+  rangeValue.textContent = `${min} – ${max}`;
+  const lo = Number(roundtripMin.min);
+  const hi = Number(roundtripMin.max);
+  const fromPct = ((min - lo) / (hi - lo)) * 100;
+  const toPct = ((max - lo) / (hi - lo)) * 100;
+  rangeTrack.style.background =
+    `linear-gradient(to right, var(--color-border) ${fromPct}%, ` +
+    `var(--color-accent) ${fromPct}%, var(--color-accent) ${toPct}%, ` +
+    `var(--color-border) ${toPct}%)`;
+}
+
+roundtripMin.addEventListener('input', () => syncRangeSlider('min'));
+roundtripMax.addEventListener('input', () => syncRangeSlider('max'));
+syncRangeSlider('min');
 
 // --- Cafés along the route ---------------------------------------------------
 

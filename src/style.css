@@ -531,17 +531,121 @@ body,
   color: var(--color-muted);
 }
 
-.range-row {
-  align-items: center;
+.range-label {
+  float: right;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
 }
 
-.range-row input {
-  min-width: 0;
+/* Two native sliders stacked on one track; only the thumbs receive clicks. */
+.dual-range {
+  position: relative;
+  height: 26px;
+  margin: 0.45rem 0 0.2rem;
 }
 
-.range-sep {
-  color: var(--color-muted);
-  flex-shrink: 0;
+.range-track {
+  position: absolute;
+  top: 11px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border);
+}
+
+.dual-range input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  pointer-events: none;
+}
+
+.dual-range input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+}
+
+.dual-range input[type='range']::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+}
+
+button.generate {
+  display: block;
+  width: 100%;
+  margin: 0.35rem 0 0.15rem;
+  padding: 0.7rem 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.generate:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.save-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.save-actions button {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.save-actions button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.save-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.save-actions button.primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
 }
 
 #cafes {
