@@ -11,6 +11,8 @@ import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
 import { generateRoundTrips, rejectionText, type LoopOption } from './ors';
 import { detectClimbs, type Climb } from './climbs';
 import { compassLabel, type WindInfo } from './wind';
+import { searchPlaces, type GeocodeResult } from './geocode';
+import { fetchCafes, type Cafe } from './cafes';
 
 type BikeType = 'race' | 'gravel' | 'mtb';
 
@@ -36,6 +38,7 @@ const state = {
   selectedLoop: -1,
   climbs: [] as Climb[],
   selectedClimb: -1,
+  cafes: [] as Cafe[],
 };
 
 const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
@@ -60,6 +63,15 @@ const loopOptionsEl = document.querySelector<HTMLElement>('#loop-options')!;
 const windChipEl = document.querySelector<HTMLElement>('#wind-chip')!;
 const climbsEl = document.querySelector<HTMLElement>('#climbs')!;
 const climbsList = document.querySelector<HTMLUListElement>('#climbs-list')!;
+const searchInput = document.querySelector<HTMLInputElement>('#search-input')!;
+const searchResults = document.querySelector<HTMLUListElement>('#search-results')!;
+const btnLocate = document.querySelector<HTMLButtonElement>('#btn-locate')!;
+const marginSlider = document.querySelector<HTMLInputElement>('#roundtrip-margin')!;
+const marginValue = document.querySelector<HTMLElement>('#margin-value')!;
+const cafesEl = document.querySelector<HTMLElement>('#cafes')!;
+const cafeKmInput = document.querySelector<HTMLInputElement>('#cafe-km')!;
+const btnCafes = document.querySelector<HTMLButtonElement>('#btn-cafes')!;
+const cafesList = document.querySelector<HTMLUListElement>('#cafes-list')!;
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -92,6 +104,40 @@ map.on('load', () => {
       'line-opacity': 0.85,
     },
   });
+  // Café markers along the current route.
+  map.addSource('cafes', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+  map.addLayer({
+    id: 'cafe-dots',
+    type: 'circle',
+    source: 'cafes',
+    paint: {
+      'circle-radius': 6,
+      'circle-color': '#8a5a2b',
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#fff',
+    },
+  });
+  map.on('click', 'cafe-dots', (event) => {
+    const feature = event.features?.[0];
+    if (!feature) return;
+    const props = feature.properties as { name: string; detail: string };
+    new maplibregl.Popup({ offset: 10 })
+      .setLngLat(event.lngLat)
+      .setHTML(
+        `<strong>${escapeHtml(props.name)}</strong><br>${escapeHtml(props.detail)}`,
+      )
+      .addTo(map);
+  });
+  map.on('mouseenter', 'cafe-dots', () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', 'cafe-dots', () => {
+    map.getCanvas().style.cursor = '';
+  });
+
   // Highlight layer for a selected climb, drawn on top of the route.
   map.addSource('climb-highlight', {
     type: 'geojson',
@@ -117,6 +163,10 @@ map.on('load', () => {
 });
 
 map.on('click', (event) => {
+  // Clicks on a café marker open its popup instead of adding a waypoint.
+  if (map.getLayer('cafe-dots')) {
+    if (map.queryRenderedFeatures(event.point, { layers: ['cafe-dots'] }).length > 0) return;
+  }
   // A click on the route line inserts a via-point instead of appending.
   if (state.waypoints.length >= 2 && map.getLayer('route-line')) {
     const pad = 6;
@@ -194,6 +244,7 @@ btnRoundtrip.addEventListener('click', async () => {
       km * 1000,
       settings.bike,
       roundtripHilly.checked,
+      Number(marginSlider.value) / 100,
     );
     if (requestId !== state.requestId) return;
 
@@ -321,6 +372,181 @@ function renderWindChip(wind: WindInfo | null): void {
   const label = document.createElement('span');
   label.textContent = ` Wind now: ${Math.round(wind.speedKmh)} km/h from ${compassLabel(wind.fromDeg)}`;
   windChipEl.append(arrow, label);
+}
+
+// --- Address search & GPS locate -------------------------------------------
+
+/** Adds a waypoint as if the user clicked the map there; flies there if it is the first. */
+function addWaypoint(lngLat: LngLat, label?: string): void {
+  const isFirst = state.waypoints.length === 0;
+  state.waypoints.push(lngLat);
+  rebuildMarkers();
+  void recalculateRoute();
+  if (isFirst) {
+    map.flyTo({ center: lngLat, zoom: Math.max(map.getZoom(), 12) });
+    setStatus(label ? `Start set at ${label}.` : 'Start point set.');
+  } else if (label) {
+    setStatus(`Added ${label} as point ${state.waypoints.length}.`);
+  }
+}
+
+let searchTimer: number | undefined;
+let searchAbort: AbortController | null = null;
+
+searchInput.addEventListener('input', () => {
+  window.clearTimeout(searchTimer);
+  const query = searchInput.value.trim();
+  if (query.length < 3) {
+    renderSearchResults([]);
+    return;
+  }
+  searchTimer = window.setTimeout(async () => {
+    searchAbort?.abort();
+    searchAbort = new AbortController();
+    try {
+      const center = map.getCenter();
+      const results = await searchPlaces(query, [center.lng, center.lat], searchAbort.signal);
+      renderSearchResults(results);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        renderSearchResults([]);
+        setStatus('Address search failed; try again.', true);
+      }
+    }
+  }, 350);
+});
+
+searchInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') renderSearchResults([]);
+});
+
+function renderSearchResults(results: GeocodeResult[]): void {
+  searchResults.innerHTML = '';
+  searchResults.hidden = results.length === 0;
+  for (const result of results) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.className = 'search-result';
+    const label = document.createElement('span');
+    label.className = 'search-label';
+    label.textContent = result.label;
+    const detail = document.createElement('span');
+    detail.className = 'search-detail';
+    detail.textContent = result.detail;
+    button.append(label, detail);
+    button.addEventListener('click', () => {
+      searchInput.value = '';
+      renderSearchResults([]);
+      addWaypoint([...result.lngLat] as LngLat, result.label);
+    });
+    item.append(button);
+    searchResults.append(item);
+  }
+}
+
+btnLocate.addEventListener('click', () => {
+  if (!('geolocation' in navigator)) {
+    setStatus('This browser does not support GPS location.', true);
+    return;
+  }
+  setStatus('Getting your location…');
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      addWaypoint([position.coords.longitude, position.coords.latitude], 'your location');
+    },
+    () => setStatus('Could not get your location. Check the location permission.', true),
+    { timeout: 10000, maximumAge: 60000 },
+  );
+});
+
+// --- Round-trip distance tolerance slider -----------------------------------
+
+marginSlider.addEventListener('input', () => {
+  marginValue.textContent = marginSlider.value;
+});
+
+// --- Cafés along the route ---------------------------------------------------
+
+btnCafes.addEventListener('click', async () => {
+  if (!state.route) return;
+  btnCafes.disabled = true;
+  setStatus('Searching cafés along the route…');
+  try {
+    state.cafes = await fetchCafes(state.route.coordinates);
+    renderCafes();
+    setStatus(state.cafes.length === 0 ? 'No cafés found along this route.' : '');
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : 'Café search failed.', true);
+  } finally {
+    btnCafes.disabled = false;
+  }
+});
+
+cafeKmInput.addEventListener('input', () => {
+  if (state.cafes.length > 0) renderCafes();
+});
+
+/** Renders the café list (optionally filtered around a km mark) and the map dots. */
+function renderCafes(): void {
+  const aroundKm = Number(cafeKmInput.value);
+  const filtered =
+    cafeKmInput.value !== '' && !Number.isNaN(aroundKm)
+      ? state.cafes.filter((cafe) => Math.abs(cafe.atKm - aroundKm) <= 5)
+      : state.cafes;
+
+  cafesList.innerHTML = '';
+  if (state.cafes.length > 0 && filtered.length === 0) {
+    const note = document.createElement('li');
+    note.className = 'cafe-empty';
+    note.textContent = `No cafés within 5 km of km ${aroundKm}.`;
+    cafesList.append(note);
+  }
+  for (const cafe of filtered.slice(0, 25)) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.className = 'cafe-item';
+    button.innerHTML =
+      `<span class="cafe-where">km ${cafe.atKm.toFixed(1)}</span>` +
+      `<span class="cafe-name">${escapeHtml(cafe.name)}</span>` +
+      `<span class="cafe-detour">${Math.round(cafe.offRouteM)} m</span>`;
+    if (cafe.openingHours) button.title = `Opening hours: ${cafe.openingHours}`;
+    button.addEventListener('click', () => {
+      map.flyTo({ center: cafe.lngLat, zoom: 15 });
+    });
+    item.append(button);
+    cafesList.append(item);
+  }
+  setCafeData(filtered);
+}
+
+function setCafeData(cafes: Cafe[]): void {
+  const source = map.getSource('cafes') as maplibregl.GeoJSONSource | undefined;
+  source?.setData({
+    type: 'FeatureCollection',
+    features: cafes.map((cafe) => ({
+      type: 'Feature',
+      properties: {
+        name: cafe.name,
+        detail:
+          `at km ${cafe.atKm.toFixed(1)}, ${Math.round(cafe.offRouteM)} m off route` +
+          (cafe.openingHours ? `<br>${cafe.openingHours}` : ''),
+      },
+      geometry: { type: 'Point', coordinates: cafe.lngLat },
+    })),
+  });
+}
+
+function clearCafes(): void {
+  state.cafes = [];
+  cafesList.innerHTML = '';
+  cafeKmInput.value = '';
+  setCafeData([]);
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 bikeButtons.forEach((button) =>
@@ -464,6 +690,10 @@ function setRouteData(data: FeatureCollection): void {
 
 /** Renders stats, elevation chart, surface bar and climbs for the current route (or clears them). */
 function renderRouteDetails(): void {
+  // Any route change invalidates café results found for the previous route.
+  clearCafes();
+  cafesEl.hidden = !state.route;
+
   if (state.route) {
     statDistance.textContent = `${(state.route.distanceMeters / 1000).toFixed(1)} km`;
     statAscend.textContent = `${Math.round(state.route.ascendMeters)} m`;

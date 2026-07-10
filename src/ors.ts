@@ -27,10 +27,8 @@ const ORS_PROFILES: Record<string, string> = {
   mtb: 'cycling-mountain',
 };
 
-/** Distance deviation from the target that carries no penalty. */
-const DISTANCE_MARGIN = 0.05;
-/** Hard limit: candidates further off target than this are rejected. */
-const MAX_DEVIATION = 0.12;
+/** Default hard limit on distance deviation; the UI slider overrides it. */
+export const DEFAULT_MAX_DEVIATION = 0.12;
 /** Number of candidate loops generated per batch. */
 const CANDIDATES = 6;
 /** Max options offered to the user. */
@@ -73,6 +71,7 @@ export async function generateRoundTrips(
   lengthMeters: number,
   bike: string,
   preferHills: boolean,
+  maxDeviation: number = DEFAULT_MAX_DEVIATION,
 ): Promise<RoundTripResult> {
   // The loop of length L fits inside a circle of diameter L/pi around the
   // start; fetch the cycle network for that area (plus margin) in parallel
@@ -85,7 +84,7 @@ export async function generateRoundTrips(
   ]);
 
   let evaluated = firstBatch.map((route) =>
-    evaluateCandidate(route, lengthMeters, bike, preferHills, grid, wind),
+    evaluateCandidate(route, lengthMeters, bike, preferHills, grid, wind, maxDeviation),
   );
 
   // ORS treats the length as a loose target and often overshoots. If too few
@@ -98,7 +97,7 @@ export async function generateRoundTrips(
       const secondBatch = await fetchCandidates(start, corrected, bike);
       evaluated = evaluated.concat(
         secondBatch.map((route) =>
-          evaluateCandidate(route, lengthMeters, bike, preferHills, grid, wind),
+          evaluateCandidate(route, lengthMeters, bike, preferHills, grid, wind, maxDeviation),
         ),
       );
     } catch {
@@ -126,6 +125,7 @@ function evaluateCandidate(
   preferHills: boolean,
   grid: Awaited<ReturnType<typeof fetchNetworkGrid>>,
   wind: WindInfo | null,
+  maxDeviation: number,
 ): LoopOption {
   const coords = route.coordinates;
   const overlap = overlapRatio(coords);
@@ -137,7 +137,7 @@ function evaluateCandidate(
 
   // Hard quality gates. The rejection text feeds the "nothing found" message.
   let rejection: string | null = null;
-  if (deviation > MAX_DEVIATION) {
+  if (deviation > maxDeviation) {
     rejection = 'distance';
   } else if (overlap > MAX_OVERLAP) {
     rejection = 'overlap';
@@ -147,7 +147,8 @@ function evaluateCandidate(
     rejection = 'surface';
   }
 
-  let score = roundness - Math.max(0, deviation - DISTANCE_MARGIN) * 8 - overlap * 6;
+  // Deviations within 40% of the tolerance carry no penalty at all.
+  let score = roundness - Math.max(0, deviation - maxDeviation * 0.4) * 8 - overlap * 6;
   if (network !== null) score += network * 1.2;
   score += windBonus(wind, bearing);
   if (preferHills) {

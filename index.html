@@ -16,6 +16,13 @@
           <span class="brand-sub">Route planner</span>
         </header>
         <p class="hint">Click the map to add route points. Drag a point to reroute, click the line to insert a via point.</p>
+        <div id="search-box">
+          <span class="save-row">
+            <input id="search-input" type="text" placeholder="Search address or place" autocomplete="off" aria-label="Search address or place" />
+            <button id="btn-locate" title="Use my GPS location">📍</button>
+          </span>
+          <ul id="search-results" hidden></ul>
+        </div>
         <div class="segmented" id="bike-type">
           <button data-bike="race">Race</button>
           <button data-bike="gravel">Gravel</button>
@@ -47,6 +54,14 @@
           <span class="section-label">Climbs</span>
           <ul id="climbs-list"></ul>
         </div>
+        <div id="cafes" hidden>
+          <span class="section-label">Coffee stop</span>
+          <span class="save-row">
+            <input id="cafe-km" type="number" min="0" step="5" placeholder="around km (optional)" aria-label="Find cafés around this km mark" />
+            <button id="btn-cafes">Find cafés</button>
+          </span>
+          <ul id="cafes-list"></ul>
+        </div>
         <div id="controls">
           <button id="btn-undo" disabled>Undo last point</button>
           <button id="btn-clear" disabled>Clear all</button>
@@ -61,6 +76,10 @@
           <label class="checkbox">
             <input type="checkbox" id="roundtrip-hilly" />
             Prefer hills
+          </label>
+          <label class="field slider-field">
+            Distance tolerance: ±<span id="margin-value">12</span>%
+            <input type="range" id="roundtrip-margin" min="5" max="25" step="1" value="12" />
           </label>
           <div id="wind-chip" hidden></div>
           <div id="loop-options" hidden></div>
