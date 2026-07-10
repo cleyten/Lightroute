@@ -51,6 +51,7 @@ const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
 const statAscend = document.querySelector<HTMLElement>('#stat-ascend')!;
 const statsSection = document.querySelector<HTMLElement>('#stats')!;
 const routeEmpty = document.querySelector<HTMLElement>('#route-empty')!;
+const routePills = document.querySelector<HTMLElement>('#route-pills')!;
 const statusEl = document.querySelector<HTMLElement>('#status')!;
 const btnUndo = document.querySelector<HTMLButtonElement>('#btn-undo')!;
 const btnClear = document.querySelector<HTMLButtonElement>('#btn-clear')!;
@@ -117,13 +118,32 @@ const RASTER_BASEMAPS: Record<
     maxzoom: 20,
   },
 };
+// Dark basemap used for "clean" in dark mode (CARTO dark, free with attribution).
+const DARK_CLEAN = {
+  tiles: [
+    'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+    'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+    'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+  ],
+  attribution: '© OpenStreetMap contributors © CARTO',
+  maxzoom: 20,
+};
+
+function isDarkMode(): boolean {
+  const attr = document.documentElement.getAttribute('data-theme');
+  if (attr === 'dark') return true;
+  if (attr === 'light') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
 let currentBasemap = 'clean';
 
 function setBasemap(style: string): void {
-  if (style === currentBasemap) return;
   if (map.getLayer('basemap-raster')) map.removeLayer('basemap-raster');
   if (map.getSource('basemap-raster')) map.removeSource('basemap-raster');
-  const cfg = RASTER_BASEMAPS[style];
+  // "clean" is the vector positron base in light mode; in dark mode it swaps
+  // to a dark raster so the map matches the UI. Terrain/cycling are unchanged.
+  const cfg = RASTER_BASEMAPS[style] ?? (style === 'clean' && isDarkMode() ? DARK_CLEAN : undefined);
   if (cfg) {
     map.addSource('basemap-raster', {
       type: 'raster',
@@ -138,6 +158,11 @@ function setBasemap(style: string): void {
   }
   currentBasemap = style;
 }
+
+// When the OS theme flips, re-apply the clean basemap to swap light/dark.
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (currentBasemap === 'clean') setBasemap('clean');
+});
 
 // Dot shown on the map while hovering the elevation chart.
 const hoverDotEl = document.createElement('div');
@@ -235,6 +260,8 @@ map.on('load', () => {
   const mapstyleEl = document.querySelector<HTMLDivElement>('#mapstyle');
   if (mapstyleEl) {
     mapstyleEl.hidden = false;
+    // Start on a dark map when the UI loads in dark mode.
+    if (isDarkMode()) setBasemap('clean');
     mapstyleEl.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
       btn.addEventListener('click', () => {
         setBasemap(btn.dataset.style ?? 'clean');
@@ -776,6 +803,7 @@ function renderCafes(): void {
     cafesList.append(item);
   }
   setCafeData(filtered);
+  renderRoutePills();
 }
 
 function setCafeData(cafes: Cafe[]): void {
@@ -1068,6 +1096,23 @@ function renderRouteDetails(): void {
       hoverMarkerVisible = false;
     }
   }
+  renderRoutePills();
+}
+
+/** Compact at-a-glance pills summarizing climbs and coffee stops. */
+function renderRoutePills(): void {
+  const pills: string[] = [];
+  if (state.climbs.length > 0) {
+    const n = state.climbs.length;
+    const gain = Math.round(state.climbs.reduce((sum, c) => sum + c.gainM, 0));
+    pills.push(`<span class="pill climb">▲ ${n} climb${n > 1 ? 's' : ''} · +${gain} m</span>`);
+  }
+  if (state.cafes.length > 0) {
+    const n = state.cafes.length;
+    pills.push(`<span class="pill cafe">☕ ${n} coffee stop${n > 1 ? 's' : ''}</span>`);
+  }
+  routePills.innerHTML = pills.join('');
+  routePills.hidden = pills.length === 0;
 }
 
 /** Lists detected climbs; clicking one highlights it on the map and zooms to it. */

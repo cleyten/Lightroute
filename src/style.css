@@ -925,6 +925,34 @@ button.generate:disabled {
   margin: 0.15rem 0 0.25rem;
 }
 
+/* At-a-glance summary pills (climbs, coffee stops). */
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0.2rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.28rem 0.6rem;
+  border-radius: 20px;
+}
+
+.pill.climb {
+  background: color-mix(in srgb, var(--color-climb) 16%, transparent);
+  color: var(--color-climb);
+}
+
+.pill.cafe {
+  background: color-mix(in srgb, var(--color-cafe) 18%, transparent);
+  color: var(--color-cafe);
+}
+
 /* Subtle press feedback on the main action buttons. */
 button.generate:active:not(:disabled),
 #controls button:active:not(:disabled),
