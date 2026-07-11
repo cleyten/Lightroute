@@ -113,23 +113,15 @@ const RASTER_BASEMAPS: Record<
       'Map data: © OpenStreetMap contributors, SRTM | © OpenTopoMap (CC-BY-SA)',
     maxzoom: 17,
   },
-  cycling: {
-    tiles: [
-      'https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
-      'https://b.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
-      'https://c.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
-    ],
-    attribution: 'CyclOSM | Map data: © OpenStreetMap contributors',
-    maxzoom: 20,
-  },
 };
 
-// OpenCycleMap (Thunderforest) needs a free API key, injected at build time
-// from VITE_THUNDERFOREST_KEY (never hardcoded). Registered only when the key
-// is present; the switcher button is removed otherwise (see the load handler).
+// The "cycling" basemap is OpenCycleMap (Thunderforest), which needs a free API
+// key injected at build time from VITE_THUNDERFOREST_KEY (never hardcoded).
+// Registered only when the key is present; the button is removed otherwise
+// (see the load handler).
 const THUNDERFOREST_KEY: string = import.meta.env.VITE_THUNDERFOREST_KEY ?? '';
 if (THUNDERFOREST_KEY) {
-  RASTER_BASEMAPS.ocm = {
+  RASTER_BASEMAPS.cycling = {
     tiles: ['a', 'b', 'c'].map(
       (s) => `https://${s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=${THUNDERFOREST_KEY}`,
     ),
@@ -156,8 +148,9 @@ function isDarkMode(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-// Route line color per basemap. CyclOSM already draws cycle lanes in blue, so
-// the route switches to magenta there to stay distinguishable; blue elsewhere.
+// Route line color per basemap. OpenCycleMap (the cycling layer) draws cycle
+// routes in blue, so the route switches to magenta there to stay
+// distinguishable; blue elsewhere.
 const ROUTE_COLOR = '#2424e8';
 const ROUTE_COLOR_CYCLING = '#e5007d';
 
@@ -326,8 +319,8 @@ map.on('load', () => {
   const mapstyleEl = document.querySelector<HTMLDivElement>('#mapstyle');
   if (mapstyleEl) {
     mapstyleEl.hidden = false;
-    // OpenCycleMap only works with a Thunderforest key; hide it otherwise.
-    if (!THUNDERFOREST_KEY) mapstyleEl.querySelector('[data-style="ocm"]')?.remove();
+    // OpenCycleMap (the cycling layer) only works with a Thunderforest key.
+    if (!THUNDERFOREST_KEY) mapstyleEl.querySelector('[data-style="cycling"]')?.remove();
     // Start on a dark map when the UI loads in dark mode.
     if (isDarkMode()) setBasemap('clean');
     mapstyleEl.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
