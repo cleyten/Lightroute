@@ -13,6 +13,7 @@ import { detectClimbs, type Climb } from './climbs';
 import { compassLabel, type WindInfo } from './wind';
 import { searchPlaces, type GeocodeResult } from './geocode';
 import { fetchCafes, type Cafe } from './cafes';
+import { fetchWater, type WaterPoint } from './water';
 
 type BikeType = 'race' | 'gravel' | 'mtb';
 
@@ -42,6 +43,7 @@ const state = {
   climbs: [] as Climb[],
   selectedClimb: -1,
   cafes: [] as Cafe[],
+  water: [] as WaterPoint[],
   // Route returns to waypoint 1 (a closed loop): set by generating a round
   // trip or by clicking near point 1.
   closed: false,
@@ -83,6 +85,9 @@ const cafesEl = document.querySelector<HTMLElement>('#cafes')!;
 const cafeKmInput = document.querySelector<HTMLInputElement>('#cafe-km')!;
 const btnCafes = document.querySelector<HTMLButtonElement>('#btn-cafes')!;
 const cafesList = document.querySelector<HTMLUListElement>('#cafes-list')!;
+const waterEl = document.querySelector<HTMLElement>('#water')!;
+const btnWater = document.querySelector<HTMLButtonElement>('#btn-water')!;
+const waterList = document.querySelector<HTMLUListElement>('#water-list')!;
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -118,6 +123,21 @@ const RASTER_BASEMAPS: Record<
     maxzoom: 20,
   },
 };
+
+// OpenCycleMap (Thunderforest) needs a free API key, injected at build time
+// from VITE_THUNDERFOREST_KEY (never hardcoded). Registered only when the key
+// is present; the switcher button is removed otherwise (see the load handler).
+const THUNDERFOREST_KEY: string = import.meta.env.VITE_THUNDERFOREST_KEY ?? '';
+if (THUNDERFOREST_KEY) {
+  RASTER_BASEMAPS.ocm = {
+    tiles: ['a', 'b', 'c'].map(
+      (s) => `https://${s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=${THUNDERFOREST_KEY}`,
+    ),
+    attribution: 'Maps © Thunderforest, Data © OpenStreetMap contributors',
+    maxzoom: 22,
+  };
+}
+
 // Dark basemap used for "clean" in dark mode (CARTO dark, free with attribution).
 const DARK_CLEAN = {
   tiles: [
@@ -245,6 +265,40 @@ map.on('load', () => {
     map.getCanvas().style.cursor = '';
   });
 
+  // Drinking-water refill markers along the current route.
+  map.addSource('water', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+  map.addLayer({
+    id: 'water-dots',
+    type: 'circle',
+    source: 'water',
+    paint: {
+      'circle-radius': 6,
+      'circle-color': '#1f9ed6',
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#fff',
+    },
+  });
+  map.on('click', 'water-dots', (event) => {
+    const feature = event.features?.[0];
+    if (!feature) return;
+    const props = feature.properties as { name: string; detail: string };
+    new maplibregl.Popup({ offset: 10 })
+      .setLngLat(event.lngLat)
+      .setHTML(
+        `<strong>${escapeHtml(props.name)}</strong><br>${escapeHtml(props.detail)}`,
+      )
+      .addTo(map);
+  });
+  map.on('mouseenter', 'water-dots', () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', 'water-dots', () => {
+    map.getCanvas().style.cursor = '';
+  });
+
   // Highlight layer for a selected climb, drawn on top of the route.
   map.addSource('climb-highlight', {
     type: 'geojson',
@@ -272,6 +326,8 @@ map.on('load', () => {
   const mapstyleEl = document.querySelector<HTMLDivElement>('#mapstyle');
   if (mapstyleEl) {
     mapstyleEl.hidden = false;
+    // OpenCycleMap only works with a Thunderforest key; hide it otherwise.
+    if (!THUNDERFOREST_KEY) mapstyleEl.querySelector('[data-style="ocm"]')?.remove();
     // Start on a dark map when the UI loads in dark mode.
     if (isDarkMode()) setBasemap('clean');
     mapstyleEl.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
@@ -288,9 +344,10 @@ map.on('load', () => {
 });
 
 map.on('click', (event) => {
-  // Clicks on a café marker open its popup instead of adding a waypoint.
-  if (map.getLayer('cafe-dots')) {
-    if (map.queryRenderedFeatures(event.point, { layers: ['cafe-dots'] }).length > 0) return;
+  // Clicks on a café or water marker open its popup instead of adding a waypoint.
+  const poiLayers = ['cafe-dots', 'water-dots'].filter((id) => map.getLayer(id));
+  if (poiLayers.length > 0 && map.queryRenderedFeatures(event.point, { layers: poiLayers }).length > 0) {
+    return;
   }
   // Clicking near point 1 closes an open route into a loop.
   if (!state.closed && state.waypoints.length >= 3 && nearFirstWaypoint(event.point)) {
@@ -842,6 +899,65 @@ function clearCafes(): void {
   setCafeData([]);
 }
 
+// --- Drinking water along the route ------------------------------------------
+
+btnWater.addEventListener('click', async () => {
+  if (!state.route) return;
+  btnWater.disabled = true;
+  setStatus('Searching drinking water along the route…');
+  try {
+    state.water = await fetchWater(state.route.coordinates);
+    renderWater();
+    setStatus(state.water.length === 0 ? 'No drinking water found along this route.' : '');
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : 'Water search failed.', true);
+  } finally {
+    btnWater.disabled = false;
+  }
+});
+
+/** Renders the drinking-water list and the map dots. */
+function renderWater(): void {
+  waterList.innerHTML = '';
+  for (const point of state.water.slice(0, 25)) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.className = 'cafe-item water-item';
+    button.innerHTML =
+      `<span class="cafe-where">km ${point.atKm.toFixed(1)}</span>` +
+      `<span class="cafe-name">${escapeHtml(point.name)}</span>` +
+      `<span class="water-detour">${Math.round(point.offRouteM)} m</span>`;
+    button.addEventListener('click', () => {
+      map.flyTo({ center: point.lngLat, zoom: 15 });
+    });
+    item.append(button);
+    waterList.append(item);
+  }
+  setWaterData(state.water);
+  renderRoutePills();
+}
+
+function setWaterData(points: WaterPoint[]): void {
+  const source = map.getSource('water') as maplibregl.GeoJSONSource | undefined;
+  source?.setData({
+    type: 'FeatureCollection',
+    features: points.map((point) => ({
+      type: 'Feature',
+      properties: {
+        name: point.name,
+        detail: `at km ${point.atKm.toFixed(1)}, ${Math.round(point.offRouteM)} m off route`,
+      },
+      geometry: { type: 'Point', coordinates: point.lngLat },
+    })),
+  });
+}
+
+function clearWater(): void {
+  state.water = [];
+  waterList.innerHTML = '';
+  setWaterData([]);
+}
+
 function escapeHtml(text: string): string {
   const div = document.createElement('div');
   div.textContent = text;
@@ -1058,7 +1174,9 @@ function setRouteData(data: FeatureCollection): void {
 function renderRouteDetails(): void {
   // Any route change invalidates café results found for the previous route.
   clearCafes();
+  clearWater();
   cafesEl.hidden = !state.route;
+  waterEl.hidden = !state.route;
   statsSection.hidden = !state.route;
   routeEmpty.hidden = !!state.route;
 
@@ -1122,6 +1240,10 @@ function renderRoutePills(): void {
   if (state.cafes.length > 0) {
     const n = state.cafes.length;
     pills.push(`<span class="pill cafe">☕ ${n} coffee stop${n > 1 ? 's' : ''}</span>`);
+  }
+  if (state.water.length > 0) {
+    const n = state.water.length;
+    pills.push(`<span class="pill water">💧 ${n} water</span>`);
   }
   routePills.innerHTML = pills.join('');
   routePills.hidden = pills.length === 0;

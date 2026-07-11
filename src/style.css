@@ -17,6 +17,7 @@
   /* Semantic */
   --color-climb: #e8571a;
   --color-cafe: #8a5a2b;
+  --color-water: #1f8fbf;
   /* Shape */
   --radius: 12px;
   --radius-sm: 9px;
@@ -43,6 +44,7 @@
     --color-accent-tint: #23233b;
     --color-climb: #ff7a44;
     --color-cafe: #c39058;
+    --color-water: #4cc2ee;
     --shadow-sm: 0 3px 12px rgba(0, 0, 0, 0.45);
     --shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
   }
@@ -63,6 +65,7 @@
   --color-accent-tint: #23233b;
   --color-climb: #ff7a44;
   --color-cafe: #c39058;
+  --color-water: #4cc2ee;
   --shadow-sm: 0 3px 12px rgba(0, 0, 0, 0.45);
   --shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
 }
@@ -136,6 +139,8 @@ body,
   bottom: 1rem;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
+  max-width: 360px;
   gap: 2px;
   padding: 3px;
   background: var(--color-panel);
@@ -918,6 +923,53 @@ button.generate:disabled {
   padding: 0.25rem 0;
 }
 
+/* Drinking-water finder: reuses the café item layout, water-colored. */
+#water {
+  margin: 0 0 0.75rem;
+}
+
+.find-btn {
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.find-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-hover);
+}
+
+.find-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#water-list {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.water-item:hover {
+  border-color: var(--color-water);
+}
+
+.water-detour {
+  color: var(--color-water);
+  font-weight: 600;
+}
+
 .empty-note {
   font-size: 0.82rem;
   line-height: 1.45;
@@ -951,6 +1003,11 @@ button.generate:disabled {
 .pill.cafe {
   background: color-mix(in srgb, var(--color-cafe) 18%, transparent);
   color: var(--color-cafe);
+}
+
+.pill.water {
+  background: color-mix(in srgb, var(--color-water) 18%, transparent);
+  color: var(--color-water);
 }
 
 /* Subtle press feedback on the main action buttons. */
