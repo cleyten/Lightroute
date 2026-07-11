@@ -27,6 +27,7 @@ jobs:
       - run: npm run build
         env:
           VITE_ORS_KEY: ${{ secrets.ORS_KEY }}
+          VITE_THUNDERFOREST_KEY: ${{ secrets.THUNDERFOREST_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
