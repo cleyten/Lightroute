@@ -148,11 +148,8 @@ function isDarkMode(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-// Route line color per basemap. OpenCycleMap (the cycling layer) draws cycle
-// routes in blue, so the route switches to magenta there to stay
-// distinguishable; blue elsewhere.
+// Route line color, the same across every basemap.
 const ROUTE_COLOR = '#2424e8';
-const ROUTE_COLOR_CYCLING = '#e5007d';
 
 let currentBasemap = 'clean';
 
@@ -175,13 +172,6 @@ function setBasemap(style: string): void {
     map.addLayer({ id: 'basemap-raster', type: 'raster', source: 'basemap-raster' }, beforeId);
   }
   currentBasemap = style;
-  if (map.getLayer('route-line')) {
-    map.setPaintProperty(
-      'route-line',
-      'line-color',
-      style === 'cycling' ? ROUTE_COLOR_CYCLING : ROUTE_COLOR,
-    );
-  }
 }
 
 // When the OS theme flips, re-apply the clean basemap to swap light/dark.
