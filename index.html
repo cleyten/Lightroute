@@ -52,6 +52,10 @@
             <button type="button" data-hills="mix" aria-pressed="true">Mix</button>
             <button type="button" data-hills="prefer" aria-pressed="false">Prefer</button>
           </div>
+          <label class="field" id="avg-speed-label">
+            Avg speed (km/h)
+            <input id="avg-speed" type="number" min="5" max="60" step="1" value="25" inputmode="numeric" aria-label="Average riding speed in km/h, used for the time estimate" />
+          </label>
         </section>
 
         <section class="group">
@@ -81,15 +85,24 @@
               <span class="stat-label">Elevation gain</span>
               <span class="stat-value" id="stat-ascend">–</span>
             </div>
+            <div class="stat">
+              <span class="stat-label">Est. time</span>
+              <span class="stat-value" id="stat-time">–</span>
+            </div>
           </div>
           <div id="route-pills" class="pill-row" hidden></div>
           <div id="chart-wrap" hidden>
             <canvas id="elevation-chart"></canvas>
           </div>
+          <div id="grade-legend" class="surface-legend" hidden></div>
           <div id="surface" hidden></div>
           <div id="climbs" hidden>
             <span class="section-label">Climbs</span>
             <ul id="climbs-list"></ul>
+          </div>
+          <div id="cues" hidden>
+            <span class="section-label">Cue sheet</span>
+            <ul id="cues-list"></ul>
           </div>
           <div id="cafes" hidden>
             <span class="section-label">Coffee stop</span>
@@ -118,6 +131,7 @@
           </label>
           <div class="save-actions">
             <button id="btn-save" disabled>Save</button>
+            <button id="btn-share" disabled>Share</button>
             <button id="btn-export" class="primary" disabled>Export GPX</button>
           </div>
           <ul id="saved-list"></ul>

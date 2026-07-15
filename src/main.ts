@@ -5,7 +5,7 @@ import './style.css';
 import { fetchRoute, type LngLat, type RouteResult } from './routing';
 import { downloadGpx } from './gpx';
 import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
-import { renderElevationChart, clearElevationChart } from './chart';
+import { renderElevationChart, clearElevationChart, renderGradeLegend } from './chart';
 import { surfaceBreakdown, renderSurfaceBar } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
 import { generateRoundTrips, rejectionText, type LoopOption } from './ors';
@@ -14,6 +14,9 @@ import { compassLabel, type WindInfo } from './wind';
 import { searchPlaces, type GeocodeResult } from './geocode';
 import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
+import { estimateRideTimeHours, formatDuration } from './ridetime';
+import { buildCueSheet, TURN_LABEL, TURN_ARROW, type Cue } from './cues';
+import { buildShareUrl, parseShareUrl } from './share';
 
 type BikeType = 'race' | 'gravel' | 'mtb';
 
@@ -23,10 +26,16 @@ interface Settings {
   bike: BikeType;
   traffic: number; // 0 = fastest, 1 = low traffic, 2 = very low traffic (race only)
   hills: HillPreference; // round-trip elevation preference
+  avgSpeedKmh: number; // used only for the estimated ride time
+  // True once the rider has typed their own speed, so switching bikes stops
+  // overwriting it with the per-bike default.
+  avgSpeedCustom: boolean;
 }
 
 const SETTINGS_KEY = 'lightroute-settings';
 const TRAFFIC_PROFILES = ['fastbike', 'fastbike-lowtraffic', 'fastbike-verylowtraffic'];
+/** Sensible average-speed defaults per bike type, km/h. */
+const BIKE_DEFAULT_SPEED: Record<BikeType, number> = { race: 25, gravel: 20, mtb: 16 };
 
 const settings: Settings = loadSettings();
 
@@ -42,6 +51,7 @@ const state = {
   selectedLoop: -1,
   climbs: [] as Climb[],
   selectedClimb: -1,
+  cues: [] as Cue[],
   cafes: [] as Cafe[],
   water: [] as WaterPoint[],
   // Route returns to waypoint 1 (a closed loop): set by generating a round
@@ -51,9 +61,15 @@ const state = {
 
 const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
 const statAscend = document.querySelector<HTMLElement>('#stat-ascend')!;
+const statTime = document.querySelector<HTMLElement>('#stat-time')!;
 const statsSection = document.querySelector<HTMLElement>('#stats')!;
 const routeEmpty = document.querySelector<HTMLElement>('#route-empty')!;
 const routePills = document.querySelector<HTMLElement>('#route-pills')!;
+const gradeLegendEl = document.querySelector<HTMLElement>('#grade-legend')!;
+const avgSpeedInput = document.querySelector<HTMLInputElement>('#avg-speed')!;
+const cuesEl = document.querySelector<HTMLElement>('#cues')!;
+const cuesList = document.querySelector<HTMLUListElement>('#cues-list')!;
+const btnShare = document.querySelector<HTMLButtonElement>('#btn-share')!;
 const statusEl = document.querySelector<HTMLElement>('#status')!;
 const btnUndo = document.querySelector<HTMLButtonElement>('#btn-undo')!;
 const btnClear = document.querySelector<HTMLButtonElement>('#btn-clear')!;
@@ -295,6 +311,9 @@ map.on('load', () => {
       });
     });
   }
+
+  // A shared route needs the 'route' source/layers above to already exist.
+  void applySharedRoute();
 });
 
 map.on('click', (event) => {
@@ -396,7 +415,33 @@ btnExport.addEventListener('click', () => {
   if (!state.route) return;
   const name =
     routeNameInput.value.trim() || `Lightroute ${new Date().toISOString().slice(0, 10)}`;
-  downloadGpx(state.route.coordinates, name);
+  const cueWaypoints = state.cues.map((cue) => ({ lngLat: cue.lngLat, label: TURN_LABEL[cue.turn] }));
+  downloadGpx(state.route.coordinates, name, cueWaypoints);
+});
+
+btnShare.addEventListener('click', async () => {
+  if (!state.route || state.waypoints.length < 2) return;
+  const url = buildShareUrl({
+    waypoints: state.waypoints.map((wp) => [...wp] as LngLat),
+    bike: settings.bike,
+    traffic: settings.traffic,
+    closed: state.closed,
+  });
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Lightroute route', url });
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return; // user cancelled
+      // otherwise fall through to the clipboard
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    setStatus('Share link copied to clipboard.');
+  } catch {
+    setStatus(`Copy this link to share: ${url}`);
+  }
 });
 
 btnSave.addEventListener('click', async () => {
@@ -921,11 +966,25 @@ function escapeHtml(text: string): string {
 bikeButtons.forEach((button) =>
   button.addEventListener('click', () => {
     settings.bike = button.dataset.bike as BikeType;
+    // Follow the new bike's typical pace unless the rider set their own.
+    if (!settings.avgSpeedCustom) settings.avgSpeedKmh = BIKE_DEFAULT_SPEED[settings.bike];
     persistSettings();
     syncProfileUi();
     void recalculateRoute();
   }),
 );
+
+avgSpeedInput.addEventListener('change', () => {
+  const value = Number(avgSpeedInput.value);
+  if (!Number.isFinite(value) || value < 5 || value > 60) {
+    avgSpeedInput.value = String(settings.avgSpeedKmh);
+    return;
+  }
+  settings.avgSpeedKmh = value;
+  settings.avgSpeedCustom = true;
+  persistSettings();
+  updateEstimatedTime();
+});
 
 // Hills preference only affects the next round trip, so no reroute here.
 hillsButtons.forEach((button) =>
@@ -955,17 +1014,29 @@ function loadSettings(): Settings {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (['race', 'gravel', 'mtb'].includes(parsed.bike)) {
+        const bike = parsed.bike as BikeType;
         return {
-          bike: parsed.bike,
+          bike,
           traffic: [0, 1, 2].includes(parsed.traffic) ? parsed.traffic : 0,
           hills: ['avoid', 'mix', 'prefer'].includes(parsed.hills) ? parsed.hills : 'mix',
+          avgSpeedKmh:
+            typeof parsed.avgSpeedKmh === 'number' && parsed.avgSpeedKmh >= 5 && parsed.avgSpeedKmh <= 60
+              ? parsed.avgSpeedKmh
+              : BIKE_DEFAULT_SPEED[bike],
+          avgSpeedCustom: parsed.avgSpeedCustom === true,
         };
       }
     }
   } catch {
     // Corrupt settings fall through to the defaults.
   }
-  return { bike: 'race', traffic: 0, hills: 'mix' };
+  return {
+    bike: 'race',
+    traffic: 0,
+    hills: 'mix',
+    avgSpeedKmh: BIKE_DEFAULT_SPEED.race,
+    avgSpeedCustom: false,
+  };
 }
 
 function persistSettings(): void {
@@ -991,6 +1062,21 @@ function syncProfileUi(): void {
   });
   trafficLabel.hidden = settings.bike !== 'race';
   trafficSelect.value = String(settings.traffic);
+  avgSpeedInput.value = String(settings.avgSpeedKmh);
+}
+
+/** Rough distance/ascent-based ride time estimate; "–" without a route. */
+function updateEstimatedTime(): void {
+  if (!state.route) {
+    statTime.textContent = '–';
+    return;
+  }
+  const hours = estimateRideTimeHours(
+    state.route.distanceMeters,
+    state.route.ascendMeters,
+    settings.avgSpeedKmh,
+  );
+  statTime.textContent = formatDuration(hours);
 }
 
 /** Recreates all markers from state.waypoints, keeping numbering correct. */
@@ -1143,20 +1229,19 @@ function renderRouteDetails(): void {
     setClimbHighlight(null);
     renderClimbsList();
 
+    state.cues = buildCueSheet(state.route.coordinates);
+    renderCuesList();
+
     chartWrap.hidden = false;
-    renderElevationChart(
-      chartCanvas,
-      state.route.coordinates,
-      (index) => {
-        const [lng, lat] = state.route!.coordinates[index];
-        hoverMarker.setLngLat([lng, lat]);
-        if (!hoverMarkerVisible) {
-          hoverMarker.addTo(map);
-          hoverMarkerVisible = true;
-        }
-      },
-      state.climbs,
-    );
+    gradeLegendEl.hidden = false;
+    renderElevationChart(chartCanvas, state.route.coordinates, (index) => {
+      const [lng, lat] = state.route!.coordinates[index];
+      hoverMarker.setLngLat([lng, lat]);
+      if (!hoverMarkerVisible) {
+        hoverMarker.addTo(map);
+        hoverMarkerVisible = true;
+      }
+    });
 
     const totals = state.route.surface ?? surfaceBreakdown(state.route.messages);
     if (totals) {
@@ -1169,10 +1254,13 @@ function renderRouteDetails(): void {
     statDistance.textContent = '–';
     statAscend.textContent = '–';
     chartWrap.hidden = true;
+    gradeLegendEl.hidden = true;
     surfaceEl.hidden = true;
     climbsEl.hidden = true;
+    cuesEl.hidden = true;
     state.climbs = [];
     state.selectedClimb = -1;
+    state.cues = [];
     setClimbHighlight(null);
     clearElevationChart();
     if (hoverMarkerVisible) {
@@ -1180,7 +1268,28 @@ function renderRouteDetails(): void {
       hoverMarkerVisible = false;
     }
   }
+  updateEstimatedTime();
   renderRoutePills();
+}
+
+/** Turn-by-turn cue sheet, derived from route geometry (see cues.ts). */
+function renderCuesList(): void {
+  cuesEl.hidden = state.cues.length === 0;
+  cuesList.innerHTML = '';
+  state.cues.forEach((cue) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.className = 'cue-item';
+    button.innerHTML =
+      `<span class="cue-where">km ${cue.atKm.toFixed(1)}</span>` +
+      `<span class="cue-arrow" aria-hidden="true">${TURN_ARROW[cue.turn]}</span>` +
+      `<span>${TURN_LABEL[cue.turn]}</span>`;
+    button.addEventListener('click', () => {
+      map.flyTo({ center: cue.lngLat, zoom: 16 });
+    });
+    item.append(button);
+    cuesList.append(item);
+  });
 }
 
 /** Compact at-a-glance pills summarizing climbs and coffee stops. */
@@ -1315,10 +1424,32 @@ function updateControls(): void {
   btnReverse.disabled = !state.route;
   btnExport.disabled = !state.route;
   btnSave.disabled = !state.route || state.waypoints.length < 2;
+  btnShare.disabled = !state.route || state.waypoints.length < 2;
+}
+
+/** Loads a route shared via URL (see share.ts), if the link carries one. */
+async function applySharedRoute(): Promise<void> {
+  const shared = parseShareUrl(window.location.search);
+  if (!shared) return;
+  state.waypoints = shared.waypoints;
+  state.closed = shared.closed;
+  settings.bike = shared.bike as BikeType;
+  settings.traffic = shared.traffic;
+  persistSettings();
+  syncProfileUi();
+  rebuildMarkers();
+  const bounds = state.waypoints.reduce(
+    (acc, wp) => acc.extend(wp),
+    new maplibregl.LngLatBounds(state.waypoints[0], state.waypoints[0]),
+  );
+  map.fitBounds(bounds, { padding: 60 });
+  await recalculateRoute();
+  if (state.route) setStatus('Loaded a shared route.');
 }
 
 syncProfileUi();
 void refreshSavedList();
+renderGradeLegend(gradeLegendEl);
 
 // --- Mobile bottom sheet ---
 // On phones the panel is a draggable sheet over a full-screen map. Dragging

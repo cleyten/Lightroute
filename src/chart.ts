@@ -1,20 +1,51 @@
-// Elevation profile chart (distance vs. elevation) rendered with Chart.js.
+// Elevation profile chart (distance vs. elevation) rendered with Chart.js,
+// colored continuously by grade (steepness) rather than a flat single color.
 import { Chart } from 'chart.js/auto';
 import { cumulativeDistances } from './geo';
-import type { Climb } from './climbs';
 
 let chart: Chart | null = null;
+
+/** Grade thresholds (percent, upper bound inclusive) and their colors, mild to steep. */
+const GRADE_STOPS: { max: number; color: string; label: string }[] = [
+  { max: 0, color: '#4a90d9', label: 'Descent' },
+  { max: 3, color: '#63a922', label: '0–3%' },
+  { max: 6, color: '#d9a72e', label: '3–6%' },
+  { max: 9, color: '#e8571a', label: '6–9%' },
+  { max: 12, color: '#c62828', label: '9–12%' },
+  { max: Infinity, color: '#7a1414', label: '12%+' },
+];
+
+function gradeColor(pct: number): string {
+  for (const stop of GRADE_STOPS) {
+    if (pct <= stop.max) return stop.color;
+  }
+  return GRADE_STOPS[GRADE_STOPS.length - 1].color;
+}
+
+function withAlpha(hex: string, alpha: number): string {
+  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
+  return `${hex}${a}`;
+}
+
+/** Grade (percent) of a chart segment: x is km, y is meters elevation. */
+function segmentGradePct(p0: unknown, p1: unknown): number {
+  const a = (p0 as { parsed: { x: number; y: number } }).parsed;
+  const b = (p1 as { parsed: { x: number; y: number } }).parsed;
+  const runM = (b.x - a.x) * 1000;
+  if (runM <= 0) return 0;
+  return ((b.y - a.y) / runM) * 100;
+}
 
 /**
  * Draws the elevation profile. `onHover` receives the index into the
  * ORIGINAL coordinates array so the caller can highlight that point on the
- * map. Stretches inside a detected climb are drawn in orange.
+ * map. Each segment is colored by its grade (steepness), from a cool tone for
+ * descents through green/amber/orange/red for progressively steeper climbs.
  */
 export function renderElevationChart(
   canvas: HTMLCanvasElement,
   coordinates: [number, number, number][],
   onHover: (coordinateIndex: number) => void,
-  climbs: Climb[] = [],
 ): void {
   // Downsample long tracks; the chart stays readable and fast.
   const stride = Math.max(1, Math.ceil(coordinates.length / 600));
@@ -35,11 +66,6 @@ export function renderElevationChart(
   const tickColor = css.getPropertyValue('--color-muted').trim() || '#6f6c62';
   const gridColor = css.getPropertyValue('--color-border').trim() || '#e4dfd3';
 
-  // Climb ranges in km along the track, for per-segment coloring.
-  const climbRanges = climbs.map((c) => [c.startKm, c.startKm + c.lengthM / 1000]);
-  const inClimb = (km: number) =>
-    climbRanges.some(([from, to]) => km >= from && km <= to);
-
   chart?.destroy();
   chart = new Chart(canvas, {
     type: 'line',
@@ -54,12 +80,8 @@ export function renderElevationChart(
           borderWidth: 1.5,
           tension: 0.1,
           segment: {
-            borderColor: (ctx) =>
-              inClimb((ctx.p0 as { parsed: { x: number } }).parsed.x) ? '#e8571a' : '#2424e8',
-            backgroundColor: (ctx) =>
-              inClimb((ctx.p0 as { parsed: { x: number } }).parsed.x)
-                ? 'rgba(232, 87, 26, 0.18)'
-                : 'rgba(36, 36, 232, 0.15)',
+            borderColor: (ctx) => gradeColor(segmentGradePct(ctx.p0, ctx.p1)),
+            backgroundColor: (ctx) => withAlpha(gradeColor(segmentGradePct(ctx.p0, ctx.p1)), 0.2),
           },
         },
       ],
@@ -104,4 +126,11 @@ export function renderElevationChart(
 export function clearElevationChart(): void {
   chart?.destroy();
   chart = null;
+}
+
+/** Renders the static grade-color legend (thresholds never change per route). */
+export function renderGradeLegend(container: HTMLElement): void {
+  container.innerHTML = GRADE_STOPS.map(
+    ({ color, label }) => `<span><i style="background:${color}"></i>${label}</span>`,
+  ).join('');
 }
