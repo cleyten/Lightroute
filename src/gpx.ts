@@ -1,25 +1,10 @@
 // Client-side GPX 1.1 export. GPX is the standard XML format that Garmin,
 // Wahoo and Strava all accept for planned routes.
 
-export interface GpxWaypoint {
-  lngLat: [number, number];
-  label: string;
-}
-
 export function buildGpx(
   coordinates: [number, number, number][],
   name: string,
-  waypoints: GpxWaypoint[] = [],
 ): string {
-  // Cue-sheet turns as <wpt> elements: Garmin/Wahoo devices show these as
-  // on-screen prompts when riding the course, ahead of the actual turn.
-  const wpts = waypoints
-    .map(
-      ({ lngLat: [lng, lat], label }) =>
-        `  <wpt lat="${lat}" lon="${lng}"><name>${escapeXml(label)}</name><sym>Turn</sym></wpt>`,
-    )
-    .join('\n');
-
   const trackpoints = coordinates
     .map(
       ([lng, lat, ele]) =>
@@ -32,7 +17,7 @@ export function buildGpx(
   <metadata>
     <name>${escapeXml(name)}</name>
   </metadata>
-${wpts ? wpts + '\n' : ''}  <trk>
+  <trk>
     <name>${escapeXml(name)}</name>
     <trkseg>
 ${trackpoints}
@@ -45,9 +30,8 @@ ${trackpoints}
 export function downloadGpx(
   coordinates: [number, number, number][],
   name: string,
-  waypoints: GpxWaypoint[] = [],
 ): void {
-  const gpx = buildGpx(coordinates, name, waypoints);
+  const gpx = buildGpx(coordinates, name);
   const blob = new Blob([gpx], { type: 'application/gpx+xml' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

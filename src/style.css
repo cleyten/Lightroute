@@ -339,6 +339,33 @@ select {
   margin-right: 0.3rem;
 }
 
+/* Grade-color legend: a fixed 3-column grid instead of free-wrapping flex,
+   so the six labels of uneven length ("Descent" vs "12%+") line up neatly
+   rather than wrapping raggedly at the sidebar's width. */
+.grade-legend {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+.grade-legend span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.grade-legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
 /* Map overlay: fixed brand blue so it stays consistent with the route line
    regardless of the UI theme. */
 .hover-dot {
@@ -921,53 +948,6 @@ button.generate:disabled {
   font-size: 0.8rem;
   color: var(--color-muted);
   padding: 0.25rem 0;
-}
-
-/* Cue sheet: turn-by-turn list, same row layout as climbs/cafés. */
-#cues {
-  margin: 0 0 0.75rem;
-}
-
-#cues-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.cue-item {
-  display: flex;
-  width: 100%;
-  align-items: baseline;
-  gap: 0.55rem;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-  text-align: left;
-}
-
-.cue-item:hover {
-  border-color: var(--color-accent);
-}
-
-.cue-where {
-  color: var(--color-muted);
-  min-width: 3.6rem;
-}
-
-.cue-arrow {
-  color: var(--color-accent-fg);
-  font-weight: 700;
-  min-width: 1.1rem;
-  text-align: center;
 }
 
 /* Drinking-water finder: reuses the café item layout, water-colored. */

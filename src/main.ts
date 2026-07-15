@@ -14,8 +14,6 @@ import { compassLabel, type WindInfo } from './wind';
 import { searchPlaces, type GeocodeResult } from './geocode';
 import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
-import { estimateRideTimeHours, formatDuration } from './ridetime';
-import { buildCueSheet, TURN_LABEL, TURN_ARROW, type Cue } from './cues';
 import { buildShareUrl, parseShareUrl } from './share';
 import { parseGpx, isClosedTrack } from './gpximport';
 
@@ -27,16 +25,10 @@ interface Settings {
   bike: BikeType;
   traffic: number; // 0 = fastest, 1 = low traffic, 2 = very low traffic (race only)
   hills: HillPreference; // round-trip elevation preference
-  avgSpeedKmh: number; // used only for the estimated ride time
-  // True once the rider has typed their own speed, so switching bikes stops
-  // overwriting it with the per-bike default.
-  avgSpeedCustom: boolean;
 }
 
 const SETTINGS_KEY = 'lightroute-settings';
 const TRAFFIC_PROFILES = ['fastbike', 'fastbike-lowtraffic', 'fastbike-verylowtraffic'];
-/** Sensible average-speed defaults per bike type, km/h. */
-const BIKE_DEFAULT_SPEED: Record<BikeType, number> = { race: 25, gravel: 20, mtb: 16 };
 
 const settings: Settings = loadSettings();
 
@@ -52,7 +44,6 @@ const state = {
   selectedLoop: -1,
   climbs: [] as Climb[],
   selectedClimb: -1,
-  cues: [] as Cue[],
   cafes: [] as Cafe[],
   water: [] as WaterPoint[],
   // Route returns to waypoint 1 (a closed loop): set by generating a round
@@ -62,14 +53,10 @@ const state = {
 
 const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
 const statAscend = document.querySelector<HTMLElement>('#stat-ascend')!;
-const statTime = document.querySelector<HTMLElement>('#stat-time')!;
 const statsSection = document.querySelector<HTMLElement>('#stats')!;
 const routeEmpty = document.querySelector<HTMLElement>('#route-empty')!;
 const routePills = document.querySelector<HTMLElement>('#route-pills')!;
 const gradeLegendEl = document.querySelector<HTMLElement>('#grade-legend')!;
-const avgSpeedInput = document.querySelector<HTMLInputElement>('#avg-speed')!;
-const cuesEl = document.querySelector<HTMLElement>('#cues')!;
-const cuesList = document.querySelector<HTMLUListElement>('#cues-list')!;
 const btnShare = document.querySelector<HTMLButtonElement>('#btn-share')!;
 const statusEl = document.querySelector<HTMLElement>('#status')!;
 const btnUndo = document.querySelector<HTMLButtonElement>('#btn-undo')!;
@@ -418,8 +405,7 @@ btnExport.addEventListener('click', () => {
   if (!state.route) return;
   const name =
     routeNameInput.value.trim() || `Lightroute ${new Date().toISOString().slice(0, 10)}`;
-  const cueWaypoints = state.cues.map((cue) => ({ lngLat: cue.lngLat, label: TURN_LABEL[cue.turn] }));
-  downloadGpx(state.route.coordinates, name, cueWaypoints);
+  downloadGpx(state.route.coordinates, name);
 });
 
 btnShare.addEventListener('click', async () => {
@@ -1007,25 +993,11 @@ function escapeHtml(text: string): string {
 bikeButtons.forEach((button) =>
   button.addEventListener('click', () => {
     settings.bike = button.dataset.bike as BikeType;
-    // Follow the new bike's typical pace unless the rider set their own.
-    if (!settings.avgSpeedCustom) settings.avgSpeedKmh = BIKE_DEFAULT_SPEED[settings.bike];
     persistSettings();
     syncProfileUi();
     void recalculateRoute();
   }),
 );
-
-avgSpeedInput.addEventListener('change', () => {
-  const value = Number(avgSpeedInput.value);
-  if (!Number.isFinite(value) || value < 5 || value > 60) {
-    avgSpeedInput.value = String(settings.avgSpeedKmh);
-    return;
-  }
-  settings.avgSpeedKmh = value;
-  settings.avgSpeedCustom = true;
-  persistSettings();
-  updateEstimatedTime();
-});
 
 // Hills preference only affects the next round trip, so no reroute here.
 hillsButtons.forEach((button) =>
@@ -1055,29 +1027,17 @@ function loadSettings(): Settings {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (['race', 'gravel', 'mtb'].includes(parsed.bike)) {
-        const bike = parsed.bike as BikeType;
         return {
-          bike,
+          bike: parsed.bike,
           traffic: [0, 1, 2].includes(parsed.traffic) ? parsed.traffic : 0,
           hills: ['avoid', 'mix', 'prefer'].includes(parsed.hills) ? parsed.hills : 'mix',
-          avgSpeedKmh:
-            typeof parsed.avgSpeedKmh === 'number' && parsed.avgSpeedKmh >= 5 && parsed.avgSpeedKmh <= 60
-              ? parsed.avgSpeedKmh
-              : BIKE_DEFAULT_SPEED[bike],
-          avgSpeedCustom: parsed.avgSpeedCustom === true,
         };
       }
     }
   } catch {
     // Corrupt settings fall through to the defaults.
   }
-  return {
-    bike: 'race',
-    traffic: 0,
-    hills: 'mix',
-    avgSpeedKmh: BIKE_DEFAULT_SPEED.race,
-    avgSpeedCustom: false,
-  };
+  return { bike: 'race', traffic: 0, hills: 'mix' };
 }
 
 function persistSettings(): void {
@@ -1103,21 +1063,6 @@ function syncProfileUi(): void {
   });
   trafficLabel.hidden = settings.bike !== 'race';
   trafficSelect.value = String(settings.traffic);
-  avgSpeedInput.value = String(settings.avgSpeedKmh);
-}
-
-/** Rough distance/ascent-based ride time estimate; "–" without a route. */
-function updateEstimatedTime(): void {
-  if (!state.route) {
-    statTime.textContent = '–';
-    return;
-  }
-  const hours = estimateRideTimeHours(
-    state.route.distanceMeters,
-    state.route.ascendMeters,
-    settings.avgSpeedKmh,
-  );
-  statTime.textContent = formatDuration(hours);
 }
 
 /** Recreates all markers from state.waypoints, keeping numbering correct. */
@@ -1270,9 +1215,6 @@ function renderRouteDetails(): void {
     setClimbHighlight(null);
     renderClimbsList();
 
-    state.cues = buildCueSheet(state.route.coordinates);
-    renderCuesList();
-
     chartWrap.hidden = false;
     gradeLegendEl.hidden = false;
     renderElevationChart(chartCanvas, state.route.coordinates, (index) => {
@@ -1298,10 +1240,8 @@ function renderRouteDetails(): void {
     gradeLegendEl.hidden = true;
     surfaceEl.hidden = true;
     climbsEl.hidden = true;
-    cuesEl.hidden = true;
     state.climbs = [];
     state.selectedClimb = -1;
-    state.cues = [];
     setClimbHighlight(null);
     clearElevationChart();
     if (hoverMarkerVisible) {
@@ -1309,28 +1249,7 @@ function renderRouteDetails(): void {
       hoverMarkerVisible = false;
     }
   }
-  updateEstimatedTime();
   renderRoutePills();
-}
-
-/** Turn-by-turn cue sheet, derived from route geometry (see cues.ts). */
-function renderCuesList(): void {
-  cuesEl.hidden = state.cues.length === 0;
-  cuesList.innerHTML = '';
-  state.cues.forEach((cue) => {
-    const item = document.createElement('li');
-    const button = document.createElement('button');
-    button.className = 'cue-item';
-    button.innerHTML =
-      `<span class="cue-where">km ${cue.atKm.toFixed(1)}</span>` +
-      `<span class="cue-arrow" aria-hidden="true">${TURN_ARROW[cue.turn]}</span>` +
-      `<span>${TURN_LABEL[cue.turn]}</span>`;
-    button.addEventListener('click', () => {
-      map.flyTo({ center: cue.lngLat, zoom: 16 });
-    });
-    item.append(button);
-    cuesList.append(item);
-  });
 }
 
 /** Compact at-a-glance pills summarizing climbs and coffee stops. */
