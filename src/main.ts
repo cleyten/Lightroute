@@ -17,6 +17,7 @@ import { fetchWater, type WaterPoint } from './water';
 import { estimateRideTimeHours, formatDuration } from './ridetime';
 import { buildCueSheet, TURN_LABEL, TURN_ARROW, type Cue } from './cues';
 import { buildShareUrl, parseShareUrl } from './share';
+import { parseGpx, isClosedTrack } from './gpximport';
 
 type BikeType = 'race' | 'gravel' | 'mtb';
 
@@ -97,6 +98,8 @@ const climbsList = document.querySelector<HTMLUListElement>('#climbs-list')!;
 const searchInput = document.querySelector<HTMLInputElement>('#search-input')!;
 const searchResults = document.querySelector<HTMLUListElement>('#search-results')!;
 const btnLocate = document.querySelector<HTMLButtonElement>('#btn-locate')!;
+const btnImportGpx = document.querySelector<HTMLButtonElement>('#btn-import-gpx')!;
+const gpxFileInput = document.querySelector<HTMLInputElement>('#gpx-file-input')!;
 const cafesEl = document.querySelector<HTMLElement>('#cafes')!;
 const cafeKmInput = document.querySelector<HTMLInputElement>('#cafe-km')!;
 const btnCafes = document.querySelector<HTMLButtonElement>('#btn-cafes')!;
@@ -569,7 +572,7 @@ function selectLoop(index: number): void {
   // on screen until the user actually drags a point, which reroutes through
   // these waypoints via BRouter.
   const coords = option.route.coordinates;
-  state.waypoints = extractLoopWaypoints(coords);
+  state.waypoints = extractTrackWaypoints(coords, true);
   state.closed = true;
   rebuildMarkers();
 
@@ -595,38 +598,48 @@ const WP_MAX_GAP_M = 5000;
 const WP_TURN_DEG = 30;
 
 /**
- * Picks editable waypoints along a generated loop. Within each 1.5-5 km
- * window it places the waypoint on the sharpest turn (so dragging reshapes
- * real corners and junctions); if the stretch is straight it falls back to
- * the 5 km mark. The first waypoint is always the start.
+ * Picks editable waypoints along a generated loop or an imported track. Within
+ * each 1.5-5 km window it places the waypoint on the sharpest turn (so
+ * dragging reshapes real corners and junctions); if the stretch is straight
+ * it falls back to the 5 km mark. The first waypoint is always the start.
+ * `closesToStart` skips adding an explicit final waypoint for closed loops,
+ * since `state.closed` already routes the last leg back to point 1; an open
+ * track gets its actual endpoint appended instead.
  */
-function extractLoopWaypoints(coords: [number, number, number][]): LngLat[] {
+function extractTrackWaypoints(
+  coords: [number, number, number][],
+  closesToStart: boolean,
+): LngLat[] {
   const cum = cumulativeDistances(coords);
   const total = cum[cum.length - 1];
   const waypoints: LngLat[] = [[coords[0][0], coords[0][1]]];
-  if (total <= WP_MAX_GAP_M) return waypoints;
+  if (total > WP_MAX_GAP_M) {
+    const turns = turnMagnitudes(coords, cum);
+    let lastDist = 0;
+    // Keep placing until the closing/final leg is <= 5 km.
+    while (total - lastDist > WP_MAX_GAP_M) {
+      const windowStart = lastDist + WP_MIN_GAP_M;
+      const windowEnd = Math.min(lastDist + WP_MAX_GAP_M, total - WP_MIN_GAP_M);
 
-  const turns = turnMagnitudes(coords, cum);
-  let lastDist = 0;
-  // Keep placing until the closing leg (last point back to start) is <= 5 km.
-  while (total - lastDist > WP_MAX_GAP_M) {
-    const windowStart = lastDist + WP_MIN_GAP_M;
-    const windowEnd = Math.min(lastDist + WP_MAX_GAP_M, total - WP_MIN_GAP_M);
-
-    let placeIdx = -1;
-    let bestTurn = WP_TURN_DEG;
-    for (let i = 0; i < coords.length; i++) {
-      if (cum[i] < windowStart) continue;
-      if (cum[i] > windowEnd) break;
-      if (turns[i] > bestTurn) {
-        bestTurn = turns[i];
-        placeIdx = i;
+      let placeIdx = -1;
+      let bestTurn = WP_TURN_DEG;
+      for (let i = 0; i < coords.length; i++) {
+        if (cum[i] < windowStart) continue;
+        if (cum[i] > windowEnd) break;
+        if (turns[i] > bestTurn) {
+          bestTurn = turns[i];
+          placeIdx = i;
+        }
       }
-    }
-    if (placeIdx < 0) placeIdx = indexAtDistance(cum, windowEnd); // straight: 5 km mark
+      if (placeIdx < 0) placeIdx = indexAtDistance(cum, windowEnd); // straight: 5 km mark
 
-    waypoints.push([coords[placeIdx][0], coords[placeIdx][1]]);
-    lastDist = cum[placeIdx];
+      waypoints.push([coords[placeIdx][0], coords[placeIdx][1]]);
+      lastDist = cum[placeIdx];
+    }
+  }
+  if (!closesToStart) {
+    const last = coords[coords.length - 1];
+    waypoints.push([last[0], last[1]]);
   }
   return waypoints;
 }
@@ -786,6 +799,34 @@ btnLocate.addEventListener('click', () => {
     () => setStatus('Could not get your location. Check the location permission.', true),
     { timeout: 10000, maximumAge: 60000 },
   );
+});
+
+btnImportGpx.addEventListener('click', () => gpxFileInput.click());
+
+gpxFileInput.addEventListener('change', async () => {
+  const file = gpxFileInput.files?.[0];
+  gpxFileInput.value = ''; // allow re-selecting the same file later
+  if (!file) return;
+  try {
+    const coords = parseGpx(await file.text());
+    const closed = isClosedTrack(coords);
+    state.waypoints = extractTrackWaypoints(coords, closed);
+    state.closed = closed;
+    rebuildMarkers();
+    await recalculateRoute();
+    if (state.route) {
+      const bounds = coords.reduce(
+        (acc, c) => acc.extend([c[0], c[1]]),
+        new maplibregl.LngLatBounds([coords[0][0], coords[0][1]], [coords[0][0], coords[0][1]]),
+      );
+      map.fitBounds(bounds, { padding: 60 });
+      setStatus(
+        `Imported "${file.name}". Turned into an editable route; dragging a point re-routes from there.`,
+      );
+    }
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : 'Could not read that GPX file.', true);
+  }
 });
 
 // --- Round-trip distance range slider ----------------------------------------
