@@ -130,35 +130,14 @@ if (THUNDERFOREST_KEY) {
   };
 }
 
-// Dark basemap used for "clean" in dark mode (CARTO dark, free with attribution).
-const DARK_CLEAN = {
-  tiles: [
-    'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-    'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-    'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-  ],
-  attribution: '© OpenStreetMap contributors © CARTO',
-  maxzoom: 20,
-};
-
-function isDarkMode(): boolean {
-  const attr = document.documentElement.getAttribute('data-theme');
-  if (attr === 'dark') return true;
-  if (attr === 'light') return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
 // Route line color, the same across every basemap.
 const ROUTE_COLOR = '#2424e8';
-
-let currentBasemap = 'clean';
 
 function setBasemap(style: string): void {
   if (map.getLayer('basemap-raster')) map.removeLayer('basemap-raster');
   if (map.getSource('basemap-raster')) map.removeSource('basemap-raster');
-  // "clean" is the vector positron base in light mode; in dark mode it swaps
-  // to a dark raster so the map matches the UI. Terrain/cycling are unchanged.
-  const cfg = RASTER_BASEMAPS[style] ?? (style === 'clean' && isDarkMode() ? DARK_CLEAN : undefined);
+  // "clean" is always the light positron vector base, regardless of UI theme.
+  const cfg = RASTER_BASEMAPS[style];
   if (cfg) {
     map.addSource('basemap-raster', {
       type: 'raster',
@@ -171,13 +150,7 @@ function setBasemap(style: string): void {
     const beforeId = map.getLayer('route-casing') ? 'route-casing' : undefined;
     map.addLayer({ id: 'basemap-raster', type: 'raster', source: 'basemap-raster' }, beforeId);
   }
-  currentBasemap = style;
 }
-
-// When the OS theme flips, re-apply the clean basemap to swap light/dark.
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  if (currentBasemap === 'clean') setBasemap('clean');
-});
 
 // Dot shown on the map while hovering the elevation chart.
 const hoverDotEl = document.createElement('div');
@@ -311,8 +284,6 @@ map.on('load', () => {
     mapstyleEl.hidden = false;
     // OpenCycleMap (the cycling layer) only works with a Thunderforest key.
     if (!THUNDERFOREST_KEY) mapstyleEl.querySelector('[data-style="cycling"]')?.remove();
-    // Start on a dark map when the UI loads in dark mode.
-    if (isDarkMode()) setBasemap('clean');
     mapstyleEl.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
       btn.addEventListener('click', () => {
         setBasemap(btn.dataset.style ?? 'clean');
