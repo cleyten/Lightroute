@@ -9,6 +9,7 @@ export interface CommunityRoute {
   id: string;
   ownerId: string;
   name: string;
+  authorName: string | null;
   waypoints: LngLat[];
   bike: string;
   traffic: number;
@@ -24,6 +25,8 @@ export interface CommunityRoute {
 
 export interface PublishInput {
   name: string;
+  /** Display name of the author; falls back to null (shown as "Anonymous"). */
+  authorName?: string | null;
   waypoints: LngLat[];
   bike: string;
   traffic: number;
@@ -37,11 +40,15 @@ export interface PublishInput {
 
 export type CommunitySort = 'newest' | 'top';
 
+/** Grace period a deleted route (row + GPX file) is kept before it is purged. */
+export const GRACE_DAYS = 14;
+
 // Shape of a row from the `routes_with_rating` view (snake_case, as stored).
 interface RouteRow {
   id: string;
   owner_id: string;
   name: string;
+  author_name: string | null;
   waypoints: LngLat[];
   bike: string;
   traffic: number;
@@ -85,6 +92,7 @@ export async function publishRoute(input: PublishInput): Promise<void> {
   const { error } = await db.from('routes').insert({
     owner_id: userId,
     name: input.name,
+    author_name: input.authorName?.trim() || null,
     waypoints: input.waypoints,
     bike: input.bike,
     traffic: input.traffic,
@@ -107,6 +115,50 @@ export async function fetchCommunityRoutes(sort: CommunitySort): Promise<Communi
       : await base.order('created_at', { ascending: false });
   if (error) throw error;
   return ((data as RouteRow[] | null) ?? []).map(mapRow);
+}
+
+/**
+ * Soft-deletes one of the current user's routes: it is hidden from the library
+ * at once (the `routes_with_rating` view filters `deleted_at is null`), but the
+ * row and any GPX file survive the grace period so the owner can change their
+ * mind. `purgeExpiredRoutes` removes them for good afterwards.
+ */
+export async function softDeleteRoute(routeId: string): Promise<void> {
+  const db = client();
+  const userId = await currentUserId();
+  if (!userId) throw new Error('Sign in first to delete a route.');
+  const { error } = await db
+    .from('routes')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', routeId)
+    .eq('owner_id', userId);
+  if (error) throw error;
+}
+
+/**
+ * Permanently removes the current user's routes whose grace period has passed,
+ * along with their uploaded GPX files. Best-effort and non-fatal: called
+ * opportunistically when the owner is signed in, so cleanup happens on their
+ * next visit at or after the grace period.
+ */
+export async function purgeExpiredRoutes(): Promise<void> {
+  const db = client();
+  const userId = await currentUserId();
+  if (!userId) return;
+  const cutoff = new Date(Date.now() - GRACE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await db
+    .from('routes')
+    .select('id, gpx_path')
+    .eq('owner_id', userId)
+    .not('deleted_at', 'is', null)
+    .lt('deleted_at', cutoff);
+  if (error) return; // e.g. the column does not exist yet; nothing to purge.
+  for (const row of (data as { id: string; gpx_path: string | null }[] | null) ?? []) {
+    if (row.gpx_path) {
+      await db.storage.from('gpx-uploads').remove([row.gpx_path]);
+    }
+    await db.from('routes').delete().eq('id', row.id).eq('owner_id', userId);
+  }
 }
 
 /** Adds or replaces the current user's star rating for a route (1-5). */
@@ -150,6 +202,7 @@ function mapRow(row: RouteRow): CommunityRoute {
     id: row.id,
     ownerId: row.owner_id,
     name: row.name,
+    authorName: row.author_name ?? null,
     waypoints: (row.waypoints ?? []) as LngLat[],
     bike: row.bike,
     traffic: row.traffic,

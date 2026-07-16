@@ -227,6 +227,39 @@ select {
   color: var(--color-accent-fg);
 }
 
+/* Top-level tabs: Route planner vs. Community. Underline style so they read as
+   section navigation, distinct from the pill-shaped .segmented filters. */
+.main-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.4rem 1.15rem 0;
+}
+
+.main-tab {
+  flex: 1;
+  padding: 0.55rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.main-tab:hover:not(.active) {
+  color: var(--color-text);
+}
+
+.main-tab.active {
+  color: var(--color-accent-fg);
+  border-bottom-color: var(--color-accent-fg);
+}
+
 .hint {
   color: var(--color-muted);
   font-size: 0.85rem;
@@ -312,7 +345,7 @@ select {
 }
 
 #surface {
-  margin: 0 0 0.75rem;
+  margin: 1.1rem 0 0.9rem;
 }
 
 .surface-track {
@@ -322,13 +355,21 @@ select {
   overflow: hidden;
 }
 
+/* Fixed two-column grid (like .grade-legend) so the surface labels line up in
+   an even block instead of wrapping raggedly across the panel width. */
 .surface-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
-  margin-top: 0.35rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem 0.75rem;
+  margin-top: 0.7rem;
   font-size: 0.75rem;
   color: var(--color-muted);
+}
+
+.surface-legend span {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .surface-legend i {
@@ -337,6 +378,7 @@ select {
   height: 9px;
   border-radius: 2px;
   margin-right: 0.3rem;
+  flex: 0 0 auto;
 }
 
 /* Grade-color legend: a fixed 3-column grid instead of free-wrapping flex,
@@ -404,6 +446,7 @@ select {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  margin-top: 0.6rem;
 }
 
 #controls button {
@@ -1162,8 +1205,21 @@ button.generate:active:not(:disabled),
   background: var(--color-hover);
 }
 
-#community-sort {
-  margin: 0.6rem 1.15rem 0;
+#author-field {
+  padding: 0 1.15rem;
+  margin-top: 0.4rem;
+}
+
+.community-controls {
+  padding: 0 1.15rem;
+}
+
+.community-controls .field {
+  margin: 0.7rem 0 0;
+}
+
+.community-controls .segmented {
+  margin: 0.3rem 0 0;
 }
 
 #community-list {
@@ -1182,15 +1238,39 @@ button.generate:active:not(:disabled),
 }
 
 .community-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
   padding: 0.6rem 0.7rem;
   border-radius: var(--radius-sm);
   background: var(--color-surface);
+}
+
+/* Waypoint-outline thumbnail of the route, drawn in preview.ts. */
+.route-preview {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-line-soft);
+  color: var(--color-accent-fg);
+}
+
+.community-body {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .community-head {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+}
+
+.community-loc {
+  font-size: 0.78rem;
+  color: var(--color-muted);
 }
 
 .community-name {
@@ -1202,6 +1282,16 @@ button.generate:active:not(:disabled),
 .community-meta {
   font-size: 0.78rem;
   color: var(--color-muted);
+}
+
+.community-author {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.community-author strong {
+  color: var(--color-text);
+  font-weight: 600;
 }
 
 .community-rating {
@@ -1272,4 +1362,20 @@ button.generate:active:not(:disabled),
 
 .community-gpx:hover {
   text-decoration: underline;
+}
+
+/* Destructive, so kept quiet (muted text) and pushed to the far right, away
+   from Load/GPX; only reddens on hover. */
+.community-delete {
+  margin-left: auto;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  border: 0;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.community-delete:hover {
+  color: #d64545;
 }

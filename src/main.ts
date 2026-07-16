@@ -11,7 +11,8 @@ import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
 import { generateRoundTrips, rejectionText, type LoopOption } from './ors';
 import { detectClimbs, type Climb } from './climbs';
 import { compassLabel, type WindInfo } from './wind';
-import { searchPlaces, type GeocodeResult } from './geocode';
+import { searchPlaces, reverseCity, type GeocodeResult } from './geocode';
+import { buildRoutePreviewSvg } from './preview';
 import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
 import { buildShareUrl, parseShareUrl } from './share';
@@ -24,6 +25,9 @@ import {
   rateRoute,
   fetchMyRatings,
   gpxDownloadUrl,
+  softDeleteRoute,
+  purgeExpiredRoutes,
+  GRACE_DAYS,
   type CommunityRoute,
   type CommunitySort,
 } from './community';
@@ -110,7 +114,11 @@ const waterEl = document.querySelector<HTMLElement>('#water')!;
 const btnWater = document.querySelector<HTMLButtonElement>('#btn-water')!;
 const waterList = document.querySelector<HTMLUListElement>('#water-list')!;
 const btnPublish = document.querySelector<HTMLButtonElement>('#btn-publish')!;
-const communitySection = document.querySelector<HTMLElement>('#community-section')!;
+const mainTabs = document.querySelector<HTMLElement>('#main-tabs')!;
+const mainTabButtons = [...document.querySelectorAll<HTMLButtonElement>('#main-tabs .main-tab')];
+const plannerPanel = document.querySelector<HTMLElement>('#tab-planner')!;
+const communityPanel = document.querySelector<HTMLElement>('#tab-community')!;
+const brandSub = document.querySelector<HTMLElement>('.brand-sub')!;
 const accountSignedOut = document.querySelector<HTMLElement>('#account-signed-out')!;
 const accountSignedIn = document.querySelector<HTMLElement>('#account-signed-in')!;
 const accountEmail = document.querySelector<HTMLInputElement>('#account-email')!;
@@ -118,7 +126,19 @@ const btnSignin = document.querySelector<HTMLButtonElement>('#btn-signin')!;
 const accountName = document.querySelector<HTMLElement>('#account-name')!;
 const btnSignout = document.querySelector<HTMLButtonElement>('#btn-signout')!;
 const communitySortButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-sort button')];
+const communityBikeButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-bike button')];
+const communityHillsButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-hills button')];
+const communityDistMin = document.querySelector<HTMLInputElement>('#community-dist-min')!;
+const communityDistMax = document.querySelector<HTMLInputElement>('#community-dist-max')!;
+const communityDistValue = document.querySelector<HTMLElement>('#community-dist-value')!;
+const communityDistTrack = document.querySelector<HTMLElement>('#community-dist-track')!;
+const authorField = document.querySelector<HTMLElement>('#author-field')!;
+const authorNameInput = document.querySelector<HTMLInputElement>('#author-name')!;
 const communityList = document.querySelector<HTMLUListElement>('#community-list')!;
+
+// Last GPS fix, shared between the planner's locate button and the community
+// "Near me" sort / distance-away labels. Null until the user grants location.
+let lastKnownLocation: [number, number] | null = null;
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -430,7 +450,7 @@ function lineFeatureCollection(coordinates: [number, number, number][]): Feature
 btnExport.addEventListener('click', () => {
   if (!state.route) return;
   const name =
-    routeNameInput.value.trim() || `Lightroute ${new Date().toISOString().slice(0, 10)}`;
+    routeNameInput.value.trim() || `Lightmile ${new Date().toISOString().slice(0, 10)}`;
   downloadGpx(state.route.coordinates, name);
 });
 
@@ -444,7 +464,7 @@ btnShare.addEventListener('click', async () => {
   });
   if (navigator.share) {
     try {
-      await navigator.share({ title: 'Lightroute route', url });
+      await navigator.share({ title: 'Lightmile route', url });
       return;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return; // user cancelled
@@ -806,7 +826,8 @@ btnLocate.addEventListener('click', () => {
   setStatus('Getting your location…');
   navigator.geolocation.getCurrentPosition(
     (position) => {
-      addWaypoint([position.coords.longitude, position.coords.latitude], 'your location');
+      lastKnownLocation = [position.coords.longitude, position.coords.latitude];
+      addWaypoint(lastKnownLocation, 'your location');
     },
     () => setStatus('Could not get your location. Check the location permission.', true),
     { timeout: 10000, maximumAge: 60000 },
@@ -1448,25 +1469,145 @@ renderGradeLegend(gradeLegendEl);
 // Publishing/rating needs sign-in; browsing is public. The whole section only
 // appears when the backend is configured, so the planner works without it.
 let currentUser: User | null = null;
-let communitySort: CommunitySort = 'newest';
+// 'near' is a client-side proximity sort layered on a newest fetch.
+type CommunitySortMode = CommunitySort | 'near';
+let communitySort: CommunitySortMode = 'newest';
+let communityBikeFilter: 'all' | 'race' | 'gravel' | 'mtb' = 'all';
+let communityHillsFilter: 'all' | 'flat' | 'hilly' = 'all';
+// Last fetched page, kept so changing a client-side filter re-renders without
+// hitting the network again.
+let communityRoutes: CommunityRoute[] = [];
+let communityRatings = new Map<string, number>();
+
+const AUTHOR_KEY = 'lightmile-author';
+const CITY_CACHE_KEY = 'lightmile-city-cache';
+
+// Metres of climbing per km above which a route counts as "hilly".
+const HILLY_THRESHOLD = 10;
+// Distance slider ceiling (km); the max thumb here means "no upper limit".
+const DIST_MAX = 200;
+
+// Reverse-geocoded town per route id, cached across sessions so the community
+// list needs no extra DB column and no repeat lookups.
+const cityCache = new Map<string, string>();
+try {
+  const raw = localStorage.getItem(CITY_CACHE_KEY);
+  if (raw) {
+    for (const [id, city] of Object.entries(JSON.parse(raw) as Record<string, string>)) {
+      cityCache.set(id, city);
+    }
+  }
+} catch {
+  /* corrupt cache: ignore, it rebuilds itself */
+}
+
+function rememberCity(id: string, city: string): void {
+  cityCache.set(id, city);
+  try {
+    localStorage.setItem(CITY_CACHE_KEY, JSON.stringify(Object.fromEntries(cityCache)));
+  } catch {
+    /* storage full or unavailable: the in-memory cache still works this session */
+  }
+}
+
+function routeIsHilly(route: CommunityRoute): boolean {
+  const km = route.distanceMeters / 1000;
+  if (km <= 0) return false;
+  return route.ascendMeters / km >= HILLY_THRESHOLD;
+}
+
+function routeCentroid(route: CommunityRoute): [number, number] {
+  let sx = 0;
+  let sy = 0;
+  for (const [lng, lat] of route.waypoints) {
+    sx += lng;
+    sy += lat;
+  }
+  const n = route.waypoints.length || 1;
+  return [sx / n, sy / n];
+}
+
+/** Nearest approach (metres) of the route to the user, or null without a fix. */
+function routeDistanceFromUser(route: CommunityRoute): number | null {
+  if (!lastKnownLocation) return null;
+  let min = Infinity;
+  for (const wp of route.waypoints) {
+    const d = haversineMeters(lastKnownLocation, wp);
+    if (d < min) min = d;
+  }
+  return Number.isFinite(min) ? min : null;
+}
+
+function filteredCommunityRoutes(): CommunityRoute[] {
+  const distMin = Number(communityDistMin.value);
+  const distMax = Number(communityDistMax.value);
+  const list = communityRoutes.filter((route) => {
+    if (communityBikeFilter !== 'all' && route.bike !== communityBikeFilter) return false;
+    if (communityHillsFilter === 'flat' && routeIsHilly(route)) return false;
+    if (communityHillsFilter === 'hilly' && !routeIsHilly(route)) return false;
+    const km = route.distanceMeters / 1000;
+    if (km < distMin) return false;
+    if (distMax < DIST_MAX && km > distMax) return false;
+    return true;
+  });
+  if (communitySort === 'near' && lastKnownLocation) {
+    list.sort(
+      (a, b) => (routeDistanceFromUser(a) ?? Infinity) - (routeDistanceFromUser(b) ?? Infinity),
+    );
+  }
+  return list;
+}
 
 function updatePublishButton(): void {
   if (!isSupabaseConfigured) return;
   btnPublish.disabled = !state.route || state.waypoints.length < 2 || !currentUser;
-  btnPublish.title = currentUser ? '' : 'Sign in below to publish';
+  btnPublish.title = currentUser ? '' : 'Sign in on the Community tab to publish';
+}
+
+/** Switches between the Route planner and Community tabs. */
+function setActiveTab(name: 'planner' | 'community'): void {
+  mainTabButtons.forEach((btn) => {
+    const active = btn.dataset.tab === name;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', String(active));
+  });
+  plannerPanel.hidden = name !== 'planner';
+  communityPanel.hidden = name !== 'community';
+  brandSub.textContent = name === 'community' ? 'Community' : 'Route planner';
+  if (name === 'community') void refreshCommunity();
 }
 
 if (isSupabaseConfigured) {
-  communitySection.hidden = false;
+  mainTabs.hidden = false;
   btnPublish.hidden = false;
+
+  mainTabButtons.forEach((btn) => {
+    btn.addEventListener('click', () =>
+      setActiveTab(btn.dataset.tab === 'community' ? 'community' : 'planner'),
+    );
+  });
 
   onAuthChange((user) => {
     currentUser = user;
     accountSignedOut.hidden = !!user;
     accountSignedIn.hidden = !user;
-    if (user) accountName.textContent = user.email ?? 'you';
+    authorField.hidden = !user;
+    if (user) {
+      accountName.textContent = user.email ?? 'you';
+      // Prefill the display name from last time, else the email's local part.
+      if (!authorNameInput.value) {
+        authorNameInput.value =
+          localStorage.getItem(AUTHOR_KEY) ?? user.email?.split('@')[0] ?? '';
+      }
+      // Clean up this owner's routes whose grace period has passed.
+      void purgeExpiredRoutes();
+    }
     updatePublishButton();
     void refreshCommunity();
+  });
+
+  authorNameInput.addEventListener('input', () => {
+    localStorage.setItem(AUTHOR_KEY, authorNameInput.value.trim());
   });
 
   btnSignin.addEventListener('click', async () => {
@@ -1500,6 +1641,7 @@ if (isSupabaseConfigured) {
     try {
       await publishRoute({
         name,
+        authorName: authorNameInput.value.trim() || null,
         waypoints: state.waypoints.map((wp) => [...wp] as LngLat),
         bike: settings.bike,
         traffic: settings.traffic,
@@ -1518,27 +1660,115 @@ if (isSupabaseConfigured) {
     }
   });
 
+  // Newest/Top are server-side (they change the query order), so they refetch.
+  // "Near me" plus bike/hills/distance are client-side over the fetched page.
   communitySortButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      communitySort = (btn.dataset.sort as CommunitySort) ?? 'newest';
-      communitySortButtons.forEach((b) => {
-        const active = b === btn;
-        b.classList.toggle('active', active);
-        b.setAttribute('aria-pressed', String(active));
-      });
+    btn.addEventListener('click', async () => {
+      const sort = (btn.dataset.sort as CommunitySortMode) ?? 'newest';
+      if (sort === 'near' && !(await ensureLocation())) return; // no fix: keep current sort
+      communitySort = sort;
+      setActiveInGroup(communitySortButtons, btn);
       void refreshCommunity();
     });
+  });
+
+  communityBikeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      communityBikeFilter = (btn.dataset.bike as typeof communityBikeFilter) ?? 'all';
+      setActiveInGroup(communityBikeButtons, btn);
+      renderCommunityList(filteredCommunityRoutes(), communityRatings);
+    });
+  });
+
+  communityHillsButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      communityHillsFilter = (btn.dataset.hills as typeof communityHillsFilter) ?? 'all';
+      setActiveInGroup(communityHillsButtons, btn);
+      renderCommunityList(filteredCommunityRoutes(), communityRatings);
+    });
+  });
+
+  const onDistInput = (moved: 'min' | 'max') => () => {
+    syncCommunityDistSlider(moved);
+    renderCommunityList(filteredCommunityRoutes(), communityRatings);
+  };
+  communityDistMin.addEventListener('input', onDistInput('min'));
+  communityDistMax.addEventListener('input', onDistInput('max'));
+  syncCommunityDistSlider('min');
+}
+
+/** Resolves to the user's location, requesting a GPS fix once if needed. */
+function ensureLocation(): Promise<[number, number] | null> {
+  if (lastKnownLocation) return Promise.resolve(lastKnownLocation);
+  if (!('geolocation' in navigator)) {
+    setStatus('This browser does not support GPS location.', true);
+    return Promise.resolve(null);
+  }
+  setStatus('Getting your location…');
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        lastKnownLocation = [position.coords.longitude, position.coords.latitude];
+        setStatus('');
+        resolve(lastKnownLocation);
+      },
+      () => {
+        setStatus('Could not get your location. Check the location permission.', true);
+        resolve(null);
+      },
+      { timeout: 10000, maximumAge: 60000 },
+    );
+  });
+}
+
+/** Keeps the two distance thumbs apart and paints the label and track fill. */
+function syncCommunityDistSlider(moved: 'min' | 'max'): void {
+  const step = Number(communityDistMin.step) || 5;
+  let min = Number(communityDistMin.value);
+  let max = Number(communityDistMax.value);
+  if (min > max - step) {
+    if (moved === 'min') {
+      min = max - step;
+      communityDistMin.value = String(min);
+    } else {
+      max = min + step;
+      communityDistMax.value = String(max);
+    }
+  }
+  const maxLabel = max >= DIST_MAX ? `${DIST_MAX}+` : String(max);
+  communityDistValue.textContent =
+    min === 0 && max >= DIST_MAX ? 'Any length' : `${min} – ${maxLabel} km`;
+  const lo = Number(communityDistMin.min);
+  const hi = Number(communityDistMin.max);
+  const fromPct = ((min - lo) / (hi - lo)) * 100;
+  const toPct = ((max - lo) / (hi - lo)) * 100;
+  communityDistTrack.style.background =
+    `linear-gradient(to right, var(--color-border) ${fromPct}%, ` +
+    `var(--color-accent) ${fromPct}%, var(--color-accent) ${toPct}%, ` +
+    `var(--color-border) ${toPct}%)`;
+}
+
+/** Marks one button active within a segmented group, clearing the rest. */
+function setActiveInGroup(buttons: HTMLButtonElement[], active: HTMLButtonElement): void {
+  buttons.forEach((b) => {
+    const on = b === active;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
   });
 }
 
 async function refreshCommunity(): Promise<void> {
   if (!isSupabaseConfigured) return;
   try {
+    // 'near' has no server ordering; fetch newest and sort by distance client-side.
+    const serverSort: CommunitySort = communitySort === 'near' ? 'newest' : communitySort;
     const [routes, myRatings] = await Promise.all([
-      fetchCommunityRoutes(communitySort),
+      fetchCommunityRoutes(serverSort),
       fetchMyRatings(),
     ]);
-    renderCommunityList(routes, myRatings);
+    communityRoutes = routes;
+    communityRatings = myRatings;
+    renderCommunityList(filteredCommunityRoutes(), communityRatings);
   } catch (error) {
     // Non-fatal: the planner keeps working even if the library can't load.
     console.warn('Could not load community routes:', error);
@@ -1550,7 +1780,10 @@ function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, nu
   if (routes.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'community-empty';
-    empty.textContent = 'No routes published yet. Plan one and hit Publish.';
+    empty.textContent =
+      communityRoutes.length === 0
+        ? 'No routes published yet. Plan one and hit Publish.'
+        : 'No routes match these filters.';
     communityList.append(empty);
     return;
   }
@@ -1567,7 +1800,19 @@ function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, nu
     meta.className = 'community-meta';
     meta.textContent =
       `${(route.distanceMeters / 1000).toFixed(1)} km · +${Math.round(route.ascendMeters)} m · ${route.bike}`;
-    head.append(name, meta);
+    const author = document.createElement('span');
+    author.className = 'community-author';
+    const authorName = route.authorName?.trim() || 'Anonymous';
+    author.innerHTML = 'by ';
+    const authorStrong = document.createElement('strong');
+    authorStrong.textContent = authorName;
+    author.append(authorStrong);
+    const loc = document.createElement('span');
+    loc.className = 'community-loc';
+    loc.textContent = communityLocLabel(route);
+    loc.hidden = loc.textContent === '';
+    head.append(name, meta, author, loc);
+    void fillCity(route, loc);
 
     const ratingRow = document.createElement('div');
     ratingRow.className = 'community-rating';
@@ -1595,13 +1840,53 @@ function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, nu
         download.className = 'community-gpx';
         download.href = url;
         download.textContent = 'GPX';
-        download.setAttribute('download', `${route.name}.gpx`);
+        download.setAttribute('download', `${route.name.replace(/[^\w-]+/g, '_')}.gpx`);
         actions.append(download);
       }
     }
+    if (currentUser && route.ownerId === currentUser.id) {
+      const del = document.createElement('button');
+      del.className = 'community-delete';
+      del.type = 'button';
+      del.textContent = 'Delete';
+      del.addEventListener('click', () => void deleteCommunityRoute(route));
+      actions.append(del);
+    }
 
-    item.append(head, ratingRow, actions);
+    const body = document.createElement('div');
+    body.className = 'community-body';
+    body.append(head, ratingRow, actions);
+
+    const preview = buildRoutePreviewSvg(route.waypoints as [number, number][], route.closed);
+    item.append(preview, body);
     communityList.append(item);
+  }
+}
+
+/** City (once reverse-geocoded) plus distance-from-you, for a route's location line. */
+function communityLocLabel(route: CommunityRoute): string {
+  const parts: string[] = [];
+  const city = cityCache.get(route.id);
+  if (city) parts.push(city);
+  const away = routeDistanceFromUser(route);
+  if (away != null) {
+    const km = away / 1000;
+    parts.push(`${km < 10 ? km.toFixed(1) : Math.round(km)} km away`);
+  }
+  return parts.join(' · ');
+}
+
+/** Fills in a route's town name once, lazily, then updates its location line. */
+async function fillCity(route: CommunityRoute, loc: HTMLElement): Promise<void> {
+  if (cityCache.has(route.id)) return;
+  try {
+    const city = await reverseCity(routeCentroid(route));
+    if (!city) return;
+    rememberCity(route.id, city);
+    loc.textContent = communityLocLabel(route);
+    loc.hidden = loc.textContent === '';
+  } catch {
+    /* best-effort: a missing town label is not worth surfacing */
   }
 }
 
@@ -1654,6 +1939,22 @@ async function loadCommunityRoute(route: CommunityRoute): Promise<void> {
   map.fitBounds(bounds, { padding: 60 });
   await recalculateRoute();
   if (state.route) setStatus(`Loaded "${route.name}".`);
+}
+
+/** Soft-deletes the owner's own community route after a confirmation. */
+async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
+  const confirmed = window.confirm(
+    `Delete "${route.name}" from the community? It disappears from the library right away, ` +
+      `and is kept recoverable for ${GRACE_DAYS} days before it is removed for good.`,
+  );
+  if (!confirmed) return;
+  try {
+    await softDeleteRoute(route.id);
+    setStatus(`Deleted "${route.name}". Recoverable for ${GRACE_DAYS} days.`);
+    await refreshCommunity();
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : 'Could not delete this route.', true);
+  }
 }
 
 // --- Mobile bottom sheet ---

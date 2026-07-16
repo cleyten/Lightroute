@@ -6,7 +6,7 @@
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#2424e8" />
-    <title>Lightroute</title>
+    <title>Lightmile</title>
   </head>
   <body>
     <div id="app">
@@ -14,9 +14,16 @@
         <div id="sheet-handle" role="button" tabindex="0" aria-label="Expand or collapse the panel" aria-expanded="false"></div>
         <div id="sheet-body">
         <header id="brand">
-          <h1>Lightroute</h1>
+          <h1>Lightmile</h1>
           <span class="brand-sub">Route planner</span>
         </header>
+
+        <nav id="main-tabs" class="main-tabs" role="tablist" hidden>
+          <button type="button" class="main-tab active" data-tab="planner" role="tab" aria-selected="true" aria-controls="tab-planner">Route planner</button>
+          <button type="button" class="main-tab" data-tab="community" role="tab" aria-selected="false" aria-controls="tab-community">Community</button>
+        </nav>
+
+        <div id="tab-planner" class="tab-panel" role="tabpanel" aria-label="Route planner">
         <p class="hint">Click the map to add points. Drag a point to reroute, click the line to insert one, click a point to remove it, click point 1 to close the loop.</p>
 
         <section class="group">
@@ -69,6 +76,11 @@
             <div id="wind-chip" hidden></div>
             <div id="loop-options" hidden></div>
           </div>
+          <div id="controls">
+            <button id="btn-undo" disabled>Undo last point</button>
+            <button id="btn-clear" disabled>Clear all</button>
+            <button id="btn-reverse" disabled>Reverse direction</button>
+          </div>
         </section>
 
         <section class="group" id="route-group">
@@ -107,11 +119,6 @@
             <button id="btn-water" class="find-btn" type="button">Find water refills</button>
             <ul id="water-list"></ul>
           </div>
-          <div id="controls">
-            <button id="btn-undo" disabled>Undo last point</button>
-            <button id="btn-clear" disabled>Clear all</button>
-            <button id="btn-reverse" disabled>Reverse direction</button>
-          </div>
         </section>
 
         <section class="group" id="save-section">
@@ -127,9 +134,10 @@
           <button id="btn-publish" class="find-btn" type="button" hidden disabled>Publish to community</button>
           <ul id="saved-list"></ul>
         </section>
+        </div>
 
-        <section class="group" id="community-section" hidden>
-          <span class="group-label">Community</span>
+        <div id="tab-community" class="tab-panel" role="tabpanel" aria-label="Community" hidden>
+        <section class="group" id="community-section">
           <div id="account-signed-out">
             <span class="save-row">
               <input id="account-email" type="email" placeholder="you@example.com" autocomplete="email" aria-label="Email for a sign-in link" />
@@ -141,12 +149,43 @@
             <span class="account-who">Signed in as <strong id="account-name"></strong></span>
             <button id="btn-signout" type="button">Sign out</button>
           </div>
-          <div class="segmented" id="community-sort">
-            <button type="button" data-sort="newest" class="active" aria-pressed="true">Newest</button>
-            <button type="button" data-sort="top" aria-pressed="false">Top rated</button>
+          <label class="field" id="author-field" hidden>
+            Publish as
+            <input id="author-name" type="text" placeholder="Your name" autocomplete="name" maxlength="40" />
+          </label>
+          <div class="community-controls">
+            <span class="field">Sort</span>
+            <div class="segmented" id="community-sort">
+              <button type="button" data-sort="newest" class="active" aria-pressed="true">Newest</button>
+              <button type="button" data-sort="top" aria-pressed="false">Top rated</button>
+              <button type="button" data-sort="near" aria-pressed="false">Near me</button>
+            </div>
+            <span class="field">Bike</span>
+            <div class="segmented" id="community-bike">
+              <button type="button" data-bike="all" class="active" aria-pressed="true">All</button>
+              <button type="button" data-bike="race" aria-pressed="false">Race</button>
+              <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
+              <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
+            </div>
+            <span class="field">Hills</span>
+            <div class="segmented" id="community-hills">
+              <button type="button" data-hills="all" class="active" aria-pressed="true">All</button>
+              <button type="button" data-hills="flat" aria-pressed="false">Flat</button>
+              <button type="button" data-hills="hilly" aria-pressed="false">Hilly</button>
+            </div>
+            <span class="field" id="community-dist-field">
+              Distance
+              <span class="range-label"><span id="community-dist-value">Any length</span></span>
+            </span>
+            <div class="dual-range">
+              <div class="range-track" id="community-dist-track"></div>
+              <input id="community-dist-min" type="range" min="0" max="200" step="5" value="0" aria-label="Minimum route distance in km" />
+              <input id="community-dist-max" type="range" min="0" max="200" step="5" value="200" aria-label="Maximum route distance in km" />
+            </div>
           </div>
           <ul id="community-list"></ul>
         </section>
+        </div>
 
         <p id="status" role="status"></p>
         </div>

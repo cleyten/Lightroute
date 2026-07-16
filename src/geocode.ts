@@ -21,6 +21,33 @@ interface PhotonFeature {
   };
 }
 
+/**
+ * Reverse-geocodes a point to the name of the nearest populated place (city /
+ * town / village), or null. Used to label a community route with the town it
+ * runs through or around, from its centroid.
+ */
+export async function reverseCity(lngLat: [number, number]): Promise<string | null> {
+  const url =
+    `https://photon.komoot.io/reverse?lon=${lngLat[0].toFixed(4)}` +
+    `&lat=${lngLat[1].toFixed(4)}&lang=en`;
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const data = (await response.json()) as { features: PhotonFeature[] };
+  const PLACE = ['city', 'town', 'village', 'municipality', 'suburb'];
+  // Prefer a feature that carries an explicit city, then the nearest named
+  // place, then whatever city/name the closest feature happens to have.
+  for (const f of data.features) {
+    if (f.properties.city) return f.properties.city;
+  }
+  for (const f of data.features) {
+    if (f.properties.name && PLACE.includes(f.properties.osm_value ?? '')) {
+      return f.properties.name;
+    }
+  }
+  const first = data.features[0]?.properties;
+  return first?.city ?? first?.name ?? null;
+}
+
 export async function searchPlaces(
   query: string,
   bias: [number, number],

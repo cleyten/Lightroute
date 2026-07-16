@@ -1,4 +1,4 @@
--- Lightroute community backend: routes library + star ratings + GPX uploads.
+-- Lightmile community backend: routes library + star ratings + GPX uploads.
 --
 -- Run this once in the Supabase project's SQL editor (Dashboard > SQL Editor
 -- > New query > paste > Run) after creating the project. It has not been run
@@ -24,6 +24,7 @@ create table if not exists routes (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
+  author_name text,
   waypoints jsonb not null,
   bike text not null check (bike in ('race', 'gravel', 'mtb')),
   traffic smallint not null default 0 check (traffic in (0, 1, 2)),
@@ -32,8 +33,18 @@ create table if not exists routes (
   ascend_meters numeric not null default 0,
   source text not null default 'planned' check (source in ('planned', 'imported')),
   gpx_path text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Soft delete: set when the owner removes a route. The route is hidden from
+  -- the library immediately, but the row and its GPX file are kept for a grace
+  -- period (see purgeExpiredRoutes in src/community.ts) so a change of mind is
+  -- recoverable, then permanently purged.
+  deleted_at timestamptz
 );
+
+-- Additive migrations for projects created before these columns existed. Safe
+-- to re-run: `add column if not exists` is a no-op once the column is present.
+alter table routes add column if not exists author_name text;
+alter table routes add column if not exists deleted_at timestamptz;
 
 create table if not exists route_ratings (
   route_id uuid not null references routes (id) on delete cascade,
@@ -43,14 +54,20 @@ create table if not exists route_ratings (
   primary key (route_id, user_id)
 );
 
--- Convenience view: each route with its average rating and rating count.
-create or replace view routes_with_rating as
+-- Convenience view: each non-deleted route with its average rating and count.
+-- Dropped first (not just `create or replace`): adding columns to `routes`
+-- shifts the `r.*` column order, and `create or replace view` refuses to
+-- rename/reorder existing view columns. The `where` hides soft-deleted routes
+-- from every consumer that browses the library.
+drop view if exists routes_with_rating;
+create view routes_with_rating as
 select
   r.*,
   coalesce(avg(rr.stars), 0)::numeric(3, 2) as avg_rating,
   count(rr.*) as rating_count
 from routes r
 left join route_ratings rr on rr.route_id = r.id
+where r.deleted_at is null
 group by r.id;
 
 alter table routes enable row level security;
@@ -111,3 +128,10 @@ drop policy if exists "signed-in users can upload their own gpx" on storage.obje
 create policy "signed-in users can upload their own gpx"
   on storage.objects for insert
   with check (bucket_id = 'gpx-uploads' and auth.uid() = owner);
+
+-- Owners can delete their own GPX files, so purging a route after the grace
+-- period can also remove its stored track (not just the routes row).
+drop policy if exists "owners can delete their own gpx" on storage.objects;
+create policy "owners can delete their own gpx"
+  on storage.objects for delete
+  using (bucket_id = 'gpx-uploads' and auth.uid() = owner);
