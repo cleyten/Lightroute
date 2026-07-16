@@ -9,6 +9,10 @@ export default defineConfig(({ command }) => ({
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
+      // Registered explicitly in main.ts instead (onNeedRefresh reloads the
+      // page), so an already-open tab/installed app actually picks up a new
+      // deploy instead of silently activating it in the background only.
+      injectRegister: false,
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Lightmile',

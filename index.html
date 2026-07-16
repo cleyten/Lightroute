@@ -41,25 +41,30 @@
         </section>
 
         <section class="group">
-          <span class="group-label">Bike &amp; traffic</span>
-          <div class="segmented" id="bike-type">
-            <button type="button" data-bike="race" aria-pressed="false">Race</button>
-            <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
-            <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
-          </div>
-          <label class="field" id="traffic-label">
-            Avoid traffic
-            <select id="traffic-select">
-              <option value="0">No (fastest route)</option>
-              <option value="1">Quiet roads</option>
-              <option value="2">Very quiet roads</option>
-            </select>
-          </label>
-          <span class="field">Round-trip hills</span>
-          <div class="segmented" id="hills-type">
-            <button type="button" data-hills="avoid" aria-pressed="false">Avoid</button>
-            <button type="button" data-hills="mix" aria-pressed="true">Mix</button>
-            <button type="button" data-hills="prefer" aria-pressed="false">Prefer</button>
+          <button type="button" class="disclosure-toggle" id="planner-options-toggle" aria-expanded="false" aria-controls="planner-options-body">
+            <span class="group-label">Bike, traffic &amp; hills</span>
+            <span class="disclosure-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="planner-options-body" hidden>
+            <div class="segmented" id="bike-type">
+              <button type="button" data-bike="race" aria-pressed="false">Race</button>
+              <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
+              <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
+            </div>
+            <label class="field" id="traffic-label">
+              Avoid traffic
+              <select id="traffic-select">
+                <option value="0">No (fastest route)</option>
+                <option value="1">Quiet roads</option>
+                <option value="2">Very quiet roads</option>
+              </select>
+            </label>
+            <span class="field">Round-trip hills</span>
+            <div class="segmented" id="hills-type">
+              <button type="button" data-hills="avoid" aria-pressed="false">Avoid</button>
+              <button type="button" data-hills="mix" aria-pressed="true">Mix</button>
+              <button type="button" data-hills="prefer" aria-pressed="false">Prefer</button>
+            </div>
           </div>
         </section>
 
@@ -153,7 +158,11 @@
             Publish as
             <input id="author-name" type="text" placeholder="Your name" autocomplete="name" maxlength="40" />
           </label>
-          <div class="community-controls">
+          <button type="button" class="disclosure-toggle" id="community-filters-toggle" aria-expanded="false" aria-controls="community-filters-body">
+            <span class="group-label">Sort &amp; filter</span>
+            <span class="disclosure-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="community-controls" id="community-filters-body" hidden>
             <span class="field">Sort</span>
             <div class="segmented" id="community-sort">
               <button type="button" data-sort="newest" class="active" aria-pressed="true">Newest</button>

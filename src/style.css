@@ -132,6 +132,45 @@ body,
   font-weight: 700;
 }
 
+/* Collapsible "Options"/"Sort & filter" header: a button styled like the
+   group-label it replaces, plus a chevron that flips via [aria-expanded]. */
+.disclosure-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: 0 0 0.55rem;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.disclosure-toggle .group-label {
+  margin: 0;
+}
+
+.disclosure-toggle:hover .group-label {
+  color: var(--color-text);
+}
+
+.disclosure-chevron {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-left: 0.5rem;
+  border-right: 2px solid var(--color-muted);
+  border-bottom: 2px solid var(--color-muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.disclosure-toggle[aria-expanded='true'] .disclosure-chevron {
+  transform: rotate(225deg);
+}
+
 /* Map style switcher, floating bottom-left of the map beside the panel. */
 .mapstyle {
   position: absolute;

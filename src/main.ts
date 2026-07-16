@@ -32,6 +32,14 @@ import {
   type CommunitySort,
 } from './community';
 import type { User } from '@supabase/supabase-js';
+import { registerSW } from 'virtual:pwa-register';
+
+// The default injected registration only activates a new service worker in
+// the background; an already-open tab (or a phone's installed PWA, reopened
+// from its home-screen icon rather than truly relaunched) keeps running the
+// OLD cached JS/CSS until it happens to be fully reloaded. Reload once here
+// as soon as an update is detected, so a fresh deploy actually shows up.
+registerSW({ immediate: true, onNeedRefresh: () => window.location.reload() });
 
 type BikeType = 'race' | 'gravel' | 'mtb';
 
@@ -1041,6 +1049,26 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
+/**
+ * Wires a chevron toggle button to show/hide the content it controls, collapsed
+ * by default. Used for "Bike, traffic & hills" and "Sort & filter" so the
+ * primary action (search/generate, the route list) sits above the fold on
+ * mobile instead of being pushed down by settings most visits don't change.
+ */
+function initDisclosure(toggleSelector: string, bodySelector: string): void {
+  const toggle = document.querySelector<HTMLButtonElement>(toggleSelector);
+  const body = document.querySelector<HTMLElement>(bodySelector);
+  if (!toggle || !body) return;
+  toggle.addEventListener('click', () => {
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!expanded));
+    body.hidden = expanded;
+  });
+}
+
+initDisclosure('#planner-options-toggle', '#planner-options-body');
+initDisclosure('#community-filters-toggle', '#community-filters-body');
+
 bikeButtons.forEach((button) =>
   button.addEventListener('click', () => {
     settings.bike = button.dataset.bike as BikeType;
@@ -1971,7 +1999,10 @@ async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
   const distEl = document.querySelector<HTMLElement>('#stat-distance');
 
   const isMobile = () => window.matchMedia('(max-width: 700px)').matches;
-  let snap = 0; // 0 = peek, 1 = half, 2 = full
+  // Default to half (not peek): search/generate and the community list should
+  // be visible without dragging first, and the map shouldn't dominate the
+  // screen on load.
+  let snap = 1; // 0 = peek, 1 = half, 2 = full
 
   // Offsets in px to translate the sheet down by, per snap level.
   function offsets(): number[] {
