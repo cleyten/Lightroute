@@ -28,6 +28,11 @@ jobs:
         env:
           VITE_ORS_KEY: ${{ secrets.ORS_KEY }}
           VITE_THUNDERFOREST_KEY: ${{ secrets.THUNDERFOREST_KEY }}
+          # The Supabase URL and publishable ("anon") key are safe to be public
+          # (they ship in the client bundle; RLS protects the data). Inlined
+          # here so the deployed build works without extra GitHub secrets.
+          VITE_SUPABASE_URL: https://ovqjrpyvceehnzqnluut.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_iZQZuuhzPQuCqW00EqnkJg_4De09xR1
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

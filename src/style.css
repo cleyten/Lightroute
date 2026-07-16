@@ -1127,3 +1127,149 @@ button.generate:active:not(:disabled),
     transition: opacity 0.2s ease;
   }
 }
+
+/* --- Community library --- */
+#account-signed-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 1.15rem;
+  margin-top: 0.25rem;
+}
+
+.account-who {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.account-who strong {
+  color: var(--color-text);
+}
+
+#account-signed-in button {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+#account-signed-in button:hover {
+  border-color: var(--color-accent);
+  background: var(--color-hover);
+}
+
+#community-sort {
+  margin: 0.6rem 1.15rem 0;
+}
+
+#community-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.community-empty {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.community-item {
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.community-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.community-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.community-meta {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.community-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.stars {
+  display: inline-flex;
+  gap: 0.05rem;
+}
+
+.stars .star {
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--color-line-soft);
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.stars .star.filled {
+  color: #e6b800;
+}
+
+.stars.interactive .star {
+  cursor: pointer;
+}
+
+.stars.interactive .star:hover {
+  color: #e6b800;
+}
+
+.rating-summary {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.community-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+
+.community-load {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.community-load:hover {
+  border-color: var(--color-accent);
+  background: var(--color-hover);
+}
+
+.community-gpx {
+  font-size: 0.8rem;
+  color: var(--color-accent-fg);
+  text-decoration: none;
+}
+
+.community-gpx:hover {
+  text-decoration: underline;
+}

@@ -124,7 +124,28 @@
             <button id="btn-share" disabled>Share</button>
             <button id="btn-export" class="primary" disabled>Export GPX</button>
           </div>
+          <button id="btn-publish" class="find-btn" type="button" hidden disabled>Publish to community</button>
           <ul id="saved-list"></ul>
+        </section>
+
+        <section class="group" id="community-section" hidden>
+          <span class="group-label">Community</span>
+          <div id="account-signed-out">
+            <span class="save-row">
+              <input id="account-email" type="email" placeholder="you@example.com" autocomplete="email" aria-label="Email for a sign-in link" />
+              <button id="btn-signin" type="button">Sign in</button>
+            </span>
+            <p class="hint">Sign in with an email link to publish and rate routes. Browsing is open to everyone.</p>
+          </div>
+          <div id="account-signed-in" hidden>
+            <span class="account-who">Signed in as <strong id="account-name"></strong></span>
+            <button id="btn-signout" type="button">Sign out</button>
+          </div>
+          <div class="segmented" id="community-sort">
+            <button type="button" data-sort="newest" class="active" aria-pressed="true">Newest</button>
+            <button type="button" data-sort="top" aria-pressed="false">Top rated</button>
+          </div>
+          <ul id="community-list"></ul>
         </section>
 
         <p id="status" role="status"></p>

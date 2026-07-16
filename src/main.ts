@@ -16,6 +16,18 @@ import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
 import { buildShareUrl, parseShareUrl } from './share';
 import { parseGpx, isClosedTrack } from './gpximport';
+import { isSupabaseConfigured } from './supabase';
+import { sendMagicLink, signOut, onAuthChange } from './auth';
+import {
+  publishRoute,
+  fetchCommunityRoutes,
+  rateRoute,
+  fetchMyRatings,
+  gpxDownloadUrl,
+  type CommunityRoute,
+  type CommunitySort,
+} from './community';
+import type { User } from '@supabase/supabase-js';
 
 type BikeType = 'race' | 'gravel' | 'mtb';
 
@@ -49,6 +61,9 @@ const state = {
   // Route returns to waypoint 1 (a closed loop): set by generating a round
   // trip or by clicking near point 1.
   closed: false,
+  // Raw GPX text of a freshly imported, still-unedited route, so publishing
+  // can keep the original file. Cleared by any reroute (see recalculateRoute).
+  importedGpxText: null as string | null,
 };
 
 const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
@@ -94,6 +109,16 @@ const cafesList = document.querySelector<HTMLUListElement>('#cafes-list')!;
 const waterEl = document.querySelector<HTMLElement>('#water')!;
 const btnWater = document.querySelector<HTMLButtonElement>('#btn-water')!;
 const waterList = document.querySelector<HTMLUListElement>('#water-list')!;
+const btnPublish = document.querySelector<HTMLButtonElement>('#btn-publish')!;
+const communitySection = document.querySelector<HTMLElement>('#community-section')!;
+const accountSignedOut = document.querySelector<HTMLElement>('#account-signed-out')!;
+const accountSignedIn = document.querySelector<HTMLElement>('#account-signed-in')!;
+const accountEmail = document.querySelector<HTMLInputElement>('#account-email')!;
+const btnSignin = document.querySelector<HTMLButtonElement>('#btn-signin')!;
+const accountName = document.querySelector<HTMLElement>('#account-name')!;
+const btnSignout = document.querySelector<HTMLButtonElement>('#btn-signout')!;
+const communitySortButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-sort button')];
+const communityList = document.querySelector<HTMLUListElement>('#community-list')!;
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -370,6 +395,7 @@ btnClear.addEventListener('click', () => {
 
 btnReverse.addEventListener('click', () => {
   if (!state.route) return;
+  state.importedGpxText = null; // reversed route no longer matches the imported file
   const reversed = [...state.route.coordinates].reverse();
   state.route = {
     ...state.route,
@@ -794,12 +820,16 @@ gpxFileInput.addEventListener('change', async () => {
   gpxFileInput.value = ''; // allow re-selecting the same file later
   if (!file) return;
   try {
-    const coords = parseGpx(await file.text());
+    const text = await file.text();
+    const coords = parseGpx(text);
     const closed = isClosedTrack(coords);
     state.waypoints = extractTrackWaypoints(coords, closed);
     state.closed = closed;
     rebuildMarkers();
     await recalculateRoute();
+    // Keep the original file so publishing this route can preserve the exact
+    // ridden track. recalculateRoute() cleared it above, so set it back here.
+    state.importedGpxText = text;
     if (state.route) {
       const bounds = coords.reduce(
         (acc, c) => acc.extend([c[0], c[1]]),
@@ -1150,6 +1180,8 @@ function insertViaPoint(point: LngLat): void {
 
 async function recalculateRoute(): Promise<void> {
   const requestId = ++state.requestId;
+  // Any reroute means the route no longer matches the original imported file.
+  state.importedGpxText = null;
 
   // Manual routing replaces any round-trip suggestions.
   if (state.loopOptions.length > 0) {
@@ -1385,6 +1417,7 @@ function updateControls(): void {
   btnExport.disabled = !state.route;
   btnSave.disabled = !state.route || state.waypoints.length < 2;
   btnShare.disabled = !state.route || state.waypoints.length < 2;
+  updatePublishButton();
 }
 
 /** Loads a route shared via URL (see share.ts), if the link carries one. */
@@ -1410,6 +1443,218 @@ async function applySharedRoute(): Promise<void> {
 syncProfileUi();
 void refreshSavedList();
 renderGradeLegend(gradeLegendEl);
+
+// --- Community library (Supabase) ------------------------------------------
+// Publishing/rating needs sign-in; browsing is public. The whole section only
+// appears when the backend is configured, so the planner works without it.
+let currentUser: User | null = null;
+let communitySort: CommunitySort = 'newest';
+
+function updatePublishButton(): void {
+  if (!isSupabaseConfigured) return;
+  btnPublish.disabled = !state.route || state.waypoints.length < 2 || !currentUser;
+  btnPublish.title = currentUser ? '' : 'Sign in below to publish';
+}
+
+if (isSupabaseConfigured) {
+  communitySection.hidden = false;
+  btnPublish.hidden = false;
+
+  onAuthChange((user) => {
+    currentUser = user;
+    accountSignedOut.hidden = !!user;
+    accountSignedIn.hidden = !user;
+    if (user) accountName.textContent = user.email ?? 'you';
+    updatePublishButton();
+    void refreshCommunity();
+  });
+
+  btnSignin.addEventListener('click', async () => {
+    const email = accountEmail.value.trim();
+    if (!email) {
+      setStatus('Enter your email to get a sign-in link.', true);
+      return;
+    }
+    btnSignin.disabled = true;
+    try {
+      await sendMagicLink(email);
+      setStatus(`Sign-in link sent to ${email}. Open it on this device to finish.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not send the sign-in link.', true);
+    } finally {
+      btnSignin.disabled = false;
+    }
+  });
+
+  btnSignout.addEventListener('click', async () => {
+    await signOut();
+    setStatus('Signed out.');
+  });
+
+  btnPublish.addEventListener('click', async () => {
+    if (!state.route || state.waypoints.length < 2 || !currentUser) return;
+    const name =
+      routeNameInput.value.trim() || `Route ${new Date().toISOString().slice(0, 10)}`;
+    btnPublish.disabled = true;
+    setStatus('Publishing…');
+    try {
+      await publishRoute({
+        name,
+        waypoints: state.waypoints.map((wp) => [...wp] as LngLat),
+        bike: settings.bike,
+        traffic: settings.traffic,
+        closed: state.closed,
+        distanceMeters: state.route.distanceMeters,
+        ascendMeters: state.route.ascendMeters,
+        source: state.importedGpxText ? 'imported' : 'planned',
+        gpxText: state.importedGpxText,
+      });
+      setStatus(`Published "${name}" to the community library.`);
+      await refreshCommunity();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not publish this route.', true);
+    } finally {
+      updatePublishButton();
+    }
+  });
+
+  communitySortButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      communitySort = (btn.dataset.sort as CommunitySort) ?? 'newest';
+      communitySortButtons.forEach((b) => {
+        const active = b === btn;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-pressed', String(active));
+      });
+      void refreshCommunity();
+    });
+  });
+}
+
+async function refreshCommunity(): Promise<void> {
+  if (!isSupabaseConfigured) return;
+  try {
+    const [routes, myRatings] = await Promise.all([
+      fetchCommunityRoutes(communitySort),
+      fetchMyRatings(),
+    ]);
+    renderCommunityList(routes, myRatings);
+  } catch (error) {
+    // Non-fatal: the planner keeps working even if the library can't load.
+    console.warn('Could not load community routes:', error);
+  }
+}
+
+function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, number>): void {
+  communityList.innerHTML = '';
+  if (routes.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'community-empty';
+    empty.textContent = 'No routes published yet. Plan one and hit Publish.';
+    communityList.append(empty);
+    return;
+  }
+  for (const route of routes) {
+    const item = document.createElement('li');
+    item.className = 'community-item';
+
+    const head = document.createElement('div');
+    head.className = 'community-head';
+    const name = document.createElement('span');
+    name.className = 'community-name';
+    name.textContent = route.name;
+    const meta = document.createElement('span');
+    meta.className = 'community-meta';
+    meta.textContent =
+      `${(route.distanceMeters / 1000).toFixed(1)} km · +${Math.round(route.ascendMeters)} m · ${route.bike}`;
+    head.append(name, meta);
+
+    const ratingRow = document.createElement('div');
+    ratingRow.className = 'community-rating';
+    ratingRow.append(buildStars(route, myRatings.get(route.id) ?? 0));
+    const summary = document.createElement('span');
+    summary.className = 'rating-summary';
+    summary.textContent =
+      route.ratingCount > 0
+        ? `${route.avgRating.toFixed(1)} (${route.ratingCount})`
+        : 'no ratings yet';
+    ratingRow.append(summary);
+
+    const actions = document.createElement('div');
+    actions.className = 'community-actions';
+    const load = document.createElement('button');
+    load.className = 'community-load';
+    load.type = 'button';
+    load.textContent = 'Load';
+    load.addEventListener('click', () => void loadCommunityRoute(route));
+    actions.append(load);
+    if (route.gpxPath) {
+      const url = gpxDownloadUrl(route.gpxPath);
+      if (url) {
+        const download = document.createElement('a');
+        download.className = 'community-gpx';
+        download.href = url;
+        download.textContent = 'GPX';
+        download.setAttribute('download', `${route.name}.gpx`);
+        actions.append(download);
+      }
+    }
+
+    item.append(head, ratingRow, actions);
+    communityList.append(item);
+  }
+}
+
+/** A 5-star widget: interactive buttons when signed in, static stars otherwise. */
+function buildStars(route: CommunityRoute, myStars: number): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'stars';
+  const interactive = !!currentUser;
+  wrap.classList.toggle('interactive', interactive);
+  // Fill to the user's own rating if they rated, otherwise the rounded average.
+  const fillTo = myStars || Math.round(route.avgRating);
+  for (let n = 1; n <= 5; n++) {
+    const star = document.createElement(interactive ? 'button' : 'span');
+    star.className = 'star';
+    star.classList.toggle('filled', n <= fillTo);
+    if (myStars) star.classList.toggle('mine', n <= myStars);
+    star.textContent = '★';
+    if (interactive) {
+      const button = star as HTMLButtonElement;
+      button.type = 'button';
+      button.setAttribute('aria-label', `Rate ${n} star${n > 1 ? 's' : ''}`);
+      button.addEventListener('click', async () => {
+        try {
+          await rateRoute(route.id, n);
+          setStatus(`Rated "${route.name}" ${n} star${n > 1 ? 's' : ''}.`);
+          await refreshCommunity();
+        } catch (error) {
+          setStatus(error instanceof Error ? error.message : 'Could not save your rating.', true);
+        }
+      });
+    }
+    wrap.append(star);
+  }
+  return wrap;
+}
+
+/** Loads a community route: same as a saved route, recomputed via BRouter. */
+async function loadCommunityRoute(route: CommunityRoute): Promise<void> {
+  state.waypoints = route.waypoints.map((wp) => [...wp] as LngLat);
+  state.closed = route.closed;
+  settings.bike = (['race', 'gravel', 'mtb'].includes(route.bike) ? route.bike : 'race') as BikeType;
+  settings.traffic = [0, 1, 2].includes(route.traffic) ? route.traffic : 0;
+  persistSettings();
+  syncProfileUi();
+  rebuildMarkers();
+  const bounds = state.waypoints.reduce(
+    (acc, wp) => acc.extend(wp),
+    new maplibregl.LngLatBounds(state.waypoints[0], state.waypoints[0]),
+  );
+  map.fitBounds(bounds, { padding: 60 });
+  await recalculateRoute();
+  if (state.route) setStatus(`Loaded "${route.name}".`);
+}
 
 // --- Mobile bottom sheet ---
 // On phones the panel is a draggable sheet over a full-screen map. Dragging
