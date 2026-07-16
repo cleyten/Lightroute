@@ -24,9 +24,16 @@ const BROUTER_URL = 'https://brouter.de/brouter';
 export async function fetchRoute(
   waypoints: LngLat[],
   profile: string = 'fastbike-lowtraffic',
+  avoidZones: { lngLat: LngLat; radiusM: number }[] = [],
 ): Promise<RouteResult> {
   const lonlats = waypoints.map(([lng, lat]) => `${lng.toFixed(6)},${lat.toFixed(6)}`).join('|');
-  const url = `${BROUTER_URL}?lonlats=${lonlats}&profile=${profile}&alternativeidx=0&format=geojson`;
+  let url = `${BROUTER_URL}?lonlats=${lonlats}&profile=${profile}&alternativeidx=0&format=geojson`;
+  if (avoidZones.length > 0) {
+    const nogos = avoidZones
+      .map(({ lngLat: [lng, lat], radiusM }) => `${lng.toFixed(6)},${lat.toFixed(6)},${radiusM.toFixed(0)}`)
+      .join('|');
+    url += `&nogos=${nogos}`;
+  }
 
   const response = await fetch(url);
   const text = await response.text();

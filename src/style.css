@@ -589,6 +589,28 @@ select {
   padding: 0;
 }
 
+/* Avoid-zone row: the "Mark area" toggle plus the radius presets share one
+   line, so the presets' own .segmented margin is zeroed and it grows to fill
+   the remaining width instead. */
+#avoid-zone-row {
+  align-items: stretch;
+}
+
+#avoid-zone-row #btn-avoid-zone {
+  flex: 0 0 auto;
+}
+
+#avoid-zone-row #btn-avoid-zone.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+#avoid-zone-row .segmented {
+  flex: 1;
+  margin: 0;
+}
+
 #saved-list li {
   display: flex;
   align-items: center;

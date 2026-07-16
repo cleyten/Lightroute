@@ -88,6 +88,19 @@
           </div>
         </section>
 
+        <section class="group" id="avoid-zone-group">
+          <span class="field">Avoid an area</span>
+          <div class="save-row" id="avoid-zone-row">
+            <button id="btn-avoid-zone" type="button" title="Click the map to mark a circular area to avoid" aria-pressed="false">Mark area</button>
+            <div class="segmented" id="avoid-zone-radius">
+              <button type="button" data-radius="30" aria-pressed="false">30 m</button>
+              <button type="button" data-radius="60" class="active" aria-pressed="true">60 m</button>
+              <button type="button" data-radius="120" aria-pressed="false">120 m</button>
+            </div>
+          </div>
+          <button id="btn-clear-avoid-zones" class="find-btn" type="button" hidden>Clear avoid zones</button>
+        </section>
+
         <section class="group" id="route-group">
           <span class="group-label">Route</span>
           <p id="route-empty" class="empty-note">Add points on the map, or generate a round trip, to see distance, elevation and climbs.</p>
