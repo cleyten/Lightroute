@@ -1,4 +1,4 @@
--- Lightmile community backend: routes library + star ratings + GPX uploads.
+-- Lightmile community backend: routes library + star ratings + GPX/TCX uploads.
 --
 -- Run this once in the Supabase project's SQL editor (Dashboard > SQL Editor
 -- > New query > paste > Run) after creating the project. It has not been run
@@ -13,10 +13,13 @@
 --   for share links (see src/share.ts) — the app recalculates the actual
 --   route from these via BRouter, so this table never needs to store full
 --   track geometry for planned/round-trip routes.
--- - Imported GPX routes additionally get their original file kept in the
---   `gpx-uploads` storage bucket (`gpx_path`), so the exact ridden track can
---   still be re-downloaded even though `waypoints` only holds the
---   simplified, editable version shown on the map.
+-- - Imported GPX or TCX routes additionally get their original file kept in
+--   the `gpx-uploads` storage bucket (`gpx_path`; the bucket name predates TCX
+--   support and is kept as-is to avoid churn, it just holds either format
+--   now), so the exact ridden track can still be re-downloaded even though
+--   `waypoints` only holds the simplified, editable version shown on the map.
+--   `file_format` records which of the two it is, so the download link and
+--   the upload's extension/content-type can be chosen correctly.
 -- - One rating per person per route: route_ratings' primary key is
 --   (route_id, user_id), so a second rating updates rather than stacks.
 
@@ -33,6 +36,7 @@ create table if not exists routes (
   ascend_meters numeric not null default 0,
   source text not null default 'planned' check (source in ('planned', 'imported')),
   gpx_path text,
+  file_format text check (file_format in ('gpx', 'tcx')),
   created_at timestamptz not null default now(),
   -- Soft delete: set when the owner removes a route. The route is hidden from
   -- the library immediately, but the row and its GPX file are kept for a grace
@@ -45,6 +49,7 @@ create table if not exists routes (
 -- to re-run: `add column if not exists` is a no-op once the column is present.
 alter table routes add column if not exists author_name text;
 alter table routes add column if not exists deleted_at timestamptz;
+alter table routes add column if not exists file_format text check (file_format in ('gpx', 'tcx'));
 
 create table if not exists route_ratings (
   route_id uuid not null references routes (id) on delete cascade,

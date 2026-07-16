@@ -5,6 +5,8 @@
 import { supabase } from './supabase';
 import type { LngLat } from './routing';
 
+export type OriginalFileFormat = 'gpx' | 'tcx';
+
 export interface CommunityRoute {
   id: string;
   ownerId: string;
@@ -18,6 +20,7 @@ export interface CommunityRoute {
   ascendMeters: number;
   source: 'planned' | 'imported';
   gpxPath: string | null;
+  fileFormat: OriginalFileFormat | null;
   createdAt: string;
   avgRating: number;
   ratingCount: number;
@@ -34,8 +37,11 @@ export interface PublishInput {
   distanceMeters: number;
   ascendMeters: number;
   source: 'planned' | 'imported';
-  /** Original GPX text for imported routes; uploaded to storage when present. */
-  gpxText?: string | null;
+  /** Original file text for imported routes; uploaded to storage when present. */
+  originalFileText?: string | null;
+  /** Format of `originalFileText`; required alongside it so the upload gets
+   *  the right extension/content-type and the download link the right name. */
+  originalFileFormat?: OriginalFileFormat | null;
 }
 
 export type CommunitySort = 'newest' | 'top';
@@ -57,6 +63,7 @@ interface RouteRow {
   ascend_meters: number | string;
   source: 'planned' | 'imported';
   gpx_path: string | null;
+  file_format: OriginalFileFormat | null;
   created_at: string;
   avg_rating: number | string;
   rating_count: number | string;
@@ -79,13 +86,19 @@ export async function publishRoute(input: PublishInput): Promise<void> {
 
   // For imported routes, keep the original file so others can download the
   // exact ridden track. The storage RLS policy sets `owner` to this user, so
-  // the path only needs to be unique.
-  let gpxPath: string | null = null;
-  if (input.gpxText) {
-    gpxPath = `${userId}/${crypto.randomUUID()}.gpx`;
+  // the path only needs to be unique. The bucket is named 'gpx-uploads' from
+  // before TCX support existed; it holds either format now, kept as-is to
+  // avoid an unnecessary rename.
+  let filePath: string | null = null;
+  let fileFormat: OriginalFileFormat | null = null;
+  if (input.originalFileText && input.originalFileFormat) {
+    fileFormat = input.originalFileFormat;
+    filePath = `${userId}/${crypto.randomUUID()}.${fileFormat}`;
+    const mimeType =
+      fileFormat === 'tcx' ? 'application/vnd.garmin.tcx+xml' : 'application/gpx+xml';
     const { error: uploadError } = await db.storage
       .from('gpx-uploads')
-      .upload(gpxPath, new Blob([input.gpxText], { type: 'application/gpx+xml' }));
+      .upload(filePath, new Blob([input.originalFileText], { type: mimeType }));
     if (uploadError) throw uploadError;
   }
 
@@ -100,7 +113,8 @@ export async function publishRoute(input: PublishInput): Promise<void> {
     distance_meters: input.distanceMeters,
     ascend_meters: input.ascendMeters,
     source: input.source,
-    gpx_path: gpxPath,
+    gpx_path: filePath,
+    file_format: fileFormat,
   });
   if (error) throw error;
 }
@@ -191,8 +205,8 @@ export async function fetchMyRatings(): Promise<Map<string, number>> {
   return map;
 }
 
-/** Public download URL for an uploaded GPX file, or null if unavailable. */
-export function gpxDownloadUrl(gpxPath: string): string | null {
+/** Public download URL for an uploaded GPX/TCX file, or null if unavailable. */
+export function fileDownloadUrl(gpxPath: string): string | null {
   if (!supabase) return null;
   return supabase.storage.from('gpx-uploads').getPublicUrl(gpxPath).data.publicUrl;
 }
@@ -211,6 +225,7 @@ function mapRow(row: RouteRow): CommunityRoute {
     ascendMeters: Number(row.ascend_meters),
     source: row.source,
     gpxPath: row.gpx_path,
+    fileFormat: row.file_format ?? null,
     createdAt: row.created_at,
     avgRating: Number(row.avg_rating),
     ratingCount: Number(row.rating_count),

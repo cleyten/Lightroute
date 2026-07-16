@@ -4,6 +4,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
 import { fetchRoute, type LngLat, type RouteResult } from './routing';
 import { downloadGpx } from './gpx';
+import { downloadTcx } from './tcx';
+import { parseTcx } from './tcximport';
 import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
 import { renderElevationChart, clearElevationChart, renderGradeLegend } from './chart';
 import { surfaceBreakdown, renderSurfaceBar } from './surface';
@@ -24,7 +26,7 @@ import {
   fetchCommunityRoutes,
   rateRoute,
   fetchMyRatings,
-  gpxDownloadUrl,
+  fileDownloadUrl,
   softDeleteRoute,
   purgeExpiredRoutes,
   GRACE_DAYS,
@@ -73,9 +75,11 @@ const state = {
   // Route returns to waypoint 1 (a closed loop): set by generating a round
   // trip or by clicking near point 1.
   closed: false,
-  // Raw GPX text of a freshly imported, still-unedited route, so publishing
-  // can keep the original file. Cleared by any reroute (see recalculateRoute).
-  importedGpxText: null as string | null,
+  // Raw text of a freshly imported, still-unedited route's original file (and
+  // its format), so publishing can keep the original file. Cleared by any
+  // reroute (see recalculateRoute).
+  importedFileText: null as string | null,
+  importedFileFormat: null as 'gpx' | 'tcx' | null,
 };
 
 const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
@@ -90,6 +94,7 @@ const btnUndo = document.querySelector<HTMLButtonElement>('#btn-undo')!;
 const btnClear = document.querySelector<HTMLButtonElement>('#btn-clear')!;
 const btnReverse = document.querySelector<HTMLButtonElement>('#btn-reverse')!;
 const btnExport = document.querySelector<HTMLButtonElement>('#btn-export')!;
+const btnExportTcx = document.querySelector<HTMLButtonElement>('#btn-export-tcx')!;
 const btnSave = document.querySelector<HTMLButtonElement>('#btn-save')!;
 const routeNameInput = document.querySelector<HTMLInputElement>('#route-name')!;
 const savedList = document.querySelector<HTMLUListElement>('#saved-list')!;
@@ -423,7 +428,8 @@ btnClear.addEventListener('click', () => {
 
 btnReverse.addEventListener('click', () => {
   if (!state.route) return;
-  state.importedGpxText = null; // reversed route no longer matches the imported file
+  state.importedFileText = null; // reversed route no longer matches the imported file
+  state.importedFileFormat = null;
   const reversed = [...state.route.coordinates].reverse();
   state.route = {
     ...state.route,
@@ -460,6 +466,13 @@ btnExport.addEventListener('click', () => {
   const name =
     routeNameInput.value.trim() || `Lightmile ${new Date().toISOString().slice(0, 10)}`;
   downloadGpx(state.route.coordinates, name);
+});
+
+btnExportTcx.addEventListener('click', () => {
+  if (!state.route) return;
+  const name =
+    routeNameInput.value.trim() || `Lightmile ${new Date().toISOString().slice(0, 10)}`;
+  downloadTcx(state.route.coordinates, name);
 });
 
 btnShare.addEventListener('click', async () => {
@@ -850,7 +863,8 @@ gpxFileInput.addEventListener('change', async () => {
   if (!file) return;
   try {
     const text = await file.text();
-    const coords = parseGpx(text);
+    const isTcx = file.name.toLowerCase().endsWith('.tcx');
+    const coords = isTcx ? parseTcx(text) : parseGpx(text);
     const closed = isClosedTrack(coords);
     state.waypoints = extractTrackWaypoints(coords, closed);
     state.closed = closed;
@@ -858,7 +872,8 @@ gpxFileInput.addEventListener('change', async () => {
     await recalculateRoute();
     // Keep the original file so publishing this route can preserve the exact
     // ridden track. recalculateRoute() cleared it above, so set it back here.
-    state.importedGpxText = text;
+    state.importedFileText = text;
+    state.importedFileFormat = isTcx ? 'tcx' : 'gpx';
     if (state.route) {
       const bounds = coords.reduce(
         (acc, c) => acc.extend([c[0], c[1]]),
@@ -870,7 +885,7 @@ gpxFileInput.addEventListener('change', async () => {
       );
     }
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : 'Could not read that GPX file.', true);
+    setStatus(error instanceof Error ? error.message : 'Could not read that file.', true);
   }
 });
 
@@ -1230,7 +1245,8 @@ function insertViaPoint(point: LngLat): void {
 async function recalculateRoute(): Promise<void> {
   const requestId = ++state.requestId;
   // Any reroute means the route no longer matches the original imported file.
-  state.importedGpxText = null;
+  state.importedFileText = null;
+  state.importedFileFormat = null;
 
   // Manual routing replaces any round-trip suggestions.
   if (state.loopOptions.length > 0) {
@@ -1464,6 +1480,7 @@ function updateControls(): void {
   btnClear.disabled = state.waypoints.length === 0;
   btnReverse.disabled = !state.route;
   btnExport.disabled = !state.route;
+  btnExportTcx.disabled = !state.route;
   btnSave.disabled = !state.route || state.waypoints.length < 2;
   btnShare.disabled = !state.route || state.waypoints.length < 2;
   updatePublishButton();
@@ -1676,8 +1693,9 @@ if (isSupabaseConfigured) {
         closed: state.closed,
         distanceMeters: state.route.distanceMeters,
         ascendMeters: state.route.ascendMeters,
-        source: state.importedGpxText ? 'imported' : 'planned',
-        gpxText: state.importedGpxText,
+        source: state.importedFileText ? 'imported' : 'planned',
+        originalFileText: state.importedFileText,
+        originalFileFormat: state.importedFileFormat,
       });
       setStatus(`Published "${name}" to the community library.`);
       await refreshCommunity();
@@ -1862,13 +1880,16 @@ function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, nu
     load.addEventListener('click', () => void loadCommunityRoute(route));
     actions.append(load);
     if (route.gpxPath) {
-      const url = gpxDownloadUrl(route.gpxPath);
+      const url = fileDownloadUrl(route.gpxPath);
       if (url) {
+        // Rows published before file_format existed are all GPX (the only
+        // format the app produced back then).
+        const format = route.fileFormat ?? 'gpx';
         const download = document.createElement('a');
         download.className = 'community-gpx';
         download.href = url;
-        download.textContent = 'GPX';
-        download.setAttribute('download', `${route.name.replace(/[^\w-]+/g, '_')}.gpx`);
+        download.textContent = format.toUpperCase();
+        download.setAttribute('download', `${route.name.replace(/[^\w-]+/g, '_')}.${format}`);
         actions.append(download);
       }
     }

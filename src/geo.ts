@@ -25,6 +25,18 @@ export function cumulativeDistances(coords: Coord[]): number[] {
   return out;
 }
 
+/** Compass bearing from a to b, in degrees clockwise from north (0-360). */
+export function bearingDegrees(a: Coord, b: Coord): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const toDeg = (rad: number) => (rad * 180) / Math.PI;
+  const lat1 = toRad(a[1]);
+  const lat2 = toRad(b[1]);
+  const dLng = toRad(b[0] - a[0]);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
 /**
  * Total positive elevation gain over a track, ignoring sub-2m jitter.
  * Recomputed after reversing a route, since a descent one way is a climb
