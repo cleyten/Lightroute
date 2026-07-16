@@ -7,7 +7,7 @@ import { downloadGpx } from './gpx';
 import { downloadTcx } from './tcx';
 import { parseTcx } from './tcximport';
 import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
-import { renderElevationChart, clearElevationChart, renderGradeLegend } from './chart';
+import { renderGradeLegend } from './gradelegend';
 import { surfaceBreakdown, renderSurfaceBar } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
 import { generateRoundTrips, rejectionText, type LoopOption } from './ors';
@@ -19,20 +19,13 @@ import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
 import { buildShareUrl, parseShareUrl } from './share';
 import { parseGpx, isClosedTrack } from './gpximport';
-import { isSupabaseConfigured } from './supabase';
-import { sendMagicLink, signOut, onAuthChange } from './auth';
-import {
-  publishRoute,
-  fetchCommunityRoutes,
-  rateRoute,
-  fetchMyRatings,
-  fileDownloadUrl,
-  softDeleteRoute,
-  purgeExpiredRoutes,
-  GRACE_DAYS,
-  type CommunityRoute,
-  type CommunitySort,
-} from './community';
+import { isSupabaseConfigured } from './supabaseConfig';
+// `./chart` (chart.js/auto) and `./auth`/`./community` (@supabase/supabase-js)
+// are code-split: only dynamically import()-ed below (loadChartModule(),
+// loadCommunityBackend()), never statically, so neither heavy library is in
+// the initial bundle. Type-only imports below are erased at build time and
+// have no effect on this — they're the one safe exception.
+import type { CommunityRoute, CommunitySort } from './community';
 import type { User } from '@supabase/supabase-js';
 import { registerSW } from 'virtual:pwa-register';
 
@@ -1294,6 +1287,17 @@ function setRouteData(data: FeatureCollection): void {
 }
 
 /** Renders stats, elevation chart, surface bar and climbs for the current route (or clears them). */
+// The elevation chart (chart.js/auto) is only ever needed once a route
+// exists, so it's dynamically imported here rather than statically at the
+// top of the file, keeping the heavy library out of the initial bundle.
+// Cached after the first load so later route updates reuse the same module.
+type ChartModule = typeof import('./chart');
+let chartModulePromise: Promise<ChartModule> | null = null;
+function loadChartModule(): Promise<ChartModule> {
+  if (!chartModulePromise) chartModulePromise = import('./chart');
+  return chartModulePromise;
+}
+
 function renderRouteDetails(): void {
   // Any route change invalidates café results found for the previous route.
   clearCafes();
@@ -1314,13 +1318,18 @@ function renderRouteDetails(): void {
 
     chartWrap.hidden = false;
     gradeLegendEl.hidden = false;
-    renderElevationChart(chartCanvas, state.route.coordinates, (index) => {
-      const [lng, lat] = state.route!.coordinates[index];
-      hoverMarker.setLngLat([lng, lat]);
-      if (!hoverMarkerVisible) {
-        hoverMarker.addTo(map);
-        hoverMarkerVisible = true;
-      }
+    void loadChartModule().then(({ renderElevationChart }) => {
+      // The route may have changed again while the chart module was loading;
+      // read state.route fresh here rather than capturing it earlier.
+      if (!state.route) return;
+      renderElevationChart(chartCanvas, state.route.coordinates, (index) => {
+        const [lng, lat] = state.route!.coordinates[index];
+        hoverMarker.setLngLat([lng, lat]);
+        if (!hoverMarkerVisible) {
+          hoverMarker.addTo(map);
+          hoverMarkerVisible = true;
+        }
+      });
     });
 
     const totals = state.route.surface ?? surfaceBreakdown(state.route.messages);
@@ -1340,7 +1349,10 @@ function renderRouteDetails(): void {
     state.climbs = [];
     state.selectedClimb = -1;
     setClimbHighlight(null);
-    clearElevationChart();
+    // Nothing to clear if the chart module was never loaded (no route yet).
+    if (chartModulePromise) {
+      void chartModulePromise.then(({ clearElevationChart }) => clearElevationChart());
+    }
     if (hoverMarkerVisible) {
       hoverMarker.remove();
       hoverMarkerVisible = false;
@@ -1609,6 +1621,15 @@ function updatePublishButton(): void {
   btnPublish.title = currentUser ? '' : 'Sign in on the Community tab to publish';
 }
 
+// Everything below, up to the end of deleteCommunityRoute(), only runs once
+// the community backend chunk (chart-free, but pulls in @supabase/supabase-js
+// via ./auth and ./community) has loaded — see loadCommunityBackend() and its
+// call site further down. `auth`/`community` are the resolved module
+// namespaces, passed in once, rather than re-imported at each call site.
+function initCommunityFeature(
+  auth: typeof import('./auth'),
+  community: typeof import('./community'),
+): void {
 /** Switches between the Route planner and Community tabs. */
 function setActiveTab(name: 'planner' | 'community'): void {
   mainTabButtons.forEach((btn) => {
@@ -1632,7 +1653,7 @@ if (isSupabaseConfigured) {
     );
   });
 
-  onAuthChange((user) => {
+  auth.onAuthChange((user) => {
     currentUser = user;
     accountSignedOut.hidden = !!user;
     accountSignedIn.hidden = !user;
@@ -1645,7 +1666,7 @@ if (isSupabaseConfigured) {
           localStorage.getItem(AUTHOR_KEY) ?? user.email?.split('@')[0] ?? '';
       }
       // Clean up this owner's routes whose grace period has passed.
-      void purgeExpiredRoutes();
+      void community.purgeExpiredRoutes();
     }
     updatePublishButton();
     void refreshCommunity();
@@ -1663,7 +1684,7 @@ if (isSupabaseConfigured) {
     }
     btnSignin.disabled = true;
     try {
-      await sendMagicLink(email);
+      await auth.sendMagicLink(email);
       setStatus(`Sign-in link sent to ${email}. Open it on this device to finish.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not send the sign-in link.', true);
@@ -1673,7 +1694,7 @@ if (isSupabaseConfigured) {
   });
 
   btnSignout.addEventListener('click', async () => {
-    await signOut();
+    await auth.signOut();
     setStatus('Signed out.');
   });
 
@@ -1684,7 +1705,7 @@ if (isSupabaseConfigured) {
     btnPublish.disabled = true;
     setStatus('Publishing…');
     try {
-      await publishRoute({
+      await community.publishRoute({
         name,
         authorName: authorNameInput.value.trim() || null,
         waypoints: state.waypoints.map((wp) => [...wp] as LngLat),
@@ -1809,8 +1830,8 @@ async function refreshCommunity(): Promise<void> {
     // 'near' has no server ordering; fetch newest and sort by distance client-side.
     const serverSort: CommunitySort = communitySort === 'near' ? 'newest' : communitySort;
     const [routes, myRatings] = await Promise.all([
-      fetchCommunityRoutes(serverSort),
-      fetchMyRatings(),
+      community.fetchCommunityRoutes(serverSort),
+      community.fetchMyRatings(),
     ]);
     communityRoutes = routes;
     communityRatings = myRatings;
@@ -1880,7 +1901,7 @@ function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, nu
     load.addEventListener('click', () => void loadCommunityRoute(route));
     actions.append(load);
     if (route.gpxPath) {
-      const url = fileDownloadUrl(route.gpxPath);
+      const url = community.fileDownloadUrl(route.gpxPath);
       if (url) {
         // Rows published before file_format existed are all GPX (the only
         // format the app produced back then).
@@ -1959,7 +1980,7 @@ function buildStars(route: CommunityRoute, myStars: number): HTMLElement {
       button.setAttribute('aria-label', `Rate ${n} star${n > 1 ? 's' : ''}`);
       button.addEventListener('click', async () => {
         try {
-          await rateRoute(route.id, n);
+          await community.rateRoute(route.id, n);
           setStatus(`Rated "${route.name}" ${n} star${n > 1 ? 's' : ''}.`);
           await refreshCommunity();
         } catch (error) {
@@ -1994,16 +2015,37 @@ async function loadCommunityRoute(route: CommunityRoute): Promise<void> {
 async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
   const confirmed = window.confirm(
     `Delete "${route.name}" from the community? It disappears from the library right away, ` +
-      `and is kept recoverable for ${GRACE_DAYS} days before it is removed for good.`,
+      `and is kept recoverable for ${community.GRACE_DAYS} days before it is removed for good.`,
   );
   if (!confirmed) return;
   try {
-    await softDeleteRoute(route.id);
-    setStatus(`Deleted "${route.name}". Recoverable for ${GRACE_DAYS} days.`);
+    await community.softDeleteRoute(route.id);
+    setStatus(`Deleted "${route.name}". Recoverable for ${community.GRACE_DAYS} days.`);
     await refreshCommunity();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Could not delete this route.', true);
   }
+}
+} // end initCommunityFeature
+
+// Load the community backend (chart-free, but pulls in the heavy
+// @supabase/supabase-js via ./auth and ./community) off the critical path:
+// kicked off during idle time rather than gated behind the user actually
+// opening the Community tab, so it's typically ready by the time they do,
+// without delaying first paint/interactivity of the map and planner.
+// isSupabaseConfigured itself needs no heavy import (see supabaseConfig.ts),
+// so this only ever runs when the backend is actually configured. One
+// consequence: the Community tab and Publish button (revealed inside
+// initCommunityFeature) pop in a beat after first paint rather than being
+// present immediately.
+if (isSupabaseConfigured) {
+  const runWhenIdle: (cb: () => void) => void =
+    window.requestIdleCallback ?? ((cb) => window.setTimeout(cb, 2000));
+  runWhenIdle(() => {
+    void Promise.all([import('./auth'), import('./community')]).then(([auth, community]) =>
+      initCommunityFeature(auth, community),
+    );
+  });
 }
 
 // --- Mobile bottom sheet ---

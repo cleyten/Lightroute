@@ -1,19 +1,12 @@
 // Elevation profile chart (distance vs. elevation) rendered with Chart.js,
 // colored continuously by grade (steepness) rather than a flat single color.
+// Kept deliberately Chart.js-only (no DOM-only helpers) so the whole module
+// can be code-split and lazy-loaded — see main.ts's loadChartModule().
 import { Chart } from 'chart.js/auto';
 import { cumulativeDistances } from './geo';
+import { GRADE_STOPS } from './gradelegend';
 
 let chart: Chart | null = null;
-
-/** Grade thresholds (percent, upper bound inclusive) and their colors, mild to steep. */
-const GRADE_STOPS: { max: number; color: string; label: string }[] = [
-  { max: 0, color: '#4a90d9', label: 'Descent' },
-  { max: 3, color: '#63a922', label: '0–3%' },
-  { max: 6, color: '#d9a72e', label: '3–6%' },
-  { max: 9, color: '#e8571a', label: '6–9%' },
-  { max: 12, color: '#c62828', label: '9–12%' },
-  { max: Infinity, color: '#7a1414', label: '12%+' },
-];
 
 function gradeColor(pct: number): string {
   for (const stop of GRADE_STOPS) {
@@ -126,11 +119,4 @@ export function renderElevationChart(
 export function clearElevationChart(): void {
   chart?.destroy();
   chart = null;
-}
-
-/** Renders the static grade-color legend (thresholds never change per route). */
-export function renderGradeLegend(container: HTMLElement): void {
-  container.innerHTML = GRADE_STOPS.map(
-    ({ color, label }) => `<span><i style="background:${color}"></i>${label}</span>`,
-  ).join('');
 }
