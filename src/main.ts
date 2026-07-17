@@ -132,7 +132,6 @@ const mainTabs = document.querySelector<HTMLElement>('#main-tabs')!;
 const mainTabButtons = [...document.querySelectorAll<HTMLButtonElement>('#main-tabs .main-tab')];
 const plannerPanel = document.querySelector<HTMLElement>('#tab-planner')!;
 const communityPanel = document.querySelector<HTMLElement>('#tab-community')!;
-const brandSub = document.querySelector<HTMLElement>('.brand-sub')!;
 const accountSignedOut = document.querySelector<HTMLElement>('#account-signed-out')!;
 const accountSignedIn = document.querySelector<HTMLElement>('#account-signed-in')!;
 const accountEmail = document.querySelector<HTMLInputElement>('#account-email')!;
@@ -1747,7 +1746,6 @@ function setActiveTab(name: 'planner' | 'community'): void {
   });
   plannerPanel.hidden = name !== 'planner';
   communityPanel.hidden = name !== 'community';
-  brandSub.textContent = name === 'community' ? 'Community' : 'Route planner';
   if (name === 'community') void refreshCommunity();
 }
 
