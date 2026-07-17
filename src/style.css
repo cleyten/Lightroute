@@ -1345,6 +1345,50 @@ button.primary:active:not(:disabled),
   font-weight: 650;
 }
 
+/* Heatmap toggle: floating pill under the zoom controls (top-right). */
+.mapctl {
+  position: absolute;
+  top: 104px;
+  right: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.4rem 0.85rem;
+  background: var(--color-panel);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border: 0.5px solid var(--color-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-float);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.mapctl svg {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+}
+
+.mapctl:hover:not(.active) {
+  background: var(--color-hover);
+}
+
+.mapctl.active {
+  background: var(--color-accent);
+  border-color: transparent;
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-accent);
+}
+
+.mapctl.active svg {
+  color: var(--color-on-accent);
+}
+
 /* Shown only on the mobile sheet layout. */
 .gps-fab {
   display: none;
@@ -1620,6 +1664,12 @@ button.primary:active:not(:disabled),
     top: calc(0.75rem + env(safe-area-inset-top));
     bottom: auto;
     max-width: calc(100% - 1.5rem);
+  }
+
+  /* Keep the heatmap toggle under the (taller, safe-area-shifted) zoom stack. */
+  .mapctl {
+    top: calc(104px + env(safe-area-inset-top));
+    right: max(0.75rem, env(safe-area-inset-right));
   }
 
   /* Compact floating GPS button above the sheet. */

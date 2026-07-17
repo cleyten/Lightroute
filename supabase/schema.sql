@@ -29,6 +29,11 @@ create table if not exists routes (
   name text not null,
   author_name text,
   waypoints jsonb not null,
+  -- Simplified, elevation-stripped [lng, lat] track (~one point per 40 m),
+  -- captured at publish time so the community heatmap can aggregate routes
+  -- without re-routing every waypoint set. Nullable: older rows and any route
+  -- published before this column existed simply do not contribute.
+  geometry jsonb,
   bike text not null check (bike in ('race', 'gravel', 'mtb')),
   traffic smallint not null default 0 check (traffic in (0, 1, 2)),
   closed boolean not null default false,
@@ -50,6 +55,7 @@ create table if not exists routes (
 alter table routes add column if not exists author_name text;
 alter table routes add column if not exists deleted_at timestamptz;
 alter table routes add column if not exists file_format text check (file_format in ('gpx', 'tcx'));
+alter table routes add column if not exists geometry jsonb;
 
 create table if not exists route_ratings (
   route_id uuid not null references routes (id) on delete cascade,

@@ -24,6 +24,7 @@ import { sendMagicLink, signOut, onAuthChange } from './auth';
 import {
   publishRoute,
   fetchCommunityRoutes,
+  fetchRouteGeometries,
   rateRoute,
   fetchMyRatings,
   fileDownloadUrl,
@@ -210,10 +211,88 @@ function setBasemap(style: string): void {
       maxzoom: cfg.maxzoom,
       attribution: cfg.attribution,
     });
-    // Keep the raster below the route overlays so the route stays on top.
-    const beforeId = map.getLayer('route-casing') ? 'route-casing' : undefined;
+    // Keep the raster at the bottom of our overlays: below the heatmap (when
+    // present) and below the route, so both always read on top of it.
+    const beforeId = map.getLayer('heatmap-layer')
+      ? 'heatmap-layer'
+      : map.getLayer('route-casing')
+        ? 'route-casing'
+        : undefined;
     map.addLayer({ id: 'basemap-raster', type: 'raster', source: 'basemap-raster' }, beforeId);
   }
+}
+
+// --- Community heatmap ------------------------------------------------------
+let heatmapLoaded = false;
+let heatmapStale = false; // set after publishing so the next open refetches
+
+/** Down-sample a dense routed line to ~one point per `minGapM` metres and drop
+ *  elevation — compact enough to store per route and to feed the heatmap. */
+function simplifyForHeatmap(
+  coords: [number, number, number][],
+  minGapM = 40,
+): LngLat[] {
+  const round = (n: number): number => Number(n.toFixed(5));
+  const out: LngLat[] = [];
+  let last: LngLat | null = null;
+  for (const c of coords) {
+    const p: LngLat = [round(c[0]), round(c[1])];
+    if (!last || haversineMeters(last, p) >= minGapM) {
+      out.push(p);
+      last = p;
+    }
+  }
+  const end = coords[coords.length - 1];
+  if (end) {
+    const p: LngLat = [round(end[0]), round(end[1])];
+    if (!last || last[0] !== p[0] || last[1] !== p[1]) out.push(p);
+  }
+  return out;
+}
+
+/** Loads every community route's geometry as heatmap points. Returns the
+ *  number of routes mapped. */
+async function loadHeatmapData(): Promise<number> {
+  const geometries = await fetchRouteGeometries();
+  const features = geometries.flatMap((geometry) =>
+    geometry.map((coord) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: coord },
+      properties: {},
+    })),
+  );
+  const source = map.getSource('heatmap') as maplibregl.GeoJSONSource | undefined;
+  source?.setData({ type: 'FeatureCollection', features });
+  heatmapLoaded = true;
+  heatmapStale = false;
+  return geometries.length;
+}
+
+/** Wires the map's Heatmap toggle. Shown only when the community backend is
+ *  configured, since the heatmap is built from published community routes. */
+function initHeatmap(): void {
+  const toggle = document.querySelector<HTMLButtonElement>('#heatmap-toggle');
+  if (!toggle || !isSupabaseConfigured) return;
+  toggle.hidden = false;
+  toggle.addEventListener('click', async () => {
+    const on = toggle.getAttribute('aria-pressed') !== 'true';
+    toggle.setAttribute('aria-pressed', String(on));
+    toggle.classList.toggle('active', on);
+    if (!map.getLayer('heatmap-layer')) return;
+    map.setLayoutProperty('heatmap-layer', 'visibility', on ? 'visible' : 'none');
+    if (on && (!heatmapLoaded || heatmapStale)) {
+      toggle.disabled = true;
+      setStatus('Loading community heatmap…');
+      try {
+        const count = await loadHeatmapData();
+        setStatus(count > 0 ? '' : 'No community routes on the heatmap yet.');
+      } catch {
+        setStatus('Could not load the community heatmap.', true);
+      } finally {
+        toggle.disabled = false;
+      }
+    }
+  });
 }
 
 // Dot shown on the map while hovering the elevation chart.
@@ -319,6 +398,39 @@ map.on('load', () => {
     map.getCanvas().style.cursor = '';
   });
 
+  // Community heatmap: density of published routes, below the route overlays.
+  // Hidden until toggled on; populated on first activation (see initHeatmap).
+  map.addSource('heatmap', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+  map.addLayer(
+    {
+      id: 'heatmap-layer',
+      type: 'heatmap',
+      source: 'heatmap',
+      layout: { visibility: 'none' },
+      paint: {
+        'heatmap-weight': 0.7,
+        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 7, 0.7, 14, 1.5],
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 7, 6, 11, 14, 15, 26],
+        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.85, 15, 0.6],
+        'heatmap-color': [
+          'interpolate',
+          ['linear'],
+          ['heatmap-density'],
+          0, 'rgba(47, 91, 255, 0)',
+          0.15, 'rgba(47, 91, 255, 0.55)',
+          0.4, 'rgba(56, 150, 255, 0.75)',
+          0.65, 'rgba(90, 200, 170, 0.85)',
+          0.85, 'rgba(240, 180, 40, 0.9)',
+          1, 'rgba(230, 80, 30, 0.95)',
+        ],
+      },
+    },
+    map.getLayer('route-casing') ? 'route-casing' : undefined,
+  );
+
   // Highlight layer for a selected climb, drawn on top of the route.
   map.addSource('climb-highlight', {
     type: 'geojson',
@@ -359,6 +471,8 @@ map.on('load', () => {
       });
     });
   }
+
+  initHeatmap();
 
   // A shared route needs the 'route' source/layers above to already exist.
   void applySharedRoute();
@@ -1709,9 +1823,11 @@ if (isSupabaseConfigured) {
         distanceMeters: state.route.distanceMeters,
         ascendMeters: state.route.ascendMeters,
         source: state.importedFileText ? 'imported' : 'planned',
+        geometry: simplifyForHeatmap(state.route.coordinates),
         originalFileText: state.importedFileText,
         originalFileFormat: state.importedFileFormat,
       });
+      heatmapStale = true; // a new route should appear next time the heatmap opens
       setStatus(`Published "${name}" to the community library.`);
       await refreshCommunity();
     } catch (error) {
