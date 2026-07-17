@@ -980,7 +980,8 @@ button.primary:disabled {
 }
 
 .climb-item {
-  align-items: baseline;
+  align-items: center;
+  gap: 0.65rem;
 }
 
 .climb-item:hover {
@@ -993,10 +994,36 @@ button.primary:disabled {
   box-shadow: inset 2px 0 0 var(--color-climb);
 }
 
-.climb-where {
-  color: var(--color-muted);
-  min-width: 3.6rem;
+/* Severity chip: fixed steepness colours read on both themes. */
+.climb-grade {
+  flex: 0 0 auto;
+  min-width: 3rem;
+  text-align: center;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-xs);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.climb-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.climb-where {
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.climb-len {
+  color: var(--color-muted);
+  font-size: 0.75rem;
 }
 
 .climb-gain {
@@ -1279,20 +1306,46 @@ button.primary:disabled {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.1rem 0;
+  padding: 0.15rem 0;
+}
+
+.saved-preview {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-xs);
+  background: var(--color-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent-fg);
 }
 
 .saved-name {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
   text-align: left;
   min-height: 40px;
-  padding: 0.45rem 0.6rem;
-  font-size: 0.875rem;
+  padding: 0.3rem 0.5rem;
   border: none;
   border-radius: var(--radius-xs);
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
+}
+
+.saved-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-meta {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .saved-name:hover {

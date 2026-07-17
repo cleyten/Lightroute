@@ -1514,6 +1514,14 @@ function renderRoutePills(): void {
 }
 
 /** Lists detected climbs; clicking one highlights it on the map and zooms to it. */
+/** Steepness → chip colour, mild green through to hard red (Strava-like). */
+function climbGradeColor(pct: number): string {
+  if (pct >= 10) return '#c0392b';
+  if (pct >= 7) return '#e0621a';
+  if (pct >= 4.5) return '#d98a1e';
+  return '#4a9e5b';
+}
+
 function renderClimbsList(): void {
   climbsEl.hidden = state.climbs.length === 0;
   climbsList.innerHTML = '';
@@ -1522,10 +1530,11 @@ function renderClimbsList(): void {
     const button = document.createElement('button');
     button.className = 'climb-item';
     button.innerHTML =
-      `<span class="climb-where">km ${climb.startKm.toFixed(1)}</span>` +
-      `<span>${(climb.lengthM / 1000).toFixed(1)} km at ${climb.avgPct.toFixed(1)}%</span>` +
+      `<span class="climb-grade" style="background:${climbGradeColor(climb.avgPct)}">${climb.avgPct.toFixed(1)}%</span>` +
+      `<span class="climb-info"><span class="climb-where">km ${climb.startKm.toFixed(1)}</span>` +
+      `<span class="climb-len">${(climb.lengthM / 1000).toFixed(1)} km climb</span></span>` +
       `<span class="climb-gain">+${Math.round(climb.gainM)} m</span>`;
-    button.title = `Steepest 100 m: ${climb.maxPct.toFixed(0)}%`;
+    button.title = `Average ${climb.avgPct.toFixed(1)}%, steepest 100 m ${climb.maxPct.toFixed(0)}%`;
     button.addEventListener('click', () => {
       if (state.selectedClimb === index) {
         state.selectedClimb = -1;
@@ -1576,11 +1585,19 @@ async function refreshSavedList(): Promise<void> {
   savedList.innerHTML = '';
   for (const route of routes) {
     const item = document.createElement('li');
+    item.className = 'saved-item';
+
+    const preview = buildRoutePreviewSvg(route.waypoints, route.closed ?? false);
+    preview.classList.add('saved-preview');
 
     const label = document.createElement('button');
     label.className = 'saved-name';
-    label.textContent = `${route.name} · ${(route.distanceMeters / 1000).toFixed(1)} km`;
     label.title = 'Load this route';
+    const bikeLabel =
+      route.bike === 'mtb' ? 'MTB' : route.bike.charAt(0).toUpperCase() + route.bike.slice(1);
+    label.innerHTML =
+      `<span class="saved-title">${escapeHtml(route.name)}</span>` +
+      `<span class="saved-meta">${(route.distanceMeters / 1000).toFixed(1)} km · ${bikeLabel}</span>`;
     label.addEventListener('click', () => loadSaved(route));
 
     const remove = document.createElement('button');
@@ -1592,7 +1609,7 @@ async function refreshSavedList(): Promise<void> {
       await refreshSavedList();
     });
 
-    item.append(label, remove);
+    item.append(preview, label, remove);
     savedList.append(item);
   }
 }
