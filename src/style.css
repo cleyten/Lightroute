@@ -1251,12 +1251,16 @@ button.generate.is-loading::before {
 
 /* --- Wind chip ------------------------------------------------------------ */
 #wind-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   margin-top: 0.6rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: var(--grad-surface);
+  box-shadow: var(--edge-hi);
   font-size: 0.8125rem;
-  font-weight: 400;
+  font-weight: 500;
   text-transform: none;
   letter-spacing: normal;
   color: var(--color-muted);
