@@ -1573,6 +1573,52 @@ button.primary:active:not(:disabled),
   line-height: 1.5;
 }
 
+/* Loading skeletons for the community list. */
+.community-item.skeleton {
+  pointer-events: none;
+}
+
+.sk {
+  background: var(--color-hover);
+  border-radius: 6px;
+  animation: sk-pulse 1.3s ease-in-out infinite;
+}
+
+.sk-thumb {
+  flex: 0 0 auto;
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius);
+}
+
+.community-item.skeleton .community-body {
+  width: 100%;
+}
+
+.sk-line {
+  height: 0.7rem;
+  margin: 0.35rem 0;
+}
+
+.sk-line-lg {
+  width: 62%;
+  height: 0.95rem;
+}
+
+.sk-line-sm {
+  width: 38%;
+}
+
+@keyframes sk-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .community-item {
   display: flex;
   align-items: flex-start;

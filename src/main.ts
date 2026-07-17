@@ -153,9 +153,18 @@ const communityList = document.querySelector<HTMLUListElement>('#community-list'
 // "Near me" sort / distance-away labels. Null until the user grants location.
 let lastKnownLocation: [number, number] | null = null;
 
+// The "clean" vector base follows the UI theme: a dark map in dark mode so the
+// map doesn't glare against the charcoal panel (both are OpenFreeMap styles).
+const forcedTheme = document.documentElement.getAttribute('data-theme');
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const useDarkBase = forcedTheme === 'dark' || (forcedTheme !== 'light' && prefersDark);
+const CLEAN_STYLE_URL = useDarkBase
+  ? 'https://tiles.openfreemap.org/styles/dark'
+  : 'https://tiles.openfreemap.org/styles/positron';
+
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.openfreemap.org/styles/positron',
+  style: CLEAN_STYLE_URL,
   center: [5.3, 51.9], // Netherlands
   zoom: 7,
 });
@@ -1430,12 +1439,22 @@ function renderRouteDetails(): void {
   clearWater();
   cafesEl.hidden = !state.route;
   waterEl.hidden = !state.route;
+  const statsWereHidden = statsSection.hidden;
   statsSection.hidden = !state.route;
   routeEmpty.hidden = !!state.route;
 
   if (state.route) {
-    statDistance.innerHTML = `${(state.route.distanceMeters / 1000).toFixed(1)}<span class="unit">km</span>`;
-    statAscend.innerHTML = `${Math.round(state.route.ascendMeters)}<span class="unit">m</span>`;
+    const km = state.route.distanceMeters / 1000;
+    const ascend = Math.round(state.route.ascendMeters);
+    // Count the numbers up the first time a route appears; snap on later
+    // re-routes (e.g. while dragging) so it doesn't flicker.
+    if (statsWereHidden) {
+      animateStat(statDistance, km, 'km', 1);
+      animateStat(statAscend, ascend, 'm', 0);
+    } else {
+      setStatValue(statDistance, km, 'km', 1);
+      setStatValue(statAscend, ascend, 'm', 0);
+    }
 
     state.climbs = detectClimbs(state.route.coordinates);
     state.selectedClimb = -1;
@@ -1514,6 +1533,29 @@ function renderRoutePills(): void {
 }
 
 /** Lists detected climbs; clicking one highlights it on the map and zooms to it. */
+/** Writes a stat value with its small unit label. */
+function setStatValue(el: HTMLElement, value: number, unit: string, decimals: number): void {
+  el.innerHTML = `${value.toFixed(decimals)}<span class="unit">${unit}</span>`;
+}
+
+/** Counts a stat up from zero (easeOutCubic); snaps instantly under reduced motion. */
+function animateStat(el: HTMLElement, target: number, unit: string, decimals: number): void {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    setStatValue(el, target, unit, decimals);
+    return;
+  }
+  const duration = 550;
+  const start = performance.now();
+  const step = (now: number): void => {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    setStatValue(el, target * eased, unit, decimals);
+    if (t < 1) requestAnimationFrame(step);
+    else setStatValue(el, target, unit, decimals);
+  };
+  requestAnimationFrame(step);
+}
+
 /** Steepness → chip colour, mild green through to hard red (Strava-like). */
 function climbGradeColor(pct: number): string {
   if (pct >= 10) return '#c0392b';
@@ -1967,6 +2009,8 @@ function setActiveInGroup(buttons: HTMLButtonElement[], active: HTMLButtonElemen
 
 async function refreshCommunity(): Promise<void> {
   if (!isSupabaseConfigured) return;
+  // Show skeletons on the first load (empty list) so the panel doesn't flash blank.
+  if (communityList.childElementCount === 0) renderCommunitySkeletons();
   try {
     // 'near' has no server ordering; fetch newest and sort by distance client-side.
     const serverSort: CommunitySort = communitySort === 'near' ? 'newest' : communitySort;
@@ -1980,6 +2024,23 @@ async function refreshCommunity(): Promise<void> {
   } catch (error) {
     // Non-fatal: the planner keeps working even if the library can't load.
     console.warn('Could not load community routes:', error);
+  }
+}
+
+/** Placeholder shimmer rows shown while the community library loads. */
+function renderCommunitySkeletons(count = 3): void {
+  communityList.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const li = document.createElement('li');
+    li.className = 'community-item skeleton';
+    li.innerHTML =
+      '<div class="sk sk-thumb"></div>' +
+      '<div class="community-body">' +
+      '<div class="sk sk-line sk-line-lg"></div>' +
+      '<div class="sk sk-line"></div>' +
+      '<div class="sk sk-line sk-line-sm"></div>' +
+      '</div>';
+    communityList.append(li);
   }
 }
 
