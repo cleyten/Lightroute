@@ -453,12 +453,28 @@ map.on('load', () => {
     map.getCanvas().style.cursor = '';
   });
 
-  // Wire the basemap switcher now that the overlay layers exist.
+  // Map-style chooser: a popover opened from the layers tool in the stack.
   const mapstyleEl = document.querySelector<HTMLDivElement>('#mapstyle');
-  if (mapstyleEl) {
-    mapstyleEl.hidden = false;
+  const layersToggle = document.querySelector<HTMLButtonElement>('#layers-toggle');
+  if (mapstyleEl && layersToggle) {
     // OpenCycleMap (the cycling layer) only works with a Thunderforest key.
     if (!THUNDERFOREST_KEY) mapstyleEl.querySelector('[data-style="cycling"]')?.remove();
+    const setStyleMenuOpen = (open: boolean): void => {
+      mapstyleEl.hidden = !open;
+      layersToggle.setAttribute('aria-expanded', String(open));
+    };
+    layersToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setStyleMenuOpen(Boolean(mapstyleEl.hidden));
+    });
+    // A click anywhere else closes the popover.
+    document.addEventListener('click', (event) => {
+      if (mapstyleEl.hidden) return;
+      const target = event.target as Node;
+      if (!mapstyleEl.contains(target) && !layersToggle.contains(target)) {
+        setStyleMenuOpen(false);
+      }
+    });
     mapstyleEl.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
       btn.addEventListener('click', () => {
         setBasemap(btn.dataset.style ?? 'clean');
@@ -467,6 +483,7 @@ map.on('load', () => {
           b.classList.toggle('active', active);
           b.setAttribute('aria-pressed', String(active));
         });
+        setStyleMenuOpen(false);
       });
     });
   }
@@ -2173,10 +2190,6 @@ async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
     sheetEl.style.transition = animate ? '' : 'none';
     sheetEl.style.transform = `translateY(${offsets()[snap]}px)`;
     handleEl.setAttribute('aria-expanded', String(snap > 0));
-    if (fab) {
-      fab.style.opacity = snap === 0 ? '1' : '0';
-      fab.style.pointerEvents = snap === 0 ? 'auto' : 'none';
-    }
   }
 
   // Clear inline styles on desktop so the sheet transform never leaks there.
@@ -2186,10 +2199,6 @@ async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
     } else {
       sheetEl.style.transform = '';
       sheetEl.style.transition = '';
-      if (fab) {
-        fab.style.opacity = '';
-        fab.style.pointerEvents = '';
-      }
     }
   }
 

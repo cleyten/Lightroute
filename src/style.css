@@ -1297,6 +1297,7 @@ button.primary:active:not(:disabled),
 .find-btn:active:not(:disabled),
 .icon-btn:active:not(:disabled),
 .mapstyle button:active,
+.map-tool:active,
 .community-load:active {
   transform: translateY(1px) scale(0.99);
 }
@@ -1329,17 +1330,71 @@ button.primary:active:not(:disabled),
   cursor: pointer;
 }
 
-/* Map style switcher: floating control beside the panel. */
-.mapstyle {
+/* Circular map-tool stack (top-right, under the zoom controls) — GPS,
+   heatmap and the map-style opener, matching a premium map app. */
+.map-tools {
   position: absolute;
-  left: calc(380px + 24px);
-  bottom: 12px;
+  top: 104px;
+  right: 12px;
   z-index: 2;
   display: flex;
-  flex-wrap: wrap;
-  max-width: 360px;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.map-tool {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0.5px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-panel);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  color: var(--color-text);
+  box-shadow: var(--shadow-float);
+  cursor: pointer;
+}
+
+.map-tool svg {
+  color: var(--color-muted);
+}
+
+.map-tool:hover:not(.active):not([aria-expanded='true']) {
+  background: var(--color-hover);
+}
+
+.map-tool:hover svg {
+  color: var(--color-text);
+}
+
+.map-tool.active,
+.map-tool[aria-expanded='true'] {
+  background: var(--color-accent);
+  border-color: transparent;
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-accent);
+}
+
+.map-tool.active svg,
+.map-tool[aria-expanded='true'] svg {
+  color: var(--color-on-accent);
+}
+
+/* Map-style chooser: a popover that opens to the left of the tool stack. */
+.mapstyle {
+  position: absolute;
+  top: 104px;
+  right: 68px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
-  padding: 4px;
+  min-width: 152px;
+  padding: 5px;
   background: var(--color-panel);
   -webkit-backdrop-filter: saturate(180%) blur(24px);
   backdrop-filter: saturate(180%) blur(24px);
@@ -1349,13 +1404,15 @@ button.primary:active:not(:disabled),
 }
 
 .mapstyle button {
-  min-height: 34px;
+  min-height: 40px;
+  text-align: left;
   border: 0;
   background: transparent;
   color: var(--color-text);
-  font-size: 0.8125rem;
+  font-family: inherit;
+  font-size: 0.875rem;
   font-weight: 550;
-  padding: 0.35rem 0.75rem;
+  padding: 0.4rem 0.7rem;
   border-radius: var(--radius-xs);
   cursor: pointer;
 }
@@ -1368,55 +1425,6 @@ button.primary:active:not(:disabled),
   background: var(--color-accent);
   color: var(--color-on-accent);
   font-weight: 650;
-}
-
-/* Heatmap toggle: floating pill under the zoom controls (top-right). */
-.mapctl {
-  position: absolute;
-  top: 104px;
-  right: 12px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: 40px;
-  padding: 0.4rem 0.85rem;
-  background: var(--color-panel);
-  -webkit-backdrop-filter: saturate(180%) blur(24px);
-  backdrop-filter: saturate(180%) blur(24px);
-  border: 0.5px solid var(--color-border);
-  border-radius: 999px;
-  box-shadow: var(--shadow-float);
-  color: var(--color-text);
-  font-family: inherit;
-  font-size: 0.8125rem;
-  font-weight: 550;
-  cursor: pointer;
-}
-
-.mapctl svg {
-  flex: 0 0 auto;
-  color: var(--color-muted);
-}
-
-.mapctl:hover:not(.active) {
-  background: var(--color-hover);
-}
-
-.mapctl.active {
-  background: var(--color-accent);
-  border-color: transparent;
-  color: var(--color-on-accent);
-  box-shadow: var(--shadow-accent);
-}
-
-.mapctl.active svg {
-  color: var(--color-on-accent);
-}
-
-/* Shown only on the mobile sheet layout. */
-.gps-fab {
-  display: none;
 }
 
 #sheet-handle {
@@ -1682,40 +1690,14 @@ button.primary:active:not(:disabled),
     padding-right: 1.25rem;
   }
 
-  /* Compact floating map-layer control, clear of the notch/safe area. */
-  .mapstyle {
-    left: max(0.75rem, env(safe-area-inset-left));
-    right: auto;
-    top: calc(0.75rem + env(safe-area-inset-top));
-    bottom: auto;
-    max-width: calc(100% - 1.5rem);
-  }
-
-  /* Keep the heatmap toggle under the (taller, safe-area-shifted) zoom stack. */
-  .mapctl {
+  /* Keep the tool stack + style popover under the safe-area-shifted zoom stack. */
+  .map-tools {
     top: calc(104px + env(safe-area-inset-top));
     right: max(0.75rem, env(safe-area-inset-right));
   }
 
-  /* Compact floating GPS button above the sheet. */
-  .gps-fab {
-    display: flex;
-    position: fixed;
-    right: max(1rem, env(safe-area-inset-right));
-    bottom: calc(30vh + 1rem + env(safe-area-inset-bottom));
-    z-index: 4;
-    width: 48px;
-    height: 48px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    border: 0.5px solid var(--color-border);
-    background: var(--color-panel);
-    -webkit-backdrop-filter: saturate(180%) blur(24px);
-    backdrop-filter: saturate(180%) blur(24px);
-    color: var(--color-accent-fg);
-    box-shadow: var(--shadow-float);
-    cursor: pointer;
-    transition: opacity 0.2s ease;
+  .mapstyle {
+    top: calc(104px + env(safe-area-inset-top));
+    right: calc(max(0.75rem, env(safe-area-inset-right)) + 56px);
   }
 }
