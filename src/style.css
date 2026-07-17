@@ -32,15 +32,15 @@
   --color-border-strong: rgba(0, 0, 0, 0.12);
   --color-track: rgba(0, 0, 0, 0.14);
 
-  /* Accent — fixed brand navy, used with depth via tints. */
-  --color-accent: #183153;
-  --color-accent-hi: #244470; /* lifted navy for hover */
-  --color-accent-fg: #183153; /* readable-on-page text accent */
-  --color-accent-tint: rgba(24, 49, 83, 0.09);
-  --color-accent-tint-strong: rgba(24, 49, 83, 0.14);
+  /* Accent — electric cobalt, used with depth via tints. */
+  --color-accent: #2f5bff;
+  --color-accent-hi: #4d74ff; /* lifted for hover */
+  --color-accent-fg: #1f49e0; /* readable-on-page text accent */
+  --color-accent-tint: rgba(47, 91, 255, 0.09);
+  --color-accent-tint-strong: rgba(47, 91, 255, 0.15);
   --color-on-accent: #ffffff;
-  --shadow-accent: 0 1px 2px rgba(24, 49, 83, 0.24),
-    0 6px 18px rgba(24, 49, 83, 0.22);
+  --shadow-accent: 0 1px 2px rgba(33, 72, 236, 0.26),
+    0 6px 18px rgba(33, 72, 236, 0.26);
 
   /* The "Lightmile" wordmark keeps its original brand blue, independent of the
      UI accent — used only by #brand h1. */
@@ -73,7 +73,7 @@
   );
   --grad-raised: linear-gradient(180deg, #ffffff, #f1f1f5);
   --grad-surface: linear-gradient(180deg, #f7f7f9, #eaeaee);
-  --grad-primary: linear-gradient(180deg, #26497a, #15304f);
+  --grad-primary: linear-gradient(180deg, #4570ff, #2148ec);
   --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.8);
   --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.07);
   --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.06);
@@ -97,11 +97,11 @@
     --color-border: rgba(255, 255, 255, 0.1);
     --color-border-strong: rgba(255, 255, 255, 0.18);
     --color-track: rgba(255, 255, 255, 0.22);
-    --color-accent: #2f4f7a;
-    --color-accent-hi: #3c608f;
-    --color-accent-fg: #9db8dd;
-    --color-accent-tint: rgba(157, 184, 221, 0.12);
-    --color-accent-tint-strong: rgba(157, 184, 221, 0.2);
+    --color-accent: #3f68ff;
+    --color-accent-hi: #5a7dff;
+    --color-accent-fg: #8fa8ff;
+    --color-accent-tint: rgba(143, 168, 255, 0.13);
+    --color-accent-tint-strong: rgba(143, 168, 255, 0.22);
     --color-on-accent: #ffffff;
     --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.45);
     --color-climb: #e8823f;
@@ -118,7 +118,7 @@
     );
     --grad-raised: linear-gradient(180deg, #434349, #373739);
     --grad-surface: linear-gradient(180deg, #313137, #262629);
-    --grad-primary: linear-gradient(180deg, #3a5f8f, #2a4770);
+    --grad-primary: linear-gradient(180deg, #4d74ff, #2f5bff);
     --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07);
     --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.4);
     --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -138,11 +138,11 @@
   --color-border: rgba(255, 255, 255, 0.1);
   --color-border-strong: rgba(255, 255, 255, 0.18);
   --color-track: rgba(255, 255, 255, 0.22);
-  --color-accent: #2f4f7a;
-  --color-accent-hi: #3c608f;
-  --color-accent-fg: #9db8dd;
-  --color-accent-tint: rgba(157, 184, 221, 0.12);
-  --color-accent-tint-strong: rgba(157, 184, 221, 0.2);
+  --color-accent: #3f68ff;
+  --color-accent-hi: #5a7dff;
+  --color-accent-fg: #8fa8ff;
+  --color-accent-tint: rgba(143, 168, 255, 0.13);
+  --color-accent-tint-strong: rgba(143, 168, 255, 0.22);
   --color-on-accent: #ffffff;
   --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.45);
   --color-climb: #e8823f;
@@ -159,7 +159,7 @@
   );
   --grad-raised: linear-gradient(180deg, #434349, #373739);
   --grad-surface: linear-gradient(180deg, #313137, #262629);
-  --grad-primary: linear-gradient(180deg, #3a5f8f, #2a4770);
+  --grad-primary: linear-gradient(180deg, #4d74ff, #2f5bff);
   --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.4);
   --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -1284,7 +1284,7 @@ button.primary:active:not(:disabled),
   height: 14px;
   border-radius: 50%;
   background: #fff;
-  border: 3px solid #183153;
+  border: 3px solid #2f5bff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
@@ -1292,7 +1292,7 @@ button.primary:active:not(:disabled),
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #183153;
+  background: #2f5bff;
   color: #fff;
   font-size: 0.8rem;
   font-weight: 650;

@@ -195,7 +195,7 @@ if (THUNDERFOREST_KEY) {
 }
 
 // Route line color, the same across every basemap (matches the UI accent).
-const ROUTE_COLOR = '#183153';
+const ROUTE_COLOR = '#2f5bff';
 
 function setBasemap(style: string): void {
   if (map.getLayer('basemap-raster')) map.removeLayer('basemap-raster');
