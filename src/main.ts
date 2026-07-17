@@ -1305,8 +1305,8 @@ function renderRouteDetails(): void {
   routeEmpty.hidden = !!state.route;
 
   if (state.route) {
-    statDistance.textContent = `${(state.route.distanceMeters / 1000).toFixed(1)} km`;
-    statAscend.textContent = `${Math.round(state.route.ascendMeters)} m`;
+    statDistance.innerHTML = `${(state.route.distanceMeters / 1000).toFixed(1)}<span class="unit">km</span>`;
+    statAscend.innerHTML = `${Math.round(state.route.ascendMeters)}<span class="unit">m</span>`;
 
     state.climbs = detectClimbs(state.route.coordinates);
     state.selectedClimb = -1;

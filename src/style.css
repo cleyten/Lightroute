@@ -1,13 +1,13 @@
 /* =============================================================================
    Lightmile — visual layer
-   Calm, map-first interface. Sections:
+   Calm, map-first, premium. Sections:
      1. Tokens          design variables + light/dark themes
-     2. Base            reset, typography, motion, focus
+     2. Base            reset, typography, motion, focus, scrollbars
      3. Layout          app, map, panel, sheet, brand, tabs, groups
-     4. Components       buttons, segmented, fields, list-rows, pills, …
+     4. Components       buttons, toolbar, segmented, fields, metrics, rows…
      5. States          hover/active/disabled/error, hidden
      6. Map overlays    markers, floating controls
-     7. Desktop         wide-viewport specifics
+     7. Community
      8. Mobile          bottom sheet (<= 700px)
    ============================================================================ */
 
@@ -17,28 +17,33 @@
 :root {
   /* Surfaces */
   --color-bg: #f5f5f7; /* page + map backdrop */
-  --color-panel: rgba(255, 255, 255, 0.96); /* floating panel / sheet */
+  --color-panel: rgba(255, 255, 255, 0.98); /* floating panel / sheet */
   --color-raised: #ffffff; /* raised surface (selected segment, thumbnails) */
-  --color-surface: #f5f5f7; /* secondary surface (fields, quiet rows) */
-  --color-hover: #ececef; /* hover on a quiet surface */
+  --color-surface: #f0f0f3; /* secondary surface (fields, quiet rows) */
+  --color-hover: #e7e7ec; /* hover on a quiet surface */
 
   /* Text */
   --color-text: #1d1d1f;
   --color-muted: #6e6e73;
+  --color-faint: #8e8e93;
 
   /* Lines */
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-border-strong: rgba(0, 0, 0, 0.14);
-  --color-track: rgba(0, 0, 0, 0.12);
+  --color-border: rgba(0, 0, 0, 0.07);
+  --color-border-strong: rgba(0, 0, 0, 0.12);
+  --color-track: rgba(0, 0, 0, 0.14);
 
-  /* Accent (fixed brand navy). `-fg` is the readable-on-page text variant. */
+  /* Accent — fixed brand navy, used with depth via tints. */
   --color-accent: #183153;
-  --color-accent-fg: #183153;
-  --color-accent-tint: rgba(24, 49, 83, 0.08);
+  --color-accent-hi: #244470; /* lifted navy for hover */
+  --color-accent-fg: #183153; /* readable-on-page text accent */
+  --color-accent-tint: rgba(24, 49, 83, 0.09);
+  --color-accent-tint-strong: rgba(24, 49, 83, 0.14);
   --color-on-accent: #ffffff;
+  --shadow-accent: 0 1px 2px rgba(24, 49, 83, 0.24),
+    0 6px 18px rgba(24, 49, 83, 0.22);
 
-  /* The "Lightmile" wordmark keeps its original brand blue regardless of the
-     UI accent — it is pinned here and used only by #brand h1 / .brand-sub. */
+  /* The "Lightmile" wordmark keeps its original brand blue, independent of the
+     UI accent — used only by #brand h1. */
   --brand-mark: #2424e8;
 
   /* Semantic (map + summary): climbs, cafés, water. */
@@ -46,68 +51,83 @@
   --color-cafe: #8a5a2b;
   --color-water: #1f8fbf;
 
-  /* Shape — 8px spacing system, 10–12px control radii, 18px panel. */
-  --radius-panel: 18px;
+  /* Shape — 8px spacing system, 10–14px control radii, 20px panel. */
+  --radius-panel: 20px;
+  --radius-lg: 14px;
   --radius: 12px;
   --radius-sm: 10px;
   --radius-xs: 8px;
 
-  /* Elevation — reserved for map/panel float only. */
-  --shadow-panel: 0 10px 40px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.14);
+  /* Elevation — layered, neutral. Reserved for the floating panel + controls. */
+  --shadow-panel: 0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    0 2px 6px rgba(0, 0, 0, 0.06), 0 12px 28px rgba(0, 0, 0, 0.1),
+    0 28px 56px rgba(0, 0, 0, 0.08);
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.08), 0 6px 20px rgba(0, 0, 0, 0.16);
+  --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.1);
 
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
     Roboto, Helvetica, Arial, sans-serif;
   color-scheme: light dark;
 }
 
-/* Dark mode: neutral charcoal, never tinted. Follows the OS unless the page is
-   explicitly forced to light. */
+/* Dark mode: neutral charcoal, never tinted. Follows the OS unless forced. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --color-bg: #1c1c1e;
-    --color-panel: rgba(38, 38, 40, 0.96);
-    --color-raised: #3a3a3c;
-    --color-surface: #2c2c2e;
-    --color-hover: #38383a;
+    --color-bg: #101012;
+    --color-panel: rgba(30, 30, 33, 0.97);
+    --color-raised: #3a3a3e;
+    --color-surface: #2a2a2e;
+    --color-hover: #36363b;
     --color-text: #f5f5f7;
-    --color-muted: #98989d;
-    --color-border: rgba(255, 255, 255, 0.12);
-    --color-border-strong: rgba(255, 255, 255, 0.2);
-    --color-track: rgba(255, 255, 255, 0.18);
+    --color-muted: #9d9da3;
+    --color-faint: #8a8a90;
+    --color-border: rgba(255, 255, 255, 0.1);
+    --color-border-strong: rgba(255, 255, 255, 0.18);
+    --color-track: rgba(255, 255, 255, 0.22);
     --color-accent: #2f4f7a;
+    --color-accent-hi: #3c608f;
     --color-accent-fg: #9db8dd;
-    --color-accent-tint: rgba(157, 184, 221, 0.14);
+    --color-accent-tint: rgba(157, 184, 221, 0.12);
+    --color-accent-tint-strong: rgba(157, 184, 221, 0.2);
     --color-on-accent: #ffffff;
+    --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.45);
     --color-climb: #e8823f;
     --color-cafe: #c39058;
     --color-water: #57c1e8;
-    --shadow-panel: 0 12px 44px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
-    --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.06),
+      0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.6);
+    --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);
+    --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 }
 
 /* Manual override wins over the media query in both directions. */
 :root[data-theme='dark'] {
-  --color-bg: #1c1c1e;
-  --color-panel: rgba(38, 38, 40, 0.96);
-  --color-raised: #3a3a3c;
-  --color-surface: #2c2c2e;
-  --color-hover: #38383a;
+  --color-bg: #101012;
+  --color-panel: rgba(30, 30, 33, 0.97);
+  --color-raised: #3a3a3e;
+  --color-surface: #2a2a2e;
+  --color-hover: #36363b;
   --color-text: #f5f5f7;
-  --color-muted: #98989d;
-  --color-border: rgba(255, 255, 255, 0.12);
-  --color-border-strong: rgba(255, 255, 255, 0.2);
-  --color-track: rgba(255, 255, 255, 0.18);
+  --color-muted: #9d9da3;
+  --color-faint: #8a8a90;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-track: rgba(255, 255, 255, 0.22);
   --color-accent: #2f4f7a;
+  --color-accent-hi: #3c608f;
   --color-accent-fg: #9db8dd;
-  --color-accent-tint: rgba(157, 184, 221, 0.14);
+  --color-accent-tint: rgba(157, 184, 221, 0.12);
+  --color-accent-tint-strong: rgba(157, 184, 221, 0.2);
   --color-on-accent: #ffffff;
+  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.45);
   --color-climb: #e8823f;
   --color-cafe: #c39058;
   --color-water: #57c1e8;
-  --shadow-panel: 0 12px 44px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* =============================================================================
@@ -141,8 +161,10 @@ body {
 button,
 input,
 select {
-  transition: border-color 0.15s ease, background-color 0.15s ease,
-    color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  font-family: inherit;
+  transition: border-color 0.18s ease, background-color 0.18s ease,
+    color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease,
+    opacity 0.18s ease, filter 0.18s ease;
 }
 
 :where(button, input, select, a):focus-visible {
@@ -150,11 +172,43 @@ select {
   outline-offset: 2px;
 }
 
+::placeholder {
+  color: var(--color-faint);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* Thin, quiet scrollbars — a small but load-bearing polish detail. */
+#sidebar,
+#cafes-list,
+#water-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-track) transparent;
+}
+
+#sidebar::-webkit-scrollbar,
+#cafes-list::-webkit-scrollbar,
+#water-list::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+#sidebar::-webkit-scrollbar-thumb,
+#cafes-list::-webkit-scrollbar-thumb,
+#water-list::-webkit-scrollbar-thumb {
+  background: var(--color-track);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+#sidebar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* =============================================================================
@@ -173,7 +227,7 @@ select {
 }
 
 /* Desktop: one floating panel over a full-bleed map. It is the primary
-   container — groups inside are separated by hairlines, not nested cards. */
+   container; groups inside are separated by hairlines, not nested cards. */
 #sidebar {
   position: absolute;
   top: 12px;
@@ -183,10 +237,10 @@ select {
   max-height: calc(100% - 24px);
   padding: 0;
   background: var(--color-panel);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
   color: var(--color-text);
-  border: 1px solid var(--color-border);
+  border: 0.5px solid var(--color-border);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-panel);
   overflow-y: auto;
@@ -200,7 +254,7 @@ select {
 
 /* Grouped sections: generous padding, a hairline divider between them. */
 .group {
-  padding: 1rem 1.25rem;
+  padding: 1.15rem 1.25rem;
   border-top: 1px solid var(--color-border);
 }
 
@@ -209,17 +263,18 @@ select {
 }
 
 .group-label {
-  display: block;
-  margin: 0 0 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: normal;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   text-transform: none;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
-/* Collapsible headers ("Route preferences", "Sort & filter"): a button that
-   reads like the label it replaces, plus a chevron flipped via [aria-expanded]. */
+/* Collapsible headers ("Route preferences", "Sort & filter"). */
 .disclosure-toggle {
   display: flex;
   align-items: center;
@@ -230,7 +285,6 @@ select {
   padding: 0;
   background: none;
   border: none;
-  font-family: inherit;
   text-align: left;
   cursor: pointer;
 }
@@ -240,7 +294,7 @@ select {
 }
 
 .disclosure-toggle:hover .group-label {
-  color: var(--color-text);
+  color: var(--color-accent-fg);
 }
 
 .disclosure-chevron {
@@ -248,10 +302,10 @@ select {
   width: 8px;
   height: 8px;
   margin-left: 0.5rem;
-  border-right: 2px solid var(--color-muted);
-  border-bottom: 2px solid var(--color-muted);
+  border-right: 2px solid var(--color-faint);
+  border-bottom: 2px solid var(--color-faint);
   transform: rotate(45deg);
-  transition: transform 0.2s ease;
+  transition: transform 0.22s ease;
 }
 
 .disclosure-toggle[aria-expanded='true'] .disclosure-chevron {
@@ -266,7 +320,7 @@ select {
   align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 1.15rem 1.25rem 0.9rem;
+  padding: 1.25rem 1.25rem 1rem;
 }
 
 #brand h1 {
@@ -286,24 +340,23 @@ select {
   font-style: normal;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--color-muted);
+  color: var(--color-faint);
 }
 
 /* --- Top-level tabs ------------------------------------------------------- */
 .main-tabs {
   display: flex;
-  gap: 1.25rem;
+  gap: 1.5rem;
   padding: 0 1.25rem;
   border-bottom: 1px solid var(--color-border);
 }
 
 .main-tab {
-  padding: 0.6rem 0;
+  padding: 0.65rem 0;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  font-family: inherit;
   font-size: 0.9375rem;
   font-weight: 600;
   font-style: normal;
@@ -325,37 +378,44 @@ select {
 .hint {
   color: var(--color-muted);
   font-size: 0.8125rem;
-  line-height: 1.45;
+  line-height: 1.5;
   padding: 0 1.25rem;
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.6rem;
 }
 
 /* =============================================================================
    4. COMPONENTS
    ============================================================================ */
 
-/* --- Buttons: base + variants -------------------------------------------- */
-/* Secondary (default): quiet surface, subtle border, 44px min height. */
-#controls button,
+/* Icons living inside labelled buttons. */
+.btn-ico {
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+
+/* --- Secondary buttons (default surface) --------------------------------- */
 .save-actions button,
 .save-row button,
 .find-btn,
 #btn-locate,
 #account-signed-in button,
 .community-load {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   min-height: 44px;
-  padding: 0.6rem 0.85rem;
-  font-family: inherit;
+  padding: 0.6rem 0.9rem;
   font-size: 0.9375rem;
-  font-weight: 500;
+  font-weight: 550;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-raised);
   color: var(--color-text);
+  box-shadow: var(--shadow-raise);
   cursor: pointer;
 }
 
-#controls button:hover:not(:disabled),
 .save-actions button:hover:not(:disabled),
 .save-row button:hover:not(:disabled),
 .find-btn:hover:not(:disabled),
@@ -366,49 +426,107 @@ select {
   border-color: var(--color-border-strong);
 }
 
-#controls button:disabled,
 .save-actions button:disabled,
 .save-row button:disabled,
 .find-btn:disabled {
   opacity: 0.4;
+  box-shadow: none;
   cursor: default;
 }
 
-/* Primary: accent fill, white text, no glow. Used by generate + exports. */
+/* --- Primary: accent fill, white text, real elevation (no glow) ---------- */
 button.generate,
 button.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   min-height: 46px;
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
+  border: none;
+  border-radius: var(--radius);
   background: var(--color-accent);
   color: var(--color-on-accent);
   font-weight: 600;
-  box-shadow: none;
+  box-shadow: var(--shadow-accent);
+  cursor: pointer;
+}
+
+button.generate .btn-ico,
+button.primary .btn-ico {
+  opacity: 0.95;
 }
 
 button.generate:hover:not(:disabled),
 button.primary:hover:not(:disabled) {
-  filter: brightness(1.08);
-  background: var(--color-accent);
+  background: var(--color-accent-hi);
 }
 
 button.generate {
-  display: block;
   width: 100%;
-  margin: 0.5rem 0 0;
-  padding: 0.75rem;
+  margin: 0.6rem 0 0;
+  padding: 0.8rem;
   font-size: 0.9375rem;
-  cursor: pointer;
+  letter-spacing: -0.01em;
 }
 
 button.generate:disabled,
 button.primary:disabled {
   opacity: 0.4;
-  cursor: default;
   box-shadow: none;
+  cursor: default;
 }
 
-/* --- Segmented control: quiet gray track, raised white selection --------- */
+/* --- Edit toolbar (undo / clear / reverse) ------------------------------- */
+/* Compact icon buttons with micro-captions — reads as an app editing bar,
+   not a stack of form buttons. */
+#controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.icon-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  min-height: 62px;
+  padding: 0.5rem 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.icon-btn svg {
+  color: var(--color-muted);
+  transition: color 0.18s ease;
+}
+
+.icon-btn span {
+  line-height: 1;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--color-hover);
+  border-color: var(--color-border-strong);
+}
+
+.icon-btn:hover:not(:disabled) svg {
+  color: var(--color-accent-fg);
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* --- Segmented control: quiet track, raised selection -------------------- */
 .segmented {
   display: flex;
   gap: 2px;
@@ -422,15 +540,14 @@ button.primary:disabled {
 
 .segmented button {
   flex: 1;
-  min-height: 38px;
+  min-height: 36px;
   padding: 0.45rem 0;
-  font-family: inherit;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 550;
   border: none;
   border-radius: var(--radius-xs);
   background: transparent;
-  color: var(--color-text);
+  color: var(--color-muted);
   cursor: pointer;
 }
 
@@ -439,14 +556,14 @@ button.primary:disabled {
 }
 
 .segmented button:hover:not(.active) {
-  color: var(--color-accent-fg);
+  color: var(--color-text);
 }
 
 .segmented button.active {
   background: var(--color-raised);
   color: var(--color-text);
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  font-weight: 650;
+  box-shadow: var(--shadow-raise);
 }
 
 #hills-type {
@@ -454,12 +571,11 @@ button.primary:disabled {
 }
 
 /* --- Fields + inputs ------------------------------------------------------ */
-/* `.field` is a calm sentence-case label (no uppercase / letter-spacing). */
 .field {
   display: block;
-  margin: 0.75rem 0 0;
+  margin: 0.85rem 0 0;
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 550;
   text-transform: none;
   letter-spacing: normal;
   color: var(--color-muted);
@@ -472,10 +588,9 @@ button.primary:disabled {
   width: 100%;
   min-height: 44px;
   margin-top: 0.4rem;
-  padding: 0.55rem 0.7rem;
-  font-family: inherit;
+  padding: 0.6rem 0.75rem;
   font-size: 0.9375rem;
-  font-weight: 400;
+  font-weight: 450;
   letter-spacing: normal;
   text-transform: none;
   border: 1px solid var(--color-border-strong);
@@ -489,7 +604,7 @@ button.primary:disabled {
 .save-row input:focus {
   border-color: var(--color-accent-fg);
   outline: none;
-  box-shadow: 0 0 0 3px var(--color-accent-tint);
+  box-shadow: 0 0 0 3.5px var(--color-accent-tint);
 }
 
 .save-row {
@@ -508,18 +623,15 @@ button.primary:disabled {
 }
 
 #search-input {
-  padding-left: 2.25rem;
+  padding-left: 2.4rem;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.2-4.2'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: 0.7rem center;
+  background-position: 0.75rem center;
   background-size: 16px;
 }
 
 #btn-locate {
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 44px;
   padding: 0;
   color: var(--color-text);
@@ -528,9 +640,11 @@ button.primary:disabled {
 #search-results {
   list-style: none;
   margin: 0.4rem 0 0;
-  padding: 0;
+  padding: 0.3rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
+  background: var(--color-raised);
+  box-shadow: var(--shadow-raise);
   overflow: hidden;
 }
 
@@ -539,18 +653,14 @@ button.primary:disabled {
   flex-direction: column;
   width: 100%;
   gap: 0.1rem;
-  padding: 0.6rem 0.7rem;
+  padding: 0.55rem 0.6rem;
   font-size: 0.875rem;
   border: none;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-raised);
+  border-radius: var(--radius-xs);
+  background: transparent;
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
-}
-
-#search-results li:last-child .search-result {
-  border-bottom: none;
 }
 
 .search-result:hover {
@@ -558,7 +668,7 @@ button.primary:disabled {
 }
 
 .search-label {
-  font-weight: 500;
+  font-weight: 550;
 }
 
 .search-detail {
@@ -586,19 +696,12 @@ button.primary:disabled {
   accent-color: var(--color-accent);
 }
 
-/* --- Layout helpers for button rows -------------------------------------- */
-#controls {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
+/* --- Button rows ---------------------------------------------------------- */
 .save-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.6rem;
+  margin-top: 0.7rem;
 }
 
 .save-actions button {
@@ -607,41 +710,52 @@ button.primary:disabled {
 
 .find-btn {
   width: 100%;
-  margin-top: 0.5rem;
+  margin-top: 0.6rem;
 }
 
-/* --- Stats (route summary) ------------------------------------------------ */
+/* --- Route summary: metric tiles ----------------------------------------- */
 #stats {
   display: flex;
   gap: 0.6rem;
-  margin: 0.9rem 0 0.6rem;
+  margin: 0.9rem 0 0.75rem;
 }
 
 .stat {
   flex: 1;
-  padding: 0.7rem 0.85rem;
+  padding: 0.85rem 0.95rem;
   background: var(--color-surface);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
 }
 
 .stat-label {
   display: block;
-  margin-bottom: 0.15rem;
-  font-size: 0.75rem;
-  font-weight: 500;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
   text-transform: none;
-  letter-spacing: normal;
+  letter-spacing: 0.01em;
   color: var(--color-muted);
 }
 
 .stat-value {
-  font-size: 1.4rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
 
-/* --- Summary pills (climbs / coffee / water) — quiet, colored icon only --- */
+.stat-value .unit {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--color-muted);
+}
+
+/* --- Summary pills (quiet chips, colored icon only) ---------------------- */
 .pill-row {
   display: flex;
   flex-wrap: wrap;
@@ -652,11 +766,11 @@ button.primary:disabled {
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
   font-size: 0.8125rem;
-  font-weight: 500;
-  padding: 0.35rem 0.65rem;
-  border-radius: var(--radius-xs);
+  font-weight: 550;
+  padding: 0.38rem 0.7rem;
+  border-radius: 999px;
   background: var(--color-surface);
   color: var(--color-text);
 }
@@ -682,7 +796,7 @@ button.primary:disabled {
 /* --- Elevation chart + legends ------------------------------------------- */
 #chart-wrap {
   height: 150px;
-  margin: 0.5rem 0 0.75rem;
+  margin: 0.7rem 0 0.75rem;
 }
 
 #surface {
@@ -744,27 +858,45 @@ button.primary:disabled {
   flex: 0 0 auto;
 }
 
-/* --- Section label (climbs / coffee / water headers) --------------------- */
+/* --- Section labels (with leading icon) ---------------------------------- */
 .section-label {
-  display: block;
-  margin-bottom: 0.4rem;
-  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
   font-weight: 600;
   text-transform: none;
   letter-spacing: normal;
+  color: var(--color-text);
+}
+
+.sec-ico {
+  flex: 0 0 auto;
   color: var(--color-muted);
 }
 
+#climbs .sec-ico {
+  color: var(--color-climb);
+}
+
+#cafes .sec-ico {
+  color: var(--color-cafe);
+}
+
+#water .sec-ico {
+  color: var(--color-water);
+}
+
 /* --- Reusable list-row --------------------------------------------------- */
-/* Climbs, cafés, water, loop options, saved & community routes all share one
-   row language: quiet surface, 10px radius, hairline, hover lift of color. */
+/* Climbs, cafés, water and loop options share one row language. */
 .climb-item,
 .cafe-item,
 .loop-option {
   display: flex;
   width: 100%;
   gap: 0.6rem;
-  padding: 0.6rem 0.7rem;
+  padding: 0.65rem 0.75rem;
   font-size: 0.875rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -801,22 +933,25 @@ button.primary:disabled {
 
 .climb-item:hover {
   border-color: var(--color-climb);
+  background: var(--color-hover);
 }
 
 .climb-item.active {
   border-color: var(--color-climb);
-  box-shadow: inset 0 0 0 1px var(--color-climb);
+  box-shadow: inset 2px 0 0 var(--color-climb);
 }
 
 .climb-where {
   color: var(--color-muted);
   min-width: 3.6rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .climb-gain {
   margin-left: auto;
-  font-weight: 600;
+  font-weight: 650;
   color: var(--color-climb);
+  font-variant-numeric: tabular-nums;
 }
 
 #cafes,
@@ -830,11 +965,13 @@ button.primary:disabled {
 
 .cafe-item:hover {
   border-color: var(--color-cafe);
+  background: var(--color-hover);
 }
 
 .cafe-where {
   color: var(--color-muted);
   min-width: 3.6rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .cafe-name {
@@ -846,7 +983,7 @@ button.primary:disabled {
 
 .cafe-detour {
   color: var(--color-cafe);
-  font-weight: 600;
+  font-weight: 650;
 }
 
 .cafe-empty {
@@ -857,11 +994,12 @@ button.primary:disabled {
 
 .water-item:hover {
   border-color: var(--color-water);
+  background: var(--color-hover);
 }
 
 .water-detour {
   color: var(--color-water);
-  font-weight: 600;
+  font-weight: 650;
 }
 
 /* --- Loop options (round-trip alternatives) ------------------------------ */
@@ -874,16 +1012,18 @@ button.primary:disabled {
 
 .loop-option {
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.15rem;
 }
 
 .loop-option:hover {
   border-color: var(--color-accent);
+  background: var(--color-hover);
 }
 
 .loop-option.active {
   border-color: var(--color-accent);
-  box-shadow: inset 0 0 0 1px var(--color-accent);
+  background: var(--color-accent-tint);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .loop-option.fallback {
@@ -891,7 +1031,7 @@ button.primary:disabled {
 }
 
 .loop-title {
-  font-weight: 600;
+  font-weight: 650;
   font-size: 0.875rem;
   text-transform: none;
   letter-spacing: normal;
@@ -918,17 +1058,18 @@ button.primary:disabled {
 .range-label {
   float: right;
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 650;
   text-transform: none;
   letter-spacing: normal;
   color: var(--color-text);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Two native sliders stacked on one track; only the thumbs receive clicks. */
 .dual-range {
   position: relative;
   height: 28px;
-  margin: 0.6rem 0 0.2rem;
+  margin: 0.65rem 0 0.2rem;
 }
 
 .range-track {
@@ -960,23 +1101,27 @@ button.primary:disabled {
   -webkit-appearance: none;
   appearance: none;
   pointer-events: auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-raised);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12);
+  cursor: grab;
+}
+
+.dual-range input[type='range']::-webkit-slider-thumb:active {
+  cursor: grabbing;
+}
+
+.dual-range input[type='range']::-moz-range-thumb {
+  pointer-events: auto;
   width: 20px;
   height: 20px;
   border-radius: 50%;
   background: var(--color-raised);
   border: 1px solid var(--color-border-strong);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-  cursor: grab;
-}
-
-.dual-range input[type='range']::-moz-range-thumb {
-  pointer-events: auto;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--color-raised);
-  border: 1px solid var(--color-border-strong);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
   cursor: grab;
 }
 
@@ -1008,7 +1153,7 @@ button.primary:disabled {
 /* --- Empty / status notes ------------------------------------------------- */
 .empty-note {
   font-size: 0.8125rem;
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--color-muted);
   margin: 0.15rem 0 0.25rem;
 }
@@ -1031,7 +1176,7 @@ button.primary:disabled {
 
 #saved-list {
   list-style: none;
-  margin: 0.6rem 0 0;
+  margin: 0.7rem 0 0;
   padding: 0;
 }
 
@@ -1047,7 +1192,6 @@ button.primary:disabled {
   text-align: left;
   min-height: 40px;
   padding: 0.45rem 0.6rem;
-  font-family: inherit;
   font-size: 0.875rem;
   border: none;
   border-radius: var(--radius-xs);
@@ -1063,19 +1207,35 @@ button.primary:disabled {
 .saved-delete {
   border: none;
   background: transparent;
-  color: var(--color-muted);
+  color: var(--color-faint);
   cursor: pointer;
   font-size: 1rem;
   line-height: 1;
   padding: 0.4rem;
+  border-radius: var(--radius-xs);
 }
 
 .saved-delete:hover {
   color: var(--color-text);
+  background: var(--color-hover);
 }
 
 /* =============================================================================
-   5. MAP OVERLAYS (fixed colors: they must match the route line on any base)
+   5. STATES — press feedback
+   ============================================================================ */
+button.generate:active:not(:disabled),
+button.primary:active:not(:disabled),
+.save-actions button:active:not(:disabled),
+.save-row button:active:not(:disabled),
+.find-btn:active:not(:disabled),
+.icon-btn:active:not(:disabled),
+.mapstyle button:active,
+.community-load:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* =============================================================================
+   6. MAP OVERLAYS (fixed colors: match the route line on any base)
    ============================================================================ */
 .hover-dot {
   width: 14px;
@@ -1093,12 +1253,12 @@ button.primary:disabled {
   background: #183153;
   color: #fff;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 650;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 2px solid #fff;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 
@@ -1114,9 +1274,9 @@ button.primary:disabled {
   gap: 2px;
   padding: 4px;
   background: var(--color-panel);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  border: 1px solid var(--color-border);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border: 0.5px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-float);
 }
@@ -1126,10 +1286,9 @@ button.primary:disabled {
   border: 0;
   background: transparent;
   color: var(--color-text);
-  font-family: inherit;
   font-size: 0.8125rem;
-  font-weight: 500;
-  padding: 0.35rem 0.7rem;
+  font-weight: 550;
+  padding: 0.35rem 0.75rem;
   border-radius: var(--radius-xs);
   cursor: pointer;
 }
@@ -1141,21 +1300,20 @@ button.primary:disabled {
 .mapstyle button.active {
   background: var(--color-accent);
   color: var(--color-on-accent);
-  font-weight: 600;
+  font-weight: 650;
 }
 
-/* GPS floating action button — only shown on the mobile sheet layout. */
+/* Shown only on the mobile sheet layout. */
 .gps-fab {
   display: none;
 }
 
-/* The drag handle only exists on the mobile bottom sheet. */
 #sheet-handle {
   display: none;
 }
 
 /* =============================================================================
-   6. COMMUNITY LIBRARY
+   7. COMMUNITY LIBRARY
    ============================================================================ */
 #account-signed-in {
   display: flex;
@@ -1179,7 +1337,7 @@ button.primary:disabled {
 #account-signed-in button {
   flex: 0 0 auto;
   min-height: 40px;
-  padding: 0.4rem 0.75rem;
+  padding: 0.4rem 0.8rem;
   font-size: 0.875rem;
 }
 
@@ -1193,7 +1351,7 @@ button.primary:disabled {
 }
 
 .community-controls .field {
-  margin: 0.75rem 0 0;
+  margin: 0.85rem 0 0;
 }
 
 .community-controls .segmented {
@@ -1202,7 +1360,7 @@ button.primary:disabled {
 
 #community-list {
   list-style: none;
-  margin: 0.6rem 0 0;
+  margin: 0.7rem 0 0;
   padding: 0 1.25rem;
   display: flex;
   flex-direction: column;
@@ -1212,25 +1370,24 @@ button.primary:disabled {
 .community-empty {
   color: var(--color-muted);
   font-size: 0.875rem;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .community-item {
   display: flex;
   align-items: flex-start;
   gap: 0.7rem;
-  padding: 0.7rem 0.8rem;
+  padding: 0.75rem 0.85rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
-/* Waypoint-outline thumbnail of the route, drawn in preview.ts. */
 .route-preview {
   flex: 0 0 auto;
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   background: var(--color-raised);
   border: 1px solid var(--color-border);
   color: var(--color-accent-fg);
@@ -1253,7 +1410,7 @@ button.primary:disabled {
 }
 
 .community-name {
-  font-weight: 600;
+  font-weight: 650;
   font-size: 0.9375rem;
   color: var(--color-text);
 }
@@ -1321,7 +1478,7 @@ button.primary:disabled {
 .community-load {
   flex: 0 0 auto;
   min-height: 38px;
-  padding: 0.35rem 0.8rem;
+  padding: 0.35rem 0.85rem;
   font-size: 0.8125rem;
   background: var(--color-raised);
 }
@@ -1336,32 +1493,18 @@ button.primary:disabled {
   text-decoration: underline;
 }
 
-/* Destructive: kept quiet and pushed to the far right; reddens only on hover. */
 .community-delete {
   margin-left: auto;
   padding: 0.35rem 0.5rem;
   font-size: 0.8125rem;
   border: 0;
   background: none;
-  color: var(--color-muted);
+  color: var(--color-faint);
   cursor: pointer;
 }
 
 .community-delete:hover {
   color: #c0392b;
-}
-
-/* =============================================================================
-   7. STATES — subtle press feedback on the main action buttons
-   ============================================================================ */
-button.generate:active:not(:disabled),
-button.primary:active:not(:disabled),
-#controls button:active:not(:disabled),
-.save-actions button:active:not(:disabled),
-.save-row button:active:not(:disabled),
-.find-btn:active:not(:disabled),
-.mapstyle button:active {
-  transform: translateY(1px);
 }
 
 /* =============================================================================
@@ -1379,12 +1522,12 @@ button.primary:active:not(:disabled),
     padding: 0;
     border: none;
     border-radius: var(--radius-panel) var(--radius-panel) 0 0;
-    box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 -8px 34px rgba(0, 0, 0, 0.22);
     overflow: hidden;
     display: flex;
     flex-direction: column;
     transform: translateY(64vh);
-    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
     z-index: 3;
   }
 
@@ -1400,10 +1543,10 @@ button.primary:active:not(:disabled),
   #sheet-handle::before {
     content: '';
     position: absolute;
-    top: 10px;
+    top: 9px;
     left: 50%;
     transform: translateX(-50%);
-    width: 40px;
+    width: 38px;
     height: 5px;
     border-radius: 3px;
     background: var(--color-track);
@@ -1419,7 +1562,7 @@ button.primary:active:not(:disabled),
 
   #brand {
     padding-top: 0.15rem;
-    padding-bottom: 0.6rem;
+    padding-bottom: 0.7rem;
   }
 
   #status {
@@ -1448,10 +1591,10 @@ button.primary:active:not(:disabled),
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    border: 1px solid var(--color-border);
+    border: 0.5px solid var(--color-border);
     background: var(--color-panel);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
     color: var(--color-accent-fg);
     box-shadow: var(--shadow-float);
     cursor: pointer;
