@@ -517,6 +517,31 @@ button.primary:disabled {
   cursor: default;
 }
 
+/* Loading state on the generate button: swap the icon for a spinner. */
+button.generate.is-loading {
+  opacity: 1;
+}
+
+button.generate.is-loading .btn-ico {
+  display: none;
+}
+
+button.generate.is-loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* --- Edit toolbar (undo / clear / reverse) ------------------------------- */
 /* Compact icon buttons with micro-captions — reads as an app editing bar,
    not a stack of form buttons. */
@@ -1281,14 +1306,26 @@ button.primary:disabled {
 }
 
 #status {
-  min-height: 1.2em;
-  padding: 0 1.25rem;
+  margin: 0 1.25rem;
   font-size: 0.8125rem;
+  line-height: 1.4;
   color: var(--color-muted);
+}
+
+/* Only becomes a chip when it actually carries a message. */
+#status:not(:empty) {
+  margin: 0.35rem 1.25rem 0.6rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
 }
 
 #status.error {
   color: #c0392b;
+}
+
+#status.error:not(:empty) {
+  background: color-mix(in srgb, #c0392b 12%, transparent);
 }
 
 /* --- Saved routes --------------------------------------------------------- */
@@ -1885,11 +1922,6 @@ button.primary:active:not(:disabled),
   #brand {
     padding-top: 0.15rem;
     padding-bottom: 0.7rem;
-  }
-
-  #status {
-    padding-left: 1.25rem;
-    padding-right: 1.25rem;
   }
 
   /* Keep the tool stack + style popover under the safe-area-shifted zoom stack. */

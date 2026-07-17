@@ -679,6 +679,7 @@ btnRoundtrip.addEventListener('click', async () => {
   const requestId = ++state.requestId;
   setStatus('Generating and checking loops… (this can take ~15 s)');
   btnRoundtrip.disabled = true;
+  btnRoundtrip.classList.add('is-loading');
   try {
     const result = await generateRoundTrips(
       state.waypoints[0],
@@ -715,7 +716,10 @@ btnRoundtrip.addEventListener('click', async () => {
     renderRouteDetails();
     setStatus(error instanceof Error ? error.message : 'Something went wrong.', true);
   } finally {
-    if (requestId === state.requestId) btnRoundtrip.disabled = false;
+    if (requestId === state.requestId) {
+      btnRoundtrip.disabled = false;
+      btnRoundtrip.classList.remove('is-loading');
+    }
   }
   updateControls();
 });
