@@ -1495,8 +1495,8 @@ button.primary:active:not(:disabled),
 .community-item {
   display: flex;
   align-items: flex-start;
-  gap: 0.7rem;
-  padding: 0.75rem 0.85rem;
+  gap: 0.8rem;
+  padding: 0.8rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--grad-surface);
@@ -1505,9 +1505,9 @@ button.primary:active:not(:disabled),
 
 .route-preview {
   flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-sm);
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius);
   background: var(--color-raised);
   border: 1px solid var(--color-border);
   color: var(--color-accent-fg);
@@ -1521,23 +1521,41 @@ button.primary:active:not(:disabled),
 .community-head {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.18rem;
 }
 
+/* Icon-led metadata lines (bike stats, location) — Strava-style. */
+.community-meta,
 .community-loc {
-  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
   color: var(--color-muted);
+}
+
+.community-meta::before,
+.community-loc::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  background: center / contain no-repeat;
+}
+
+.community-meta::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8a90' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='17' r='3.2'/%3E%3Ccircle cx='18' cy='17' r='3.2'/%3E%3Cpath d='M6 17l4-9h4l3.6 9'/%3E%3Cpath d='M9 8h5'/%3E%3C/svg%3E");
+}
+
+.community-loc::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8a90' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z'/%3E%3Ccircle cx='12' cy='11' r='2.2'/%3E%3C/svg%3E");
 }
 
 .community-name {
   font-weight: 650;
-  font-size: 0.9375rem;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
   color: var(--color-text);
-}
-
-.community-meta {
-  font-size: 0.78rem;
-  color: var(--color-muted);
 }
 
 .community-author {

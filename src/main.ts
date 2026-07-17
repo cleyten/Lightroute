@@ -1990,8 +1990,10 @@ function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, nu
     name.textContent = route.name;
     const meta = document.createElement('span');
     meta.className = 'community-meta';
+    const bikeLabel =
+      route.bike === 'mtb' ? 'MTB' : route.bike.charAt(0).toUpperCase() + route.bike.slice(1);
     meta.textContent =
-      `${(route.distanceMeters / 1000).toFixed(1)} km · +${Math.round(route.ascendMeters)} m · ${route.bike}`;
+      `${(route.distanceMeters / 1000).toFixed(1)} km · +${Math.round(route.ascendMeters)} m · ${bikeLabel}`;
     const author = document.createElement('span');
     author.className = 'community-author';
     const authorName = route.authorName?.trim() || 'Anonymous';
