@@ -1212,7 +1212,6 @@ function initDisclosure(toggleSelector: string, bodySelector: string): void {
   });
 }
 
-initDisclosure('#planner-options-toggle', '#planner-options-body');
 initDisclosure('#community-filters-toggle', '#community-filters-body');
 
 bikeButtons.forEach((button) =>

@@ -613,6 +613,11 @@ button.primary:disabled {
   margin-top: 0.4rem;
 }
 
+/* Always-visible route preferences (no longer collapsed) — keep them tight. */
+.pref-grid > .field:first-child {
+  margin-top: 0.15rem;
+}
+
 /* --- Fields + inputs ------------------------------------------------------ */
 .field {
   display: block;
@@ -1223,6 +1228,29 @@ button.primary:disabled {
   line-height: 1.5;
   color: var(--color-muted);
   margin: 0.15rem 0 0.25rem;
+}
+
+/* Friendly empty state for the route summary before a route exists. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  padding: 1.1rem 1rem 0.6rem;
+}
+
+.empty-state .empty-ico {
+  color: var(--color-accent-fg);
+  opacity: 0.85;
+}
+
+.empty-state p {
+  margin: 0;
+  max-width: 26ch;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-muted);
 }
 
 #status {

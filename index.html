@@ -48,16 +48,19 @@
         </section>
 
         <section class="group">
-          <button type="button" class="disclosure-toggle" id="planner-options-toggle" aria-expanded="false" aria-controls="planner-options-body">
-            <span class="group-label">Route preferences</span>
-            <span class="disclosure-chevron" aria-hidden="true"></span>
-          </button>
-          <div id="planner-options-body" hidden>
+          <span class="group-label">Route preferences</span>
+          <div id="planner-options-body" class="pref-grid">
             <span class="field">Ride type</span>
             <div class="segmented" id="bike-type">
               <button type="button" data-bike="race" aria-pressed="false">Race</button>
               <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
               <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
+            </div>
+            <span class="field">Elevation</span>
+            <div class="segmented" id="hills-type">
+              <button type="button" data-hills="avoid" aria-pressed="false">Avoid</button>
+              <button type="button" data-hills="mix" aria-pressed="true">Mix</button>
+              <button type="button" data-hills="prefer" aria-pressed="false">Prefer</button>
             </div>
             <label class="field" id="traffic-label">
               Road preference
@@ -67,12 +70,6 @@
                 <option value="2">Very quiet roads</option>
               </select>
             </label>
-            <span class="field">Elevation</span>
-            <div class="segmented" id="hills-type">
-              <button type="button" data-hills="avoid" aria-pressed="false">Avoid</button>
-              <button type="button" data-hills="mix" aria-pressed="true">Mix</button>
-              <button type="button" data-hills="prefer" aria-pressed="false">Prefer</button>
-            </div>
           </div>
         </section>
 
@@ -107,7 +104,10 @@
 
         <section class="group" id="route-group">
           <span class="group-label">Route summary</span>
-          <p id="route-empty" class="empty-note">Add points on the map, or generate a round trip, to see distance, elevation and climbs.</p>
+          <div id="route-empty" class="empty-state">
+            <svg class="empty-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="18" r="2.5" /><circle cx="18" cy="6" r="2.5" /><path d="M8.2 17C13 16 11 8 15.8 7" /></svg>
+            <p>Tap the map to drop your start, then add waypoints — or set a distance below and generate a round trip.</p>
+          </div>
           <div id="stats" hidden>
             <div class="stat">
               <span class="stat-label">Distance</span>
