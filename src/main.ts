@@ -194,8 +194,8 @@ if (THUNDERFOREST_KEY) {
   };
 }
 
-// Route line color, the same across every basemap.
-const ROUTE_COLOR = '#2424e8';
+// Route line color, the same across every basemap (matches the UI accent).
+const ROUTE_COLOR = '#183153';
 
 function setBasemap(style: string): void {
   if (map.getLayer('basemap-raster')) map.removeLayer('basemap-raster');
@@ -761,8 +761,9 @@ function renderWindChip(wind: WindInfo | null): void {
   windChipEl.innerHTML = '';
   const arrow = document.createElement('span');
   arrow.className = 'wind-arrow';
-  arrow.textContent = '➤';
-  // The arrow glyph points east; rotate it to where the wind blows TO.
+  arrow.innerHTML =
+    '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h14"/><path d="M12 6l6 6-6 6"/></svg>';
+  // The arrow points east; rotate it to where the wind blows TO.
   arrow.style.transform = `rotate(${Math.round(wind.fromDeg + 90)}deg)`;
   const label = document.createElement('span');
   label.textContent = ` Wind now: ${Math.round(wind.speedKmh)} km/h from ${compassLabel(wind.fromDeg)}`;
@@ -1349,21 +1350,35 @@ function renderRouteDetails(): void {
   renderRoutePills();
 }
 
+/** Consistent outline icons for the at-a-glance summary pills. */
+const PILL_ICONS = {
+  climb:
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18L13.5 6l-3.5 6-2-3z"/></svg>',
+  cafe:
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h11v5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z"/><path d="M16 9h2a2 2 0 0 1 0 4h-2"/><path d="M6 3v2M10 3v2"/></svg>',
+  water:
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6.2 6 10.2A6 6 0 0 1 6 13.2C6 9.2 12 3 12 3z"/></svg>',
+};
+
 /** Compact at-a-glance pills summarizing climbs and coffee stops. */
 function renderRoutePills(): void {
   const pills: string[] = [];
   if (state.climbs.length > 0) {
     const n = state.climbs.length;
     const gain = Math.round(state.climbs.reduce((sum, c) => sum + c.gainM, 0));
-    pills.push(`<span class="pill climb">▲ ${n} climb${n > 1 ? 's' : ''} · +${gain} m</span>`);
+    pills.push(
+      `<span class="pill climb">${PILL_ICONS.climb} ${n} climb${n > 1 ? 's' : ''} · +${gain} m</span>`,
+    );
   }
   if (state.cafes.length > 0) {
     const n = state.cafes.length;
-    pills.push(`<span class="pill cafe">☕ ${n} coffee stop${n > 1 ? 's' : ''}</span>`);
+    pills.push(
+      `<span class="pill cafe">${PILL_ICONS.cafe} ${n} coffee stop${n > 1 ? 's' : ''}</span>`,
+    );
   }
   if (state.water.length > 0) {
     const n = state.water.length;
-    pills.push(`<span class="pill water">💧 ${n} water</span>`);
+    pills.push(`<span class="pill water">${PILL_ICONS.water} ${n} water</span>`);
   }
   routePills.innerHTML = pills.join('');
   routePills.hidden = pills.length === 0;
@@ -2026,10 +2041,12 @@ async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
   let snap = 1; // 0 = peek, 1 = half, 2 = full
 
   // Offsets in px to translate the sheet down by, per snap level.
+  // Peek shows the handle + top of the panel; half ~48% of the viewport;
+  // full is the whole 92vh sheet.
   function offsets(): number[] {
     const h = sheetEl.offsetHeight;
-    const peekVisible = 250;
-    return [Math.max(0, h - peekVisible), Math.round(h * 0.45), 0];
+    const peekVisible = 112;
+    return [Math.max(0, h - peekVisible), Math.round(h * 0.48), 0];
   }
 
   function currentY(): number {
