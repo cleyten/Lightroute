@@ -5,7 +5,8 @@
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#2424e8" />
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)" />
     <title>Lightmile</title>
   </head>
   <body>
@@ -24,7 +25,7 @@
         </nav>
 
         <div id="tab-planner" class="tab-panel" role="tabpanel" aria-label="Route planner">
-        <p class="hint">Click the map to add points. Drag a point to reroute, click the line to insert one, click a point to remove it, click point 1 to close the loop.</p>
+        <p class="hint">Click the map to set your start and add waypoints.</p>
 
         <section class="group">
           <div id="search-box">
@@ -42,24 +43,25 @@
 
         <section class="group">
           <button type="button" class="disclosure-toggle" id="planner-options-toggle" aria-expanded="false" aria-controls="planner-options-body">
-            <span class="group-label">Bike, traffic &amp; hills</span>
+            <span class="group-label">Route preferences</span>
             <span class="disclosure-chevron" aria-hidden="true"></span>
           </button>
           <div id="planner-options-body" hidden>
+            <span class="field">Ride type</span>
             <div class="segmented" id="bike-type">
               <button type="button" data-bike="race" aria-pressed="false">Race</button>
               <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
               <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
             </div>
             <label class="field" id="traffic-label">
-              Avoid traffic
+              Road preference
               <select id="traffic-select">
                 <option value="0">No (fastest route)</option>
                 <option value="1">Quiet roads</option>
                 <option value="2">Very quiet roads</option>
               </select>
             </label>
-            <span class="field">Round-trip hills</span>
+            <span class="field">Elevation</span>
             <div class="segmented" id="hills-type">
               <button type="button" data-hills="avoid" aria-pressed="false">Avoid</button>
               <button type="button" data-hills="mix" aria-pressed="true">Mix</button>
@@ -77,7 +79,7 @@
               <input id="roundtrip-min" type="range" min="5" max="100" step="5" value="30" aria-label="Minimum round trip distance in km" />
               <input id="roundtrip-max" type="range" min="5" max="100" step="5" value="50" aria-label="Maximum round trip distance in km" />
             </div>
-            <button id="btn-roundtrip" class="primary generate">Generate round trip</button>
+            <button id="btn-roundtrip" class="primary generate">Generate route</button>
             <div id="wind-chip" hidden></div>
             <div id="loop-options" hidden></div>
           </div>
@@ -89,7 +91,7 @@
         </section>
 
         <section class="group" id="route-group">
-          <span class="group-label">Route</span>
+          <span class="group-label">Route summary</span>
           <p id="route-empty" class="empty-note">Add points on the map, or generate a round trip, to see distance, elevation and climbs.</p>
           <div id="stats" hidden>
             <div class="stat">
@@ -127,6 +129,7 @@
         </section>
 
         <section class="group" id="save-section">
+          <span class="group-label">Save and export</span>
           <label class="field">
             Route name
             <input id="route-name" type="text" placeholder="Name" />
