@@ -235,6 +235,16 @@
         <button type="button" data-style="terrain" aria-pressed="false">Terrain</button>
         <button type="button" data-style="cycling" aria-pressed="false">OpenCycleMap</button>
       </div>
+      <nav id="bottom-nav" class="bottom-nav" role="tablist" aria-label="Sections">
+        <button type="button" class="bottom-tab active" data-tab="planner" role="tab" aria-selected="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" /><path d="M9 4v14M15 6v14" /></svg>
+          <span>Plan</span>
+        </button>
+        <button type="button" class="bottom-tab" data-tab="community" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3" /><path d="M3.5 20a5.5 5.5 0 0 1 11 0" /><path d="M16 5.2a3 3 0 0 1 0 5.6" /><path d="M15.8 14.2A5.5 5.5 0 0 1 20.5 20" /></svg>
+          <span>Community</span>
+        </button>
+      </nav>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

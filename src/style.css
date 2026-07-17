@@ -1512,6 +1512,37 @@ button.primary:active:not(:disabled),
   display: none;
 }
 
+/* Bottom tab bar — mobile only (see the media query); desktop uses top tabs. */
+.bottom-nav {
+  display: none;
+}
+
+.bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.5rem 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.bottom-tab svg {
+  color: var(--color-muted);
+}
+
+.bottom-tab.active,
+.bottom-tab.active svg {
+  color: var(--color-accent-fg);
+}
+
 /* =============================================================================
    7. COMMUNITY LIBRARY
    ============================================================================ */
@@ -1776,6 +1807,32 @@ button.primary:active:not(:disabled),
    8. MOBILE — full-screen map with a draggable bottom sheet (<= 700px)
    ============================================================================ */
 @media (max-width: 700px) {
+  /* Top tabs give way to a native-style bottom tab bar on phones. The bar and
+     the sheet's raised bottom only apply when the community backend exists
+     (body.has-community), so a config-less build keeps the sheet flush. */
+  .main-tabs {
+    display: none;
+  }
+
+  .has-community .bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(56px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 5;
+    background: var(--color-panel);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    border-top: 0.5px solid var(--color-border);
+  }
+
+  .has-community #sidebar {
+    bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+
   #sidebar {
     top: auto;
     left: 0;

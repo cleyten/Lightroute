@@ -130,6 +130,8 @@ const waterList = document.querySelector<HTMLUListElement>('#water-list')!;
 const btnPublish = document.querySelector<HTMLButtonElement>('#btn-publish')!;
 const mainTabs = document.querySelector<HTMLElement>('#main-tabs')!;
 const mainTabButtons = [...document.querySelectorAll<HTMLButtonElement>('#main-tabs .main-tab')];
+// Mobile bottom tab bar mirrors the top tabs; both drive setActiveTab.
+const bottomTabButtons = [...document.querySelectorAll<HTMLButtonElement>('#bottom-nav .bottom-tab')];
 const plannerPanel = document.querySelector<HTMLElement>('#tab-planner')!;
 const communityPanel = document.querySelector<HTMLElement>('#tab-community')!;
 const accountSignedOut = document.querySelector<HTMLElement>('#account-signed-out')!;
@@ -1814,7 +1816,7 @@ function updatePublishButton(): void {
 
 /** Switches between the Route planner and Community tabs. */
 function setActiveTab(name: 'planner' | 'community'): void {
-  mainTabButtons.forEach((btn) => {
+  [...mainTabButtons, ...bottomTabButtons].forEach((btn) => {
     const active = btn.dataset.tab === name;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-selected', String(active));
@@ -1827,8 +1829,10 @@ function setActiveTab(name: 'planner' | 'community'): void {
 if (isSupabaseConfigured) {
   mainTabs.hidden = false;
   btnPublish.hidden = false;
+  // Reveals the mobile bottom tab bar and docks the sheet above it (see CSS).
+  document.body.classList.add('has-community');
 
-  mainTabButtons.forEach((btn) => {
+  [...mainTabButtons, ...bottomTabButtons].forEach((btn) => {
     btn.addEventListener('click', () =>
       setActiveTab(btn.dataset.tab === 'community' ? 'community' : 'planner'),
     );
