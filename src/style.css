@@ -65,6 +65,19 @@
   --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.08), 0 6px 20px rgba(0, 0, 0, 0.16);
   --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.1);
 
+  /* Shading — subtle gradients, top highlights and recesses give depth. */
+  --panel-grad: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.99),
+    rgba(248, 248, 251, 0.96)
+  );
+  --grad-raised: linear-gradient(180deg, #ffffff, #f1f1f5);
+  --grad-surface: linear-gradient(180deg, #f7f7f9, #eaeaee);
+  --grad-primary: linear-gradient(180deg, #26497a, #15304f);
+  --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.07);
+  --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
     Roboto, Helvetica, Arial, sans-serif;
   color-scheme: light dark;
@@ -98,6 +111,17 @@
       0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.6);
     --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);
     --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --panel-grad: linear-gradient(
+      180deg,
+      rgba(38, 38, 42, 0.98),
+      rgba(24, 24, 27, 0.97)
+    );
+    --grad-raised: linear-gradient(180deg, #434349, #373739);
+    --grad-surface: linear-gradient(180deg, #313137, #262629);
+    --grad-primary: linear-gradient(180deg, #3a5f8f, #2a4770);
+    --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -128,6 +152,17 @@
     0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.6);
   --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);
   --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --panel-grad: linear-gradient(
+    180deg,
+    rgba(38, 38, 42, 0.98),
+    rgba(24, 24, 27, 0.97)
+  );
+  --grad-raised: linear-gradient(180deg, #434349, #373739);
+  --grad-surface: linear-gradient(180deg, #313137, #262629);
+  --grad-primary: linear-gradient(180deg, #3a5f8f, #2a4770);
+  --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 /* =============================================================================
@@ -236,7 +271,7 @@ select {
   width: 380px;
   max-height: calc(100% - 24px);
   padding: 0;
-  background: var(--color-panel);
+  background: var(--panel-grad);
   -webkit-backdrop-filter: saturate(180%) blur(24px);
   backdrop-filter: saturate(180%) blur(24px);
   color: var(--color-text);
@@ -410,9 +445,9 @@ select {
   font-weight: 550;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
-  background: var(--color-raised);
+  background: var(--grad-raised);
   color: var(--color-text);
-  box-shadow: var(--shadow-raise);
+  box-shadow: var(--shadow-tile), var(--edge-hi);
   cursor: pointer;
 }
 
@@ -444,10 +479,10 @@ button.primary {
   min-height: 46px;
   border: none;
   border-radius: var(--radius);
-  background: var(--color-accent);
+  background: var(--grad-primary);
   color: var(--color-on-accent);
   font-weight: 600;
-  box-shadow: var(--shadow-accent);
+  box-shadow: var(--shadow-accent), var(--edge-hi);
   cursor: pointer;
 }
 
@@ -496,8 +531,9 @@ button.primary:disabled {
   padding: 0.5rem 0.25rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background: var(--color-surface);
+  background: var(--grad-raised);
   color: var(--color-text);
+  box-shadow: var(--shadow-tile), var(--edge-hi);
   font-size: 0.75rem;
   font-weight: 550;
   cursor: pointer;
@@ -535,6 +571,7 @@ button.primary:disabled {
   border: none;
   border-radius: var(--radius);
   background: var(--color-surface);
+  box-shadow: var(--inset-field);
   overflow: hidden;
 }
 
@@ -560,10 +597,10 @@ button.primary:disabled {
 }
 
 .segmented button.active {
-  background: var(--color-raised);
+  background: var(--grad-raised);
   color: var(--color-text);
   font-weight: 650;
-  box-shadow: var(--shadow-raise);
+  box-shadow: var(--shadow-tile), var(--edge-hi);
 }
 
 #hills-type {
@@ -597,6 +634,7 @@ button.primary:disabled {
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
+  box-shadow: var(--inset-field);
 }
 
 .field select:focus,
@@ -723,8 +761,9 @@ button.primary:disabled {
 .stat {
   flex: 1;
   padding: 0.85rem 0.95rem;
-  background: var(--color-surface);
+  background: var(--grad-raised);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-tile), var(--edge-hi);
 }
 
 .stat-label {
@@ -771,8 +810,9 @@ button.primary:disabled {
   font-weight: 550;
   padding: 0.38rem 0.7rem;
   border-radius: 999px;
-  background: var(--color-surface);
+  background: var(--grad-surface);
   color: var(--color-text);
+  box-shadow: var(--edge-hi);
 }
 
 .pill svg {
@@ -900,8 +940,9 @@ button.primary:disabled {
   font-size: 0.875rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  background: var(--grad-surface);
   color: var(--color-text);
+  box-shadow: var(--edge-hi);
   text-align: left;
   cursor: pointer;
 }
@@ -1104,9 +1145,10 @@ button.primary:disabled {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--color-raised);
+  background: var(--grad-raised);
   border: 1px solid var(--color-border-strong);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12),
+    var(--edge-hi);
   cursor: grab;
 }
 
@@ -1380,7 +1422,8 @@ button.primary:active:not(:disabled),
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  background: var(--grad-surface);
+  box-shadow: var(--edge-hi);
 }
 
 .route-preview {

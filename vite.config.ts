@@ -18,8 +18,8 @@ export default defineConfig(({ command }) => ({
         name: 'Lightmile',
         short_name: 'Lightmile',
         description: 'Free route planner for cycling',
-        theme_color: '#2424e8',
-        background_color: '#f6f3ec',
+        theme_color: '#f5f5f7',
+        background_color: '#f5f5f7',
         display: 'standalone',
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
