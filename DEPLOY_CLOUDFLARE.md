@@ -31,19 +31,47 @@ Node version is pinned to 22 via `.node-version`.
 
 ## 2. Environment variables
 
-Add these under **Settings → Environment variables → Production** (and Preview
-if you use preview deploys). They're read at build time by Vite.
+There are two kinds now: **build variables** (baked into the client bundle by
+Vite) and **Worker secrets** (available only to the server-side proxy at
+runtime, never in the bundle).
+
+### Build variables — Settings → Build → *Variables and secrets*
 
 | Variable | Value |
 |---|---|
+| `VITE_USE_PROXY` | `1` |
 | `VITE_SUPABASE_URL` | `https://ovqjrpyvceehnzqnluut.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | `sb_publishable_iZQZuuhzPQuCqW00EqnkJg_4De09xR1` |
-| `VITE_ORS_KEY` | *(copy from GitHub repo → Settings → Secrets → `ORS_KEY`)* |
-| `VITE_THUNDERFOREST_KEY` | *(copy from GitHub → Secrets → `THUNDERFOREST_KEY`)* |
 
-The Supabase URL + anon key are safe to be public (they already ship in the
-client bundle; row-level security protects the data). The ORS/Thunderforest
-keys are the same ones the GitHub Actions build uses.
+`VITE_USE_PROXY=1` makes the client call the same-origin `/api/*` proxy instead
+of the upstream APIs directly. The Supabase URL + anon key are safe to be
+public (row-level security protects the data). **Do not** set `VITE_ORS_KEY` or
+`VITE_THUNDERFOREST_KEY` here — that would put them back in the bundle.
+
+### Worker secrets — Settings → Variables and Secrets (type: Secret)
+
+| Secret | Value |
+|---|---|
+| `ORS_KEY` | *(from GitHub repo → Settings → Secrets → `ORS_KEY`)* |
+| `THUNDERFOREST_KEY` | *(from GitHub → Secrets → `THUNDERFOREST_KEY`)* |
+
+The Worker (`worker/index.ts`) injects these into the upstream requests, so the
+keys stay server-side. You can also set them from the CLI:
+`npx wrangler secret put ORS_KEY` and `npx wrangler secret put THUNDERFOREST_KEY`.
+
+### Local preview of the proxy
+
+`npm run preview:cf` builds with the proxy on and runs `wrangler dev`, which
+serves the site + Worker locally. Put the two keys in a git-ignored
+`.dev.vars` file first:
+
+```
+ORS_KEY=your-ors-key
+THUNDERFOREST_KEY=your-thunderforest-key
+```
+
+(Plain `npm run dev` still works without the proxy, using build-time
+`VITE_ORS_KEY` / `VITE_THUNDERFOREST_KEY` from a local `.env` as before.)
 
 ## 3. Custom domain
 

@@ -1,12 +1,16 @@
 {
-  // Deploys the static Vite build (./dist) to Cloudflare as a Static-Assets
-  // Worker. `npx wrangler deploy` reads this. There is no server code — just
-  // static files — and `single-page-application` serves index.html for any
-  // path that isn't a real file.
+  // Static Vite build (./dist) served by a Worker that also proxies the two
+  // key-bearing upstreams (see worker/index.ts) so the ORS / Thunderforest
+  // keys stay server-side. `npx wrangler deploy` reads this.
+  //
+  // Set the two secrets once (dashboard → Worker → Variables and Secrets, or
+  // `npx wrangler secret put ORS_KEY` / `THUNDERFOREST_KEY`).
   "name": "lightroute",
   "compatibility_date": "2024-11-01",
+  "main": "worker/index.ts",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   }
 }

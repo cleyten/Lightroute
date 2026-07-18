@@ -24,8 +24,13 @@ import {
 } from './surface';
 import { cleanLoopGeometry, healWiggles, findWiggles } from './cleanup';
 
+// When VITE_USE_PROXY is set (Cloudflare build), route requests through the
+// same-origin Worker proxy, which injects the key server-side — so the key is
+// never in the bundle. Otherwise call OpenRouteService directly with the
+// build-time key (GitHub Pages / local dev).
+const USE_PROXY = import.meta.env.VITE_USE_PROXY === '1';
 const ORS_KEY: string = import.meta.env.VITE_ORS_KEY ?? '';
-const ORS_BASE = 'https://api.openrouteservice.org/v2/directions';
+const ORS_BASE = USE_PROXY ? '/api/ors' : 'https://api.openrouteservice.org/v2/directions';
 
 const ORS_PROFILES: Record<string, string> = {
   race: 'cycling-road',
@@ -287,17 +292,18 @@ async function fetchOneRoundTrip(
   lengthMeters: number,
   bike: string,
 ): Promise<RouteResult> {
-  if (!ORS_KEY) {
+  if (!USE_PROXY && !ORS_KEY) {
     throw new Error('No OpenRouteService key configured (VITE_ORS_KEY).');
   }
 
   const profile = ORS_PROFILES[bike] ?? 'cycling-road';
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // The proxy adds the Authorization header itself; only send it when calling
+  // OpenRouteService directly.
+  if (!USE_PROXY) headers.Authorization = ORS_KEY;
   const response = await fetch(`${ORS_BASE}/${profile}/geojson`, {
     method: 'POST',
-    headers: {
-      Authorization: ORS_KEY,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       coordinates: [start],
       elevation: true,

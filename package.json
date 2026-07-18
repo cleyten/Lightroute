@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:cf": "VITE_USE_PROXY=1 npm run build && npx wrangler dev"
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.16",

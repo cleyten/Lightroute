@@ -182,16 +182,21 @@ const RASTER_BASEMAPS: Record<
   },
 };
 
-// The "cycling" basemap is OpenCycleMap (Thunderforest), which needs a free API
-// key injected at build time from VITE_THUNDERFOREST_KEY (never hardcoded).
-// Registered only when the key is present; the button is removed otherwise
+// The "cycling" basemap is OpenCycleMap (Thunderforest), which needs an API
+// key. On the Cloudflare build (VITE_USE_PROXY) the tiles go through the
+// same-origin Worker proxy, which adds the key server-side; otherwise they use
+// a build-time key directly. The button is removed when neither is available
 // (see the load handler).
+const USE_PROXY = import.meta.env.VITE_USE_PROXY === '1';
 const THUNDERFOREST_KEY: string = import.meta.env.VITE_THUNDERFOREST_KEY ?? '';
-if (THUNDERFOREST_KEY) {
+const CYCLING_AVAILABLE = USE_PROXY || Boolean(THUNDERFOREST_KEY);
+if (CYCLING_AVAILABLE) {
   RASTER_BASEMAPS.cycling = {
-    tiles: ['a', 'b', 'c'].map(
-      (s) => `https://${s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=${THUNDERFOREST_KEY}`,
-    ),
+    tiles: USE_PROXY
+      ? ['/api/tiles/thunderforest/cycle/{z}/{x}/{y}.png']
+      : ['a', 'b', 'c'].map(
+          (s) => `https://${s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=${THUNDERFOREST_KEY}`,
+        ),
     attribution: 'Maps © Thunderforest, Data © OpenStreetMap contributors',
     maxzoom: 22,
   };
@@ -485,8 +490,8 @@ map.on('load', () => {
   const mapstyleEl = document.querySelector<HTMLDivElement>('#mapstyle');
   const layersToggle = document.querySelector<HTMLButtonElement>('#layers-toggle');
   if (mapstyleEl && layersToggle) {
-    // OpenCycleMap (the cycling layer) only works with a Thunderforest key.
-    if (!THUNDERFOREST_KEY) mapstyleEl.querySelector('[data-style="cycling"]')?.remove();
+    // OpenCycleMap (the cycling layer) needs a Thunderforest key or the proxy.
+    if (!CYCLING_AVAILABLE) mapstyleEl.querySelector('[data-style="cycling"]')?.remove();
     const setStyleMenuOpen = (open: boolean): void => {
       mapstyleEl.hidden = !open;
       layersToggle.setAttribute('aria-expanded', String(open));
