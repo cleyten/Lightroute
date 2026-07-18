@@ -1948,8 +1948,14 @@ button.primary:active:not(:disabled),
     border-top: 0.5px solid var(--color-border);
   }
 
+  /* With the bottom tab bar present, the sheet sits above it AND is shortened
+     by the same amount — otherwise (bottom + 92vh) exceeds the screen and the
+     full-state sheet clips its own drag handle off the top of the viewport,
+     leaving no way to lower it back to the map. */
   .has-community #sidebar {
     bottom: calc(56px + env(safe-area-inset-bottom));
+    height: calc(92vh - 56px - env(safe-area-inset-bottom));
+    max-height: calc(92vh - 56px - env(safe-area-inset-bottom));
   }
 
   #sidebar {
