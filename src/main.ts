@@ -8,7 +8,7 @@ import { downloadTcx } from './tcx';
 import { parseTcx } from './tcximport';
 import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
 import { renderElevationChart, clearElevationChart, renderGradeLegend } from './chart';
-import { surfaceBreakdown, renderSurfaceBar } from './surface';
+import { surfaceBreakdown, renderSurfaceBar, surfaceRuns, type SurfaceClass } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
 import { generateRoundTrips, rejectionText, type LoopOption } from './ors';
 import { detectClimbs, type Climb } from './climbs';
@@ -111,6 +111,7 @@ const rangeTrack = document.querySelector<HTMLElement>('#range-track')!;
 const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')!;
 const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
 const surfaceEl = document.querySelector<HTMLElement>('#surface')!;
+const routeBadge = document.querySelector<HTMLElement>('#route-badge');
 const loopOptionsEl = document.querySelector<HTMLElement>('#loop-options')!;
 const windChipEl = document.querySelector<HTMLElement>('#wind-chip')!;
 const climbsEl = document.querySelector<HTMLElement>('#climbs')!;
@@ -155,18 +156,9 @@ const communityList = document.querySelector<HTMLUListElement>('#community-list'
 // "Near me" sort / distance-away labels. Null until the user grants location.
 let lastKnownLocation: [number, number] | null = null;
 
-// The "clean" vector base follows the UI theme: a dark map in dark mode so the
-// map doesn't glare against the charcoal panel (both are OpenFreeMap styles).
-const forcedTheme = document.documentElement.getAttribute('data-theme');
-const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-const useDarkBase = forcedTheme === 'dark' || (forcedTheme !== 'light' && prefersDark);
-const CLEAN_STYLE_URL = useDarkBase
-  ? 'https://tiles.openfreemap.org/styles/dark'
-  : 'https://tiles.openfreemap.org/styles/positron';
-
 const map = new maplibregl.Map({
   container: 'map',
-  style: CLEAN_STYLE_URL,
+  style: 'https://tiles.openfreemap.org/styles/positron',
   center: [5.3, 51.9], // Netherlands
   zoom: 7,
 });
@@ -338,6 +330,31 @@ map.on('load', () => {
       'line-color': ROUTE_COLOR,
       'line-width': 4,
       'line-opacity': 0.95,
+    },
+  });
+  // Surface-coloured overlay on top of the base line: paved reads as the
+  // accent, cobbles amber, unpaved warm brown. Empty (falls back to the solid
+  // line) when no surface data is available.
+  map.addSource('route-surface', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+  map.addLayer({
+    id: 'route-surface-line',
+    type: 'line',
+    source: 'route-surface',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-width': 4,
+      'line-opacity': 0.98,
+      'line-color': [
+        'match',
+        ['get', 'surface'],
+        'unpaved', '#b8641e',
+        'cobbles', '#d98a1e',
+        'paved', ROUTE_COLOR,
+        ROUTE_COLOR,
+      ],
     },
   });
   // Café markers along the current route.
@@ -1309,7 +1326,8 @@ function rebuildMarkers(): void {
   state.markers.forEach((marker) => marker.remove());
   state.markers = state.waypoints.map((waypoint, index) => {
     const el = document.createElement('div');
-    el.className = 'waypoint-marker';
+    // The start point (1) reads green like a route origin; the rest are accent.
+    el.className = index === 0 ? 'waypoint-marker start' : 'waypoint-marker';
     el.textContent = String(index + 1);
     el.title =
       index === 0
@@ -1438,6 +1456,83 @@ function setRouteData(data: FeatureCollection): void {
   source?.setData(data);
 }
 
+/**
+ * Splits the route geometry into per-surface LineString runs so the line can be
+ * coloured by surface (paved / cobbles / unpaved). BRouter's messages give a
+ * distance + surface per way; we walk them in step with the cumulative
+ * geometry distance and assign each coordinate segment a class, then merge
+ * consecutive same-class segments. Any problem yields an empty collection, so
+ * the solid fallback line underneath simply shows through.
+ */
+function buildSurfaceLine(
+  coords: [number, number, number][],
+  messages: string[][],
+): FeatureCollection {
+  const empty: FeatureCollection = { type: 'FeatureCollection', features: [] };
+  try {
+    const runs = surfaceRuns(messages);
+    if (!runs || runs.length === 0 || coords.length < 2) return empty;
+    const cum = cumulativeDistances(coords);
+    const runEnds: number[] = [];
+    let acc = 0;
+    for (const r of runs) {
+      acc += r.meters;
+      runEnds.push(acc);
+    }
+    // Class per coordinate segment (i → i+1), by its midpoint distance.
+    const segClass: SurfaceClass[] = [];
+    let ri = 0;
+    for (let i = 0; i + 1 < coords.length; i++) {
+      const mid = (cum[i] + cum[i + 1]) / 2;
+      while (ri < runs.length - 1 && mid > runEnds[ri]) ri++;
+      segClass.push(runs[ri].cls);
+    }
+    // Merge consecutive same-class segments into LineStrings (sharing the
+    // boundary vertex so there is no visual gap between runs).
+    const features: FeatureCollection['features'] = [];
+    let start = 0;
+    for (let i = 1; i <= segClass.length; i++) {
+      if (i === segClass.length || segClass[i] !== segClass[start]) {
+        features.push({
+          type: 'Feature',
+          properties: { surface: segClass[start] },
+          geometry: {
+            type: 'LineString',
+            coordinates: coords.slice(start, i + 1).map((c) => [c[0], c[1]]),
+          },
+        });
+        start = i;
+      }
+    }
+    return { type: 'FeatureCollection', features };
+  } catch {
+    return empty;
+  }
+}
+
+/** On-map chip summarising the route's paved vs unpaved split (Strava-style). */
+function updateRouteBadge(totals: ReturnType<typeof surfaceBreakdown>): void {
+  if (!routeBadge) return;
+  const known = totals ? totals.totalMeters - totals.unknown : 0;
+  if (!totals || known < totals.totalMeters * 0.4) {
+    routeBadge.hidden = true;
+    return;
+  }
+  const pavedPct = Math.round((totals.paved / known) * 100);
+  const offPct = 100 - pavedPct;
+  routeBadge.textContent = pavedPct >= offPct ? `${pavedPct}% paved` : `${offPct}% unpaved`;
+  routeBadge.hidden = false;
+}
+
+/** Updates the surface-coloured overlay for the current route (or clears it). */
+function setSurfaceLine(): void {
+  const source = map.getSource('route-surface') as maplibregl.GeoJSONSource | undefined;
+  if (!source) return;
+  source.setData(
+    state.route ? buildSurfaceLine(state.route.coordinates, state.route.messages) : { type: 'FeatureCollection', features: [] },
+  );
+}
+
 /** Renders stats, elevation chart, surface bar and climbs for the current route (or clears them). */
 function renderRouteDetails(): void {
   // Any route change invalidates café results found for the previous route.
@@ -1448,6 +1543,7 @@ function renderRouteDetails(): void {
   const statsWereHidden = statsSection.hidden;
   statsSection.hidden = !state.route;
   routeEmpty.hidden = !!state.route;
+  setSurfaceLine();
 
   if (state.route) {
     const km = state.route.distanceMeters / 1000;
@@ -1485,7 +1581,9 @@ function renderRouteDetails(): void {
     } else {
       surfaceEl.hidden = true;
     }
+    updateRouteBadge(totals);
   } else {
+    updateRouteBadge(null);
     statDistance.textContent = '–';
     statAscend.textContent = '–';
     chartWrap.hidden = true;

@@ -111,6 +111,39 @@ export function unpavedFraction(totals: SurfaceTotals | null): number | null {
   return (totals.unpaved + totals.cobbles * 0.3) / known;
 }
 
+export type SurfaceClass = 'paved' | 'cobbles' | 'unpaved' | 'unknown';
+
+/** Maps an OSM surface tag value to one of our four surface classes. */
+export function classifySurface(tag: string | undefined): SurfaceClass {
+  if (!tag) return 'unknown';
+  if (PAVED.has(tag)) return 'paved';
+  if (COBBLES.has(tag)) return 'cobbles';
+  if (UNPAVED.has(tag)) return 'unpaved';
+  return 'unknown';
+}
+
+/**
+ * Per-way [meters, class] runs along the route parsed from BRouter messages,
+ * in order. Used to colour the route line by surface. Returns null when the
+ * messages lack the columns we need.
+ */
+export function surfaceRuns(
+  messages: string[][],
+): { meters: number; cls: SurfaceClass }[] | null {
+  if (messages.length < 2) return null;
+  const header = messages[0];
+  const distIdx = header.indexOf('Distance');
+  const tagsIdx = header.indexOf('WayTags');
+  if (distIdx < 0 || tagsIdx < 0) return null;
+  const runs: { meters: number; cls: SurfaceClass }[] = [];
+  for (const row of messages.slice(1)) {
+    const meters = Number(row[distIdx]) || 0;
+    const surface = /(?:^|\s)surface=(\S+)/.exec(row[tagsIdx] ?? '')?.[1];
+    runs.push({ meters, cls: classifySurface(surface) });
+  }
+  return runs;
+}
+
 export function surfaceBreakdown(messages: string[][]): SurfaceTotals | null {
   if (messages.length < 2) return null;
   const header = messages[0];

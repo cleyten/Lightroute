@@ -1452,6 +1452,32 @@ button.primary:active:not(:disabled),
   cursor: pointer;
 }
 
+/* Start point reads as a route origin (green), like Strava/Komoot. */
+.waypoint-marker.start {
+  background: #34a853;
+}
+
+/* On-map surface chip: floating pill, top-centre of the map. */
+.route-badge {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: var(--color-panel);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border: 0.5px solid var(--color-border);
+  box-shadow: var(--shadow-float);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* Circular map-tool stack (top-right, under the zoom controls) — GPS,
    heatmap and the map-style opener, matching a premium map app. */
 .map-tools {
