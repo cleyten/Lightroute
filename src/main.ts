@@ -1037,6 +1037,9 @@ gpxFileInput.addEventListener('change', async () => {
     // ridden track. recalculateRoute() cleared it above, so set it back here.
     state.importedFileText = text;
     state.importedFileFormat = isTcx ? 'tcx' : 'gpx';
+    // Import lives on the Community tab now; jump back to the planner so the
+    // imported route is visible and editable.
+    setActiveTab('planner');
     if (state.route) {
       const bounds = coords.reduce(
         (acc, c) => acc.extend([c[0], c[1]]),
