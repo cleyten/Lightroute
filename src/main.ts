@@ -2509,6 +2509,21 @@ async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
   }
 
   window.addEventListener('resize', reset);
+
+  // When the PWA comes back to the foreground (or is restored from the page
+  // cache), iOS can leave the web view scrolled with the sheet transform stale
+  // — the map ends up unreachable. Reset any errant page scroll and re-assert
+  // the sheet's snap position.
+  const restore = (): void => {
+    if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+    reset();
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') restore();
+  });
+  window.addEventListener('pageshow', restore);
+
   reset();
 })();
 

@@ -183,6 +183,11 @@ body,
 #app {
   margin: 0;
   height: 100%;
+  /* Only the panel/sheet scrolls; the page itself never does. Without this,
+     iOS standalone PWAs rubber-band the whole web view and can get stuck
+     scrolled (map pushed out of view) after backgrounding the app. */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -1914,6 +1919,13 @@ button.primary:active:not(:disabled),
    8. MOBILE — full-screen map with a draggable bottom sheet (<= 700px)
    ============================================================================ */
 @media (max-width: 700px) {
+  /* Pin the page to the viewport so iOS can't leave the web view scrolled. */
+  body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+  }
+
   /* Top tabs give way to a native-style bottom tab bar on phones. The bar and
      the sheet's raised bottom only apply when the community backend exists
      (body.has-community), so a config-less build keeps the sheet flush. */
