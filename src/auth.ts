@@ -1,22 +1,36 @@
-// Email magic-link authentication. Publishing routes, uploading GPX files and
-// rating routes require a signed-in user; browsing the shared library does not.
-// Password-free: a single-use link is emailed and clicking it returns here with
-// a session (see detectSessionInUrl in supabase.ts).
+// Email one-time-code (OTP) authentication. Publishing routes, uploading GPX
+// files and rating routes require a signed-in user; browsing the shared library
+// does not. Password-free: a 6-digit code is emailed and typed back into the
+// app to establish the session.
+//
+// We deliberately use a typed code rather than a magic *link*: on iOS, tapping
+// a link in Mail always opens Safari, never an installed home-screen PWA, and
+// the standalone PWA has a separate storage context — so a link-based session
+// lands in Safari and the PWA stays signed out. A code keeps the whole flow
+// inside whatever context the user started in. (The Supabase "Magic Link" email
+// template must include {{ .Token }} for the code to appear in the email.)
 import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
-/** Sends a magic sign-in link to the given email address. */
-export async function sendMagicLink(email: string): Promise<void> {
+/** Emails a 6-digit one-time sign-in code to the given address. */
+export async function sendEmailCode(email: string): Promise<void> {
   if (!supabase) throw new Error('Community features are not configured.');
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      // Return to this exact page. Works for both localhost dev and the
-      // GitHub Pages path. This URL must be listed in the Supabase project's
-      // Authentication > URL Configuration > Redirect URLs, or the link fails.
-      emailRedirectTo: window.location.origin + window.location.pathname,
+      shouldCreateUser: true,
+      // No emailRedirectTo: omitting it keeps this a code the user types in
+      // rather than a link, so it works inside an installed PWA and needs no
+      // redirect-URL allow-listing.
     },
   });
+  if (error) throw error;
+}
+
+/** Verifies an emailed code and establishes the session in this context. */
+export async function verifyEmailCode(email: string, token: string): Promise<void> {
+  if (!supabase) throw new Error('Community features are not configured.');
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
   if (error) throw error;
 }
 

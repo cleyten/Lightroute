@@ -469,6 +469,21 @@ select {
   margin: 0 0 0.6rem;
 }
 
+/* Inline text button (e.g. "Use a different email") that reads as a link. */
+.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.linklike:hover {
+  opacity: 0.8;
+}
+
 /* =============================================================================
    4. COMPONENTS
    ============================================================================ */

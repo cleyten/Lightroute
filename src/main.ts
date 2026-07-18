@@ -20,7 +20,7 @@ import { fetchWater, type WaterPoint } from './water';
 import { buildShareUrl, parseShareUrl } from './share';
 import { parseGpx, isClosedTrack } from './gpximport';
 import { isSupabaseConfigured } from './supabase';
-import { sendMagicLink, signOut, onAuthChange } from './auth';
+import { sendEmailCode, verifyEmailCode, signOut, onAuthChange } from './auth';
 import {
   publishRoute,
   fetchCommunityRoutes,
@@ -139,6 +139,13 @@ const accountSignedOut = document.querySelector<HTMLElement>('#account-signed-ou
 const accountSignedIn = document.querySelector<HTMLElement>('#account-signed-in')!;
 const accountEmail = document.querySelector<HTMLInputElement>('#account-email')!;
 const btnSignin = document.querySelector<HTMLButtonElement>('#btn-signin')!;
+const accountCode = document.querySelector<HTMLInputElement>('#account-code')!;
+const btnVerify = document.querySelector<HTMLButtonElement>('#btn-verify')!;
+const emailRow = document.querySelector<HTMLElement>('#email-row')!;
+const codeRow = document.querySelector<HTMLElement>('#code-row')!;
+const signinHint = document.querySelector<HTMLElement>('#signin-hint')!;
+const btnSigninBack = document.querySelector<HTMLButtonElement>('#btn-signin-back')!;
+const DEFAULT_SIGNIN_HINT = signinHint.textContent ?? '';
 const accountName = document.querySelector<HTMLElement>('#account-name')!;
 const btnSignout = document.querySelector<HTMLButtonElement>('#btn-signout')!;
 const communitySortButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-sort button')];
@@ -2020,25 +2027,76 @@ if (isSupabaseConfigured) {
     localStorage.setItem(AUTHOR_KEY, authorNameInput.value.trim());
   });
 
+  // Email code (OTP) sign-in. A typed code rather than a magic link so it works
+  // inside an installed PWA, where a link would open Safari (see auth.ts).
+  let pendingEmail = '';
+
+  function showCodeEntry(email: string): void {
+    pendingEmail = email;
+    emailRow.hidden = true;
+    codeRow.hidden = false;
+    btnSigninBack.hidden = false;
+    signinHint.textContent = `Enter the 6-digit code we emailed to ${email}.`;
+    accountCode.value = '';
+    accountCode.focus();
+  }
+
+  function resetSignInForm(): void {
+    pendingEmail = '';
+    codeRow.hidden = true;
+    emailRow.hidden = false;
+    btnSigninBack.hidden = true;
+    signinHint.textContent = DEFAULT_SIGNIN_HINT;
+  }
+
   btnSignin.addEventListener('click', async () => {
     const email = accountEmail.value.trim();
     if (!email) {
-      setStatus('Enter your email to get a sign-in link.', true);
+      setStatus('Enter your email to get a sign-in code.', true);
       return;
     }
     btnSignin.disabled = true;
     try {
-      await sendMagicLink(email);
-      setStatus(`Sign-in link sent to ${email}. Open it on this device to finish.`);
+      await sendEmailCode(email);
+      showCodeEntry(email);
+      setStatus(`Code sent to ${email}. Enter it here to finish.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not send the sign-in link.', true);
+      setStatus(error instanceof Error ? error.message : 'Could not send the sign-in code.', true);
     } finally {
       btnSignin.disabled = false;
     }
   });
 
+  async function submitCode(): Promise<void> {
+    const token = accountCode.value.trim();
+    if (!/^\d{6}$/.test(token)) {
+      setStatus('Enter the 6-digit code from the email.', true);
+      return;
+    }
+    btnVerify.disabled = true;
+    try {
+      await verifyEmailCode(pendingEmail, token);
+      // onAuthChange swaps to the signed-in UI; tidy the form for next time.
+      resetSignInForm();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'That code was not valid. Try again.', true);
+    } finally {
+      btnVerify.disabled = false;
+    }
+  }
+
+  btnVerify.addEventListener('click', () => void submitCode());
+  accountCode.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') void submitCode();
+  });
+  accountEmail.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') btnSignin.click();
+  });
+  btnSigninBack.addEventListener('click', resetSignInForm);
+
   btnSignout.addEventListener('click', async () => {
     await signOut();
+    resetSignInForm();
     setStatus('Signed out.');
   });
 
