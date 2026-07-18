@@ -1249,6 +1249,53 @@ function initDisclosure(toggleSelector: string, bodySelector: string): void {
 
 initDisclosure('#community-filters-toggle', '#community-filters-body');
 
+// --- Light/dark theme toggle -------------------------------------------------
+// The UI follows the OS by default; toggling sets an explicit, persisted
+// preference on <html data-theme>. The map basemap stays light either way.
+(() => {
+  const toggle = document.querySelector<HTMLButtonElement>('#theme-toggle');
+  if (!toggle) return;
+  const THEME_KEY = 'lightmile-theme';
+  const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+  const effectiveTheme = (): 'light' | 'dark' => {
+    const forced = document.documentElement.getAttribute('data-theme');
+    if (forced === 'light' || forced === 'dark') return forced;
+    return darkQuery.matches ? 'dark' : 'light';
+  };
+
+  const sync = (): void => {
+    const dark = effectiveTheme() === 'dark';
+    toggle.classList.toggle('is-dark', dark);
+    toggle.setAttribute('aria-pressed', String(dark));
+    toggle.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+  };
+
+  toggle.addEventListener('click', () => {
+    const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      /* private mode: preference just won't persist */
+    }
+    sync();
+  });
+
+  // Reflect OS changes while the user hasn't set an explicit preference.
+  darkQuery.addEventListener('change', () => {
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(THEME_KEY);
+    } catch {
+      stored = null;
+    }
+    if (stored !== 'light' && stored !== 'dark') sync();
+  });
+
+  sync();
+})();
+
 bikeButtons.forEach((button) =>
   button.addEventListener('click', () => {
     settings.bike = button.dataset.bike as BikeType;

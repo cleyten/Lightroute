@@ -353,8 +353,16 @@ select {
 #brand {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.6rem;
   padding: 1.25rem 1.25rem 1rem;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
 }
 
 .brand-mark {
@@ -362,6 +370,38 @@ select {
   width: 30px;
   height: 30px;
   border-radius: 8px;
+}
+
+/* Light/dark toggle, top-right of the panel header. */
+.theme-toggle {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.theme-toggle .ico.sun {
+  display: none;
+}
+
+.theme-toggle.is-dark .ico.moon {
+  display: none;
+}
+
+.theme-toggle.is-dark .ico.sun {
+  display: inline-flex;
 }
 
 #brand h1 {
