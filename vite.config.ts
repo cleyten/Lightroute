@@ -4,13 +4,17 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({ command }) => ({
   // Base path per target:
   //  - GitHub Pages serves under /Lightroute/ (repo-name subpath).
-  //  - Cloudflare Pages (and any root-domain host) serve under /. Cloudflare
-  //    sets CF_PAGES=1 during its build, so this switches automatically with no
-  //    dashboard config. Set BASE_PATH explicitly to override (e.g. a subpath).
+  //  - Cloudflare serves under /. Cloudflare Pages sets CF_PAGES and Cloudflare
+  //    Workers Builds sets WORKERS_CI, so this switches automatically for both.
+  //  - Any other root host: set BASE_PATH=/ (or override to a subpath).
   //  - Local dev serves under /.
   base:
     process.env.BASE_PATH ??
-    (process.env.CF_PAGES ? '/' : command === 'build' ? '/Lightroute/' : '/'),
+    (process.env.CF_PAGES || process.env.WORKERS_CI
+      ? '/'
+      : command === 'build'
+        ? '/Lightroute/'
+        : '/'),
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',

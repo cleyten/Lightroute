@@ -5,21 +5,27 @@ server. GitHub Pages keeps working unchanged; this is an additional target.
 
 ## 1. Create the project
 
-Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** →
-**Connect to Git** → pick the `cleyten/Lightroute` repo.
+Cloudflare now defaults new git projects to the **Workers** flow (Workers
+Static Assets). This repo supports it directly via `wrangler.jsonc`.
 
-Build settings:
+**Workers flow (what the dashboard gives you by default):**
 
 | Setting | Value |
 |---|---|
-| Framework preset | None (or Vite) |
 | Build command | `npm run build` |
-| Build output directory | `dist` |
+| Deploy command | `npx wrangler deploy` |
 | Production branch | `main` |
 
-`vite.config.ts` detects Cloudflare's `CF_PAGES=1` and sets the base path to
-`/` automatically — no extra config needed. (GitHub Pages still gets
-`/Lightroute/`.)
+`wrangler.jsonc` tells `wrangler deploy` to serve `./dist` as static assets
+with an SPA fallback. The base path resolves to `/` automatically because
+Cloudflare Workers Builds sets `WORKERS_CI=1` (and Cloudflare Pages sets
+`CF_PAGES=1`). GitHub Pages keeps `/Lightroute/`. If assets ever 404 with a
+`/Lightroute/…` path, force it by setting the build command to
+`BASE_PATH=/ npm run build`.
+
+**Pages flow (alternative):** Create → Pages → Connect to Git, build command
+`npm run build`, output directory `dist`, no deploy command. `wrangler.jsonc`
+is ignored on this path; `_redirects`/`_headers` are used instead.
 
 Node version is pinned to 22 via `.node-version`.
 
