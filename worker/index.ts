@@ -10,9 +10,20 @@
 
 interface Env {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
-  ORS_KEY: string;
-  THUNDERFOREST_KEY: string;
+  // Accepted under either name: the plain runtime-secret name (ORS_KEY) or the
+  // VITE_-prefixed one, since the dashboard's "Variables and Secrets" UI leads
+  // people to reuse the build-variable names. See orsKey()/tfKey() below.
+  ORS_KEY?: string;
+  VITE_ORS_KEY?: string;
+  THUNDERFOREST_KEY?: string;
+  VITE_THUNDERFOREST_KEY?: string;
 }
+
+// The proxy reads ORS_KEY / THUNDERFOREST_KEY, but the two upstream keys are
+// easy to set under their VITE_-prefixed build-variable names by mistake, so
+// accept either. (VITE_ has no meaning at runtime; it's just a naming habit.)
+const orsKey = (env: Env): string => env.ORS_KEY || env.VITE_ORS_KEY || '';
+const tfKey = (env: Env): string => env.THUNDERFOREST_KEY || env.VITE_THUNDERFOREST_KEY || '';
 
 const ORS_PREFIX = '/api/ors/';
 const TILE_RE = /^\/api\/tiles\/thunderforest\/(.+)$/;
@@ -23,14 +34,15 @@ export default {
 
     // --- OpenRouteService (round trips) -----------------------------------
     if (pathname.startsWith(ORS_PREFIX)) {
-      if (!env.ORS_KEY) return new Response('Routing not configured', { status: 503 });
+      const key = orsKey(env);
+      if (!key) return new Response('Routing not configured', { status: 503 });
       const rest = pathname.slice(ORS_PREFIX.length); // e.g. cycling-road/geojson
       const target = `https://api.openrouteservice.org/v2/directions/${rest}`;
       const isBodyless = request.method === 'GET' || request.method === 'HEAD';
       return fetch(target, {
         method: request.method,
         headers: {
-          Authorization: env.ORS_KEY,
+          Authorization: key,
           'Content-Type': request.headers.get('content-type') || 'application/json',
         },
         body: isBodyless ? undefined : await request.text(),
@@ -40,8 +52,9 @@ export default {
     // --- Thunderforest OpenCycleMap tiles ---------------------------------
     const tile = pathname.match(TILE_RE);
     if (tile) {
-      if (!env.THUNDERFOREST_KEY) return new Response('Tiles not configured', { status: 503 });
-      const target = `https://tile.thunderforest.com/${tile[1]}?apikey=${env.THUNDERFOREST_KEY}`;
+      const key = tfKey(env);
+      if (!key) return new Response('Tiles not configured', { status: 503 });
+      const target = `https://tile.thunderforest.com/${tile[1]}?apikey=${key}`;
       const upstream = await fetch(target);
       const headers = new Headers(upstream.headers);
       headers.set('Cache-Control', 'public, max-age=86400');
