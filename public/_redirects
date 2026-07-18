@@ -1,4 +1,0 @@
-# SPA fallback: serve index.html for any path that isn't a real static file.
-# Cloudflare Pages (and Netlify) match built assets first, so /assets/*,
-# /sw.js, /manifest.webmanifest etc. are still served directly.
-/*    /index.html    200

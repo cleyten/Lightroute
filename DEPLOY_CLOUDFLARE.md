@@ -24,8 +24,9 @@ Cloudflare Workers Builds sets `WORKERS_CI=1` (and Cloudflare Pages sets
 `BASE_PATH=/ npm run build`.
 
 **Pages flow (alternative):** Create → Pages → Connect to Git, build command
-`npm run build`, output directory `dist`, no deploy command. `wrangler.jsonc`
-is ignored on this path; `_redirects`/`_headers` are used instead.
+`npm run build`, output directory `dist`, no deploy command. On this path
+`wrangler.jsonc` and the Worker are ignored, so the API-key proxy does NOT run
+— use the Workers flow above if you want the keys kept server-side.
 
 Node version is pinned to 22 via `.node-version`.
 
@@ -96,7 +97,10 @@ Supabase dashboard → **Authentication → URL Configuration**:
 
 ## Notes
 
-- `public/_redirects` gives the SPA an index.html fallback.
+- SPA fallback (serve index.html for unknown paths) is handled by
+  `not_found_handling: "single-page-application"` in `wrangler.jsonc` on the
+  Workers flow. (A `_redirects` catch-all is rejected there as an infinite
+  loop, so it is intentionally absent.)
 - `public/_headers` sets long immutable caching for hashed assets and
   `no-cache` on the service worker so new deploys are picked up.
 - Both files are ignored by GitHub Pages, so nothing changes there.
