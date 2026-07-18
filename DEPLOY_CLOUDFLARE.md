@@ -32,24 +32,14 @@ Node version is pinned to 22 via `.node-version`.
 
 ## 2. Environment variables
 
-There are two kinds now: **build variables** (baked into the client bundle by
-Vite) and **Worker secrets** (available only to the server-side proxy at
-runtime, never in the bundle).
+**The only thing you must set for Cloudflare are the two Worker secrets below.**
+The client auto-detects the Cloudflare build: because no `VITE_ORS_KEY` /
+`VITE_THUNDERFOREST_KEY` is baked in, it routes ORS + tile requests through the
+same-origin `/api/*` Worker proxy, and the (public) Supabase URL + anon key are
+compiled in as defaults. So **no build variables are required** — a plain
+`npm run build` on Cloudflare produces a working, key-free bundle.
 
-### Build variables — Settings → Build → *Variables and secrets*
-
-| Variable | Value |
-|---|---|
-| `VITE_USE_PROXY` | `1` |
-| `VITE_SUPABASE_URL` | `https://ovqjrpyvceehnzqnluut.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_iZQZuuhzPQuCqW00EqnkJg_4De09xR1` |
-
-`VITE_USE_PROXY=1` makes the client call the same-origin `/api/*` proxy instead
-of the upstream APIs directly. The Supabase URL + anon key are safe to be
-public (row-level security protects the data). **Do not** set `VITE_ORS_KEY` or
-`VITE_THUNDERFOREST_KEY` here — that would put them back in the bundle.
-
-### Worker secrets — Settings → Variables and Secrets (type: Secret)
+### Worker secrets — Settings → Variables and Secrets (type: Secret) — REQUIRED
 
 | Secret | Value |
 |---|---|

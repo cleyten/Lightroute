@@ -28,8 +28,14 @@ import { cleanLoopGeometry, healWiggles, findWiggles } from './cleanup';
 // same-origin Worker proxy, which injects the key server-side — so the key is
 // never in the bundle. Otherwise call OpenRouteService directly with the
 // build-time key (GitHub Pages / local dev).
-const USE_PROXY = import.meta.env.VITE_USE_PROXY === '1';
 const ORS_KEY: string = import.meta.env.VITE_ORS_KEY ?? '';
+// Route through the same-origin Worker proxy (which injects the key
+// server-side) whenever no direct key is baked into the bundle — that is the
+// Cloudflare build. GitHub Pages and local dev bake VITE_ORS_KEY and call ORS
+// directly. VITE_USE_PROXY=1 forces the proxy explicitly (e.g. `preview:cf`).
+// The PROD guard keeps `npm run dev` (no key) throwing a clear error instead of
+// proxying to an endpoint that only exists on the deployed Worker.
+const USE_PROXY = import.meta.env.VITE_USE_PROXY === '1' || (import.meta.env.PROD && !ORS_KEY);
 const ORS_BASE = USE_PROXY ? '/api/ors' : 'https://api.openrouteservice.org/v2/directions';
 
 const ORS_PROFILES: Record<string, string> = {

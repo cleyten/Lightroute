@@ -183,12 +183,14 @@ const RASTER_BASEMAPS: Record<
 };
 
 // The "cycling" basemap is OpenCycleMap (Thunderforest), which needs an API
-// key. On the Cloudflare build (VITE_USE_PROXY) the tiles go through the
-// same-origin Worker proxy, which adds the key server-side; otherwise they use
-// a build-time key directly. The button is removed when neither is available
-// (see the load handler).
-const USE_PROXY = import.meta.env.VITE_USE_PROXY === '1';
+// key. When no key is baked into the bundle (the Cloudflare build) the tiles
+// go through the same-origin Worker proxy, which adds the key server-side;
+// GitHub Pages / local dev bake a key and fetch tiles directly. The button is
+// removed when neither is available (see the load handler). The PROD guard
+// keeps local dev without a key from showing a broken OpenCycleMap option.
 const THUNDERFOREST_KEY: string = import.meta.env.VITE_THUNDERFOREST_KEY ?? '';
+const USE_PROXY =
+  import.meta.env.VITE_USE_PROXY === '1' || (import.meta.env.PROD && !THUNDERFOREST_KEY);
 const CYCLING_AVAILABLE = USE_PROXY || Boolean(THUNDERFOREST_KEY);
 if (CYCLING_AVAILABLE) {
   RASTER_BASEMAPS.cycling = {

@@ -6,8 +6,16 @@
 // not secrecy of this key. NEVER put the service_role key here.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// Both values are safe to ship publicly (the publishable/anon key is protected
+// by Row Level Security, not secrecy), so we fall back to the project's own
+// values when a build didn't inject them — e.g. a Cloudflare build without the
+// VITE_SUPABASE_* build variables set. This keeps the community tab working
+// without depending on build-env configuration. A build var still overrides.
+const SUPABASE_URL_DEFAULT = 'https://ovqjrpyvceehnzqnluut.supabase.co';
+const SUPABASE_ANON_KEY_DEFAULT = 'sb_publishable_iZQZuuhzPQuCqW00EqnkJg_4De09xR1';
+const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || SUPABASE_URL_DEFAULT;
+const key =
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || SUPABASE_ANON_KEY_DEFAULT;
 
 /** True when both env vars are present, so the community UI can be shown. */
 export const isSupabaseConfigured = Boolean(url && key);
