@@ -153,6 +153,15 @@
             <ul id="water-list"></ul>
           </div>
         </section>
+        </div>
+
+        <div id="tab-community" class="tab-panel" role="tabpanel" aria-label="Community" hidden>
+        <section class="group">
+          <span class="group-label">Your routes</span>
+          <button id="btn-publish" class="find-btn" type="button" hidden disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m8 7 4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Publish this route</button>
+          <button id="btn-import-gpx" class="find-btn" type="button"><svg class="btn-ico" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Import route (GPX/TCX)</button>
+          <input id="gpx-file-input" type="file" accept=".gpx,.tcx" hidden aria-hidden="true" />
+        </section>
 
         <section class="group" id="save-section">
           <span class="group-label">Save and export</span>
@@ -168,15 +177,7 @@
           </div>
           <ul id="saved-list"></ul>
         </section>
-        </div>
 
-        <div id="tab-community" class="tab-panel" role="tabpanel" aria-label="Community" hidden>
-        <section class="group">
-          <span class="group-label">Your routes</span>
-          <button id="btn-publish" class="find-btn" type="button" hidden disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m8 7 4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Publish this route</button>
-          <button id="btn-import-gpx" class="find-btn" type="button"><svg class="btn-ico" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Import route (GPX/TCX)</button>
-          <input id="gpx-file-input" type="file" accept=".gpx,.tcx" hidden aria-hidden="true" />
-        </section>
         <section class="group" id="community-section">
           <div id="account-signed-out">
             <span class="save-row" id="email-row">
