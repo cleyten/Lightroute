@@ -1,7 +1,8 @@
 // Email one-time-code (OTP) authentication. Publishing routes, uploading GPX
 // files and rating routes require a signed-in user; browsing the shared library
-// does not. Password-free: a 6-digit code is emailed and typed back into the
-// app to establish the session.
+// does not. Password-free: a numeric code (length set by the Supabase project's
+// OTP settings, commonly 6 digits) is emailed and typed back into the app to
+// establish the session.
 //
 // We deliberately use a typed code rather than a magic *link*: on iOS, tapping
 // a link in Mail always opens Safari, never an installed home-screen PWA, and
@@ -12,7 +13,7 @@
 import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
-/** Emails a 6-digit one-time sign-in code to the given address. */
+/** Emails a numeric one-time sign-in code to the given address. */
 export async function sendEmailCode(email: string): Promise<void> {
   if (!supabase) throw new Error('Community features are not configured.');
   const { error } = await supabase.auth.signInWithOtp({

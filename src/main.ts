@@ -2036,7 +2036,7 @@ if (isSupabaseConfigured) {
     emailRow.hidden = true;
     codeRow.hidden = false;
     btnSigninBack.hidden = false;
-    signinHint.textContent = `Enter the 6-digit code we emailed to ${email}.`;
+    signinHint.textContent = `Enter the code we emailed to ${email}.`;
     accountCode.value = '';
     accountCode.focus();
   }
@@ -2068,9 +2068,11 @@ if (isSupabaseConfigured) {
   });
 
   async function submitCode(): Promise<void> {
+    // Supabase's OTP length is a per-project setting, not always 6, so accept
+    // any plausible numeric code rather than assuming a fixed length.
     const token = accountCode.value.trim();
-    if (!/^\d{6}$/.test(token)) {
-      setStatus('Enter the 6-digit code from the email.', true);
+    if (!/^\d{4,12}$/.test(token)) {
+      setStatus('Enter the code from the email.', true);
       return;
     }
     btnVerify.disabled = true;
