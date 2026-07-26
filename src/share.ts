@@ -6,6 +6,7 @@
 // That keeps shared links short (a handful of points, not hundreds).
 
 import type { LngLat } from './routing';
+import { sanitizeWaypoints } from './waypoints';
 
 export interface SharePayload {
   waypoints: LngLat[];
@@ -40,9 +41,12 @@ export function parseShareUrl(search: string): SharePayload | null {
       t: number;
       c: number;
     };
-    if (!Array.isArray(compact.w) || compact.w.length < 2) return null;
+    // A link can be truncated by a chat app or edited by hand, so check the
+    // contents of the pairs, not just that a `w` array exists.
+    const waypoints = sanitizeWaypoints(compact.w);
+    if (!waypoints) return null;
     return {
-      waypoints: compact.w.map(([lng, lat]) => [lng, lat] as LngLat),
+      waypoints,
       bike: ['race', 'gravel', 'mtb'].includes(compact.b) ? compact.b : 'race',
       traffic: [0, 1, 2].includes(compact.t) ? compact.t : 0,
       closed: !!compact.c,

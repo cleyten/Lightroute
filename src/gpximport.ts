@@ -5,6 +5,7 @@
 // their own, so plain getAttribute()/querySelectorAll() by tag name works.
 
 import { haversineMeters } from './geo';
+import { isPlausibleLonLat } from './waypoints';
 
 export function parseGpx(xmlText: string): [number, number, number][] {
   const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
@@ -20,13 +21,28 @@ export function parseGpx(xmlText: string): [number, number, number][] {
     throw new Error('No track or route points found in this GPX file.');
   }
 
-  return points.map((point) => {
-    const lat = Number(point.getAttribute('lat'));
-    const lon = Number(point.getAttribute('lon'));
-    const eleText = point.querySelector('ele')?.textContent;
-    const ele = eleText !== undefined ? Number(eleText) : NaN;
-    return [lon, lat, Number.isFinite(ele) ? ele : 0];
-  });
+  // Absence has to be detected on the attribute, not on the parsed number:
+  // getAttribute returns null for a missing lat, Number(null) is 0, and 0 is a
+  // perfectly valid latitude. A point missing only its lat would otherwise
+  // survive as a plausible-looking coordinate on the equator.
+  const coords = points
+    .map((point): [number, number, number] | null => {
+      const latAttr = point.getAttribute('lat');
+      const lonAttr = point.getAttribute('lon');
+      if (latAttr === null || lonAttr === null || latAttr === '' || lonAttr === '') return null;
+      const lat = Number(latAttr);
+      const lon = Number(lonAttr);
+      if (!isPlausibleLonLat(lon, lat)) return null;
+      const eleText = point.querySelector('ele')?.textContent;
+      const ele = eleText !== undefined && eleText !== null ? Number(eleText) : NaN;
+      return [lon, lat, Number.isFinite(ele) ? ele : 0];
+    })
+    .filter((coord): coord is [number, number, number] => coord !== null);
+
+  if (coords.length < 2) {
+    throw new Error('No usable track or route points found in this GPX file.');
+  }
+  return coords;
 }
 
 /** A track is treated as a loop when its ends are within this distance (meters). */

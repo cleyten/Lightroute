@@ -1,0 +1,147 @@
+import { describe, expect, it } from 'vitest';
+import {
+  edgeSet,
+  initialBearing,
+  loopRoundness,
+  overlapRatio,
+  projectToMeters,
+  resample,
+  routeSimilarity,
+} from './loops';
+
+/** A closed square loop of roughly `sideM` meters per side, near Eindhoven. */
+function square(sideM: number, steps = 40): [number, number][] {
+  const lat0 = 51.44;
+  const dLat = sideM / 111_320;
+  const dLng = sideM / (111_320 * Math.cos((lat0 * Math.PI) / 180));
+  const corners: [number, number][] = [
+    [5.47, lat0],
+    [5.47 + dLng, lat0],
+    [5.47 + dLng, lat0 + dLat],
+    [5.47, lat0 + dLat],
+    [5.47, lat0],
+  ];
+  const out: [number, number][] = [];
+  for (let i = 1; i < corners.length; i++) {
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      out.push([
+        corners[i - 1][0] + (corners[i][0] - corners[i - 1][0]) * t,
+        corners[i - 1][1] + (corners[i][1] - corners[i - 1][1]) * t,
+      ]);
+    }
+  }
+  out.push(corners[corners.length - 1]);
+  return out;
+}
+
+/** A straight line out and back along the same ground. */
+function outAndBack(lengthM: number, steps = 80): [number, number][] {
+  const dLng = lengthM / (111_320 * Math.cos((51.44 * Math.PI) / 180));
+  const out: [number, number][] = [];
+  for (let s = 0; s <= steps; s++) out.push([5.47 + (dLng * s) / steps, 51.44]);
+  for (let s = steps - 1; s >= 0; s--) out.push([5.47 + (dLng * s) / steps, 51.44]);
+  return out;
+}
+
+describe('projectToMeters', () => {
+  it('preserves distance to within a percent at loop scale', () => {
+    const pts = projectToMeters([[5.47, 51.44], [5.47, 51.45]]);
+    const d = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
+    expect(d).toBeGreaterThan(1100);
+    expect(d).toBeLessThan(1120);
+  });
+});
+
+describe('resample', () => {
+  it('returns points spaced at roughly the requested interval', () => {
+    const line: [number, number][] = [[0, 0], [1000, 0]];
+    const out = resample(line, 100);
+    expect(out.length).toBeGreaterThanOrEqual(10);
+    for (let i = 1; i < out.length; i++) {
+      expect(Math.hypot(out[i][0] - out[i - 1][0], out[i][1] - out[i - 1][1])).toBeCloseTo(100, 6);
+    }
+  });
+
+  it('passes through lists too short to resample', () => {
+    expect(resample([[0, 0]], 100)).toEqual([[0, 0]]);
+    expect(resample([], 100)).toEqual([]);
+  });
+});
+
+describe('overlapRatio', () => {
+  it('is near zero for a clean loop', () => {
+    expect(overlapRatio(square(2000))).toBeLessThan(0.05);
+  });
+
+  it('is near a half for a full out-and-back', () => {
+    const ratio = overlapRatio(outAndBack(2000));
+    expect(ratio).toBeGreaterThan(0.4);
+    expect(ratio).toBeLessThan(0.6);
+  });
+
+  it('lands in between when a loop has a there-and-back spur', () => {
+    const loop = square(2000);
+    const spur = outAndBack(400, 20);
+    const ratio = overlapRatio([...loop, ...spur]);
+    expect(ratio).toBeGreaterThan(0.03);
+    expect(ratio).toBeLessThan(0.4);
+  });
+
+  it('returns 0 rather than throwing on a degenerate route', () => {
+    expect(overlapRatio([[5, 51], [5, 51]])).toBe(0);
+  });
+});
+
+describe('loopRoundness', () => {
+  it('rates a square well below a circle but clearly above zero', () => {
+    const side = 2000;
+    const r = loopRoundness(square(side), side * 4);
+    // A square's isoperimetric quotient is pi/4 ~ 0.785.
+    expect(r).toBeGreaterThan(0.7);
+    expect(r).toBeLessThan(0.85);
+  });
+
+  it('rates an out-and-back near zero, since it encloses no area', () => {
+    expect(loopRoundness(outAndBack(2000), 4000)).toBeLessThan(0.01);
+  });
+
+  it('guards against a zero perimeter', () => {
+    expect(loopRoundness(square(1000), 0)).toBe(0);
+  });
+});
+
+describe('initialBearing', () => {
+  it('reads north for a route heading north', () => {
+    const pts: [number, number][] = Array.from({ length: 30 }, (_, i) => [5.47, 51.44 + i * 0.002]);
+    expect(initialBearing(pts)).toBeCloseTo(0, 0);
+  });
+
+  it('reads east for a route heading east', () => {
+    const pts: [number, number][] = Array.from({ length: 30 }, (_, i) => [5.47 + i * 0.002, 51.44]);
+    expect(initialBearing(pts)).toBeCloseTo(90, 0);
+  });
+});
+
+describe('routeSimilarity', () => {
+  it('is 1 for a route against itself', () => {
+    const edges = edgeSet(square(2000));
+    expect(routeSimilarity(edges, edges)).toBeCloseTo(1, 6);
+  });
+
+  it('is 0 for routes in different places', () => {
+    const here = edgeSet(square(2000));
+    const far = edgeSet(square(2000).map(([lng, lat]) => [lng + 0.5, lat + 0.5] as [number, number]));
+    expect(routeSimilarity(here, far)).toBe(0);
+  });
+
+  it('is 0 when either side is empty', () => {
+    expect(routeSimilarity(new Set(), edgeSet(square(2000)))).toBe(0);
+  });
+
+  it('is symmetric', () => {
+    const a = edgeSet(square(2000));
+    const b = edgeSet(square(2400));
+    expect(routeSimilarity(a, b)).toBeCloseTo(routeSimilarity(b, a), 12);
+  });
+});

@@ -24,6 +24,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Runs before the build so a failing test blocks the deploy, not just a
+      # type error.
+      - run: npm test
       - run: npm run build
         env:
           VITE_ORS_KEY: ${{ secrets.ORS_KEY }}

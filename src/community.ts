@@ -4,6 +4,7 @@
 // full track); the app recomputes the geometry via BRouter when it is loaded.
 import { supabase } from './supabase';
 import type { LngLat } from './routing';
+import { sanitizeWaypoints } from './waypoints';
 
 export type OriginalFileFormat = 'gpx' | 'tcx';
 
@@ -128,7 +129,12 @@ export async function fetchCommunityRoutes(sort: CommunitySort): Promise<Communi
           .order('rating_count', { ascending: false })
       : await base.order('created_at', { ascending: false });
   if (error) throw error;
-  return ((data as RouteRow[] | null) ?? []).map(mapRow);
+  // `waypoints` is jsonb with no shape constraint, so a malformed row is
+  // possible. Drop those here rather than letting them throw halfway through
+  // rendering the list, which would silently truncate the whole library.
+  return ((data as RouteRow[] | null) ?? [])
+    .map(mapRow)
+    .filter((route): route is CommunityRoute => route !== null);
 }
 
 /**
@@ -211,13 +217,15 @@ export function fileDownloadUrl(gpxPath: string): string | null {
   return supabase.storage.from('gpx-uploads').getPublicUrl(gpxPath).data.publicUrl;
 }
 
-function mapRow(row: RouteRow): CommunityRoute {
+function mapRow(row: RouteRow): CommunityRoute | null {
+  const waypoints = sanitizeWaypoints(row.waypoints);
+  if (!waypoints) return null;
   return {
     id: row.id,
     ownerId: row.owner_id,
     name: row.name,
     authorName: row.author_name ?? null,
-    waypoints: (row.waypoints ?? []) as LngLat[],
+    waypoints,
     bike: row.bike,
     traffic: row.traffic,
     closed: row.closed,

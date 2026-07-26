@@ -14,6 +14,34 @@ export default defineConfig(({ command }) => ({
       // deploy instead of silently activating it in the background only.
       injectRegister: false,
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      workbox: {
+        // Map tiles are immutable once published and are by far the most
+        // useful thing to have offline: without them the style never finishes
+        // loading, map.on('load') never fires, and the app shows a blank grey
+        // rectangle with no explanation. Routing itself still needs a
+        // connection; that is reported in the UI instead.
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/tiles\.openfreemap\.org\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'basemap-vector',
+              expiration: { maxEntries: 800, maxAgeSeconds: 60 * 60 * 24 * 14 },
+              // Tile CDNs answer cross-origin requests opaquely (status 0).
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/[a-c]?\.?tile\.(opentopomap\.org|thunderforest\.com)\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'basemap-raster',
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 14 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'Lightmile',
         short_name: 'Lightmile',

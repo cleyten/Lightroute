@@ -6,6 +6,8 @@
 // and plain tag-name querySelectorAll matches across that namespace in
 // practice, so no namespace-aware querying is needed.
 
+import { isPlausibleLonLat } from './waypoints';
+
 export function parseTcx(xmlText: string): [number, number, number][] {
   const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
   if (doc.querySelector('parsererror')) {
@@ -19,11 +21,20 @@ export function parseTcx(xmlText: string): [number, number, number][] {
     throw new Error('No track points found in this TCX file.');
   }
 
-  return points.map((point) => {
-    const lat = Number(point.querySelector('Position > LatitudeDegrees')?.textContent);
-    const lon = Number(point.querySelector('Position > LongitudeDegrees')?.textContent);
-    const eleText = point.querySelector('AltitudeMeters')?.textContent;
-    const ele = eleText !== undefined ? Number(eleText) : NaN;
-    return [lon, lat, Number.isFinite(ele) ? ele : 0];
-  });
+  // Recorded Activity files routinely contain paused or indoor trackpoints
+  // with no <Position> at all; those would otherwise become NaN coordinates.
+  const coords = points
+    .map((point) => {
+      const lat = Number(point.querySelector('Position > LatitudeDegrees')?.textContent);
+      const lon = Number(point.querySelector('Position > LongitudeDegrees')?.textContent);
+      const eleText = point.querySelector('AltitudeMeters')?.textContent;
+      const ele = eleText !== undefined && eleText !== null ? Number(eleText) : NaN;
+      return [lon, lat, Number.isFinite(ele) ? ele : 0] as [number, number, number];
+    })
+    .filter(([lon, lat]) => isPlausibleLonLat(lon, lat));
+
+  if (coords.length < 2) {
+    throw new Error('No usable track points found in this TCX file.');
+  }
+  return coords;
 }

@@ -30,8 +30,17 @@ export async function saveRoute(route: SavedRoute): Promise<void> {
   await (await db()).add(STORE, route);
 }
 
+/**
+ * Returns an empty list rather than rejecting when IndexedDB is unavailable
+ * (private windows, locked-down browsers, a failed upgrade). The saved-routes
+ * panel is a convenience; it must not take the whole app down with it.
+ */
 export async function listRoutes(): Promise<SavedRoute[]> {
-  return (await (await db()).getAll(STORE)) as SavedRoute[];
+  try {
+    return (await (await db()).getAll(STORE)) as SavedRoute[];
+  } catch {
+    return [];
+  }
 }
 
 export async function deleteRoute(id: number): Promise<void> {

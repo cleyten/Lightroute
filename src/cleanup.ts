@@ -305,9 +305,53 @@ export interface HealResult {
 }
 
 /**
+ * Ceiling on simultaneous heal requests across all candidates.
+ *
+ * Round-trip generation evaluates 8 candidates at once, so healing each one's
+ * wiggles in parallel would put ~24 requests on the public BRouter server
+ * concurrently. That invites rate limiting, which is slower than the
+ * sequential version it replaced. This keeps the win without the flood.
+ */
+const HEAL_CONCURRENCY = 6;
+
+let activeHeals = 0;
+const healQueue: (() => void)[] = [];
+
+async function withHealSlot<T>(work: () => Promise<T>): Promise<T> {
+  if (activeHeals >= HEAL_CONCURRENCY) {
+    await new Promise<void>((resolve) => healQueue.push(resolve));
+  }
+  activeHeals++;
+  try {
+    return await work();
+  } finally {
+    activeHeals--;
+    healQueue.shift()?.();
+  }
+}
+
+/** An accepted shortcut, resolved before any splicing happens. */
+interface HealPlan {
+  i: number;
+  j: number;
+  shortcut: Coord[];
+  saving: number;
+}
+
+/**
  * Replaces detour wiggles with a direct re-route between their endpoints.
- * Processes from the end of the route backwards so earlier indices stay
- * valid after each splice. Surface codes for spliced stretches are unknown.
+ *
+ * Two phases. First every wiggle's shortcut is looked up concurrently; the
+ * wiggles found by findWiggles are non-overlapping, and their endpoints are
+ * read from the untouched `coords`, so these lookups do not depend on each
+ * other. Then the accepted shortcuts are spliced in back-to-front, which keeps
+ * lower indices valid as the array shrinks.
+ *
+ * The two HEAL_OFFSETS stay sequential within a wiggle: the wider window is a
+ * fallback only tried when the tight one finds no through-road, so requesting
+ * both up front would double the traffic for nothing.
+ *
+ * Surface codes for spliced stretches are unknown (filled with null).
  */
 export async function healWiggles(
   coords: Coord[],
@@ -319,52 +363,61 @@ export async function healWiggles(
     .slice(0, MAX_HEALS)
     .sort((a, b) => b.i - a.i);
 
+  const pts = projectToMeters(coords) as [number, number][];
+  const cum = planarCumulative(pts);
+  const maxIndex = coords.length - 2;
+
+  const plans = await Promise.all(
+    wiggles.map(async (w): Promise<HealPlan | null> => {
+      for (const offset of HEAL_OFFSETS) {
+        const i = Math.max(1, w.i - offset);
+        const j = Math.min(maxIndex, w.j + offset);
+        const excisedM = cum[j] - cum[i];
+
+        let shortcut: RouteResult;
+        try {
+          shortcut = await withHealSlot(() =>
+            fetchRoute(
+              [
+                [coords[i][0], coords[i][1]],
+                [coords[j][0], coords[j][1]],
+              ],
+              brouterProfile,
+            ),
+          );
+        } catch {
+          return null; // BRouter unavailable; keep the original geometry.
+        }
+        if (shortcut.coordinates.length < 2) continue;
+        const saving = excisedM - shortcut.distanceMeters;
+        if (saving < HEAL_MIN_SAVING_M || shortcut.distanceMeters > excisedM * HEAL_MAX_SHARE) {
+          continue; // no meaningfully shorter through-road via this window
+        }
+        return { i, j, shortcut: shortcut.coordinates, saving };
+      }
+      return null;
+    }),
+  );
+
   let outCoords = coords;
   let outCodes = segCodes;
   let healed = 0;
+  // Indices at or below `limit` still refer to the same points in the spliced
+  // array as in the original. Widening by HEAL_OFFSETS can make two plans
+  // overlap even though their wiggles did not; the later one is then dropped.
+  let limit = maxIndex;
 
-  const pts = projectToMeters(coords) as [number, number][];
-  const cum = planarCumulative(pts);
-  // Wiggles are processed back-to-front; indices at or below `limit` still
-  // refer to the same points in the spliced array as in the original.
-  let limit = coords.length - 2;
-
-  for (const w of wiggles) {
-    if (w.j >= limit) continue;
-    for (const offset of HEAL_OFFSETS) {
-      const i = Math.max(1, w.i - offset);
-      const j = Math.min(limit, w.j + offset);
-      const excisedM = cum[j] - cum[i];
-
-      let shortcut: RouteResult;
-      try {
-        shortcut = await fetchRoute(
-          [
-            [outCoords[i][0], outCoords[i][1]],
-            [outCoords[j][0], outCoords[j][1]],
-          ],
-          brouterProfile,
-        );
-      } catch {
-        break; // BRouter unavailable; keep the original geometry.
-      }
-      if (shortcut.coordinates.length < 2) continue;
-      const saving = excisedM - shortcut.distanceMeters;
-      if (saving < HEAL_MIN_SAVING_M || shortcut.distanceMeters > excisedM * HEAL_MAX_SHARE) {
-        continue; // no meaningfully shorter through-road via this window
-      }
-
-      const br = shortcut.coordinates;
-      outCoords = outCoords.slice(0, i).concat(br, outCoords.slice(j + 1));
-      if (outCodes) {
-        outCodes = outCodes
-          .slice(0, i - 1)
-          .concat(new Array(br.length + 1).fill(null), outCodes.slice(j + 1));
-      }
-      healed += saving;
-      limit = i - 1;
-      break;
+  for (const plan of plans) {
+    if (!plan || plan.j >= limit) continue;
+    const { i, j, shortcut } = plan;
+    outCoords = outCoords.slice(0, i).concat(shortcut, outCoords.slice(j + 1));
+    if (outCodes) {
+      outCodes = outCodes
+        .slice(0, i - 1)
+        .concat(new Array(shortcut.length + 1).fill(null), outCodes.slice(j + 1));
     }
+    healed += plan.saving;
+    limit = i - 1;
   }
   return { coords: outCoords, segCodes: outCodes, healedMeters: healed };
 }

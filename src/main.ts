@@ -3,6 +3,7 @@ import type { FeatureCollection } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
 import { fetchRoute, RouteCancelledError, type LngLat, type RouteResult } from './routing';
+import { sanitizeWaypoints } from './waypoints';
 import { downloadGpx } from './gpx';
 import { downloadTcx } from './tcx';
 import { parseTcx } from './tcximport';
@@ -569,15 +570,22 @@ btnSave.addEventListener('click', async () => {
   if (!state.route || state.waypoints.length < 2) return;
   const name =
     routeNameInput.value.trim() || `Route ${new Date().toISOString().slice(0, 10)}`;
-  await saveRoute({
-    name,
-    waypoints: state.waypoints.map((wp) => [...wp] as LngLat),
-    bike: settings.bike,
-    traffic: settings.traffic,
-    distanceMeters: state.route.distanceMeters,
-    createdAt: new Date().toISOString(),
-    closed: state.closed,
-  });
+  try {
+    await saveRoute({
+      name,
+      waypoints: state.waypoints.map((wp) => [...wp] as LngLat),
+      bike: settings.bike,
+      traffic: settings.traffic,
+      distanceMeters: state.route.distanceMeters,
+      createdAt: new Date().toISOString(),
+      closed: state.closed,
+    });
+  } catch {
+    // Private-browsing modes and full-storage quotas both land here. Silently
+    // doing nothing would look like the save worked.
+    setStatus('Could not save: this browser is blocking local storage.', true);
+    return;
+  }
   routeNameInput.value = '';
   await refreshSavedList();
   setStatus(`Route "${name}" saved.`);
@@ -998,11 +1006,18 @@ btnCafes.addEventListener('click', async () => {
   btnCafes.disabled = true;
   setStatus('Searching cafés along the route…');
   setBusy(true);
+  // Overpass can take 20s. Pin the geometry the results belong to: if the
+  // route changed meanwhile, their km marks and off-route distances describe a
+  // route that no longer exists.
+  const searchedRoute = state.route;
   try {
-    state.cafes = await fetchCafes(state.route.coordinates);
+    const cafes = await fetchCafes(searchedRoute.coordinates);
+    if (state.route !== searchedRoute) return;
+    state.cafes = cafes;
     renderCafes();
     setStatus(state.cafes.length === 0 ? 'No cafés found along this route.' : '');
   } catch (error) {
+    if (state.route !== searchedRoute) return;
     setStatus(error instanceof Error ? error.message : 'Café search failed.', true);
   } finally {
     setBusy(false);
@@ -1079,11 +1094,16 @@ btnWater.addEventListener('click', async () => {
   btnWater.disabled = true;
   setStatus('Searching drinking water along the route…');
   setBusy(true);
+  // Same staleness guard as the café search above.
+  const searchedRoute = state.route;
   try {
-    state.water = await fetchWater(state.route.coordinates);
+    const water = await fetchWater(searchedRoute.coordinates);
+    if (state.route !== searchedRoute) return;
+    state.water = water;
     renderWater();
     setStatus(state.water.length === 0 ? 'No drinking water found along this route.' : '');
   } catch (error) {
+    if (state.route !== searchedRoute) return;
     setStatus(error instanceof Error ? error.message : 'Water search failed.', true);
   } finally {
     setBusy(false);
@@ -1233,7 +1253,13 @@ function loadSettings(): Settings {
 }
 
 function persistSettings(): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // Blocked or full storage must not abort the caller: persistSettings runs
+    // partway through the bike/traffic/hills handlers and through every route
+    // load, and throwing here would leave the UI half-updated.
+  }
 }
 
 function currentProfile(): string {
@@ -1614,7 +1640,12 @@ async function refreshSavedList(): Promise<void> {
     remove.textContent = '✕';
     remove.title = 'Delete';
     remove.addEventListener('click', async () => {
-      await deleteRoute(route.id!);
+      try {
+        await deleteRoute(route.id!);
+      } catch {
+        setStatus('Could not delete that saved route.', true);
+        return;
+      }
       await refreshSavedList();
     });
 
@@ -1624,7 +1655,12 @@ async function refreshSavedList(): Promise<void> {
 }
 
 async function loadSaved(route: SavedRoute): Promise<void> {
-  state.waypoints = route.waypoints.map((wp) => [...wp] as LngLat);
+  const waypoints = sanitizeWaypoints(route.waypoints);
+  if (!waypoints) {
+    setStatus(`"${route.name}" could not be loaded; its saved points are unreadable.`, true);
+    return;
+  }
+  state.waypoints = waypoints;
   state.closed = route.closed ?? false;
   settings.bike = (['race', 'gravel', 'mtb'].includes(route.bike) ? route.bike : 'race') as BikeType;
   settings.traffic = [0, 1, 2].includes(route.traffic) ? route.traffic : 0;
@@ -1661,6 +1697,17 @@ function setBusy(busy: boolean): void {
   busyCount = Math.max(0, busyCount + (busy ? 1 : -1));
   syncStatusBar();
 }
+
+// Routing, search and the community library all need the network. Cached map
+// tiles keep the map itself usable offline, which makes the failure mode
+// confusing: everything looks fine until an action silently fails with a raw
+// "Failed to fetch". Say it plainly instead.
+window.addEventListener('offline', () => {
+  setStatus('You are offline. The map still works, but routing and search do not.', true);
+});
+window.addEventListener('online', () => {
+  if (statusEl.classList.contains('error')) setStatus('Back online.');
+});
 
 function syncStatusBar(): void {
   statusBarEl.dataset.state = busyCount > 0
