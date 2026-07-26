@@ -88,10 +88,14 @@ create policy "users can insert their own routes"
   on routes for insert
   with check (auth.uid() = owner_id);
 
+-- `using` only decides which rows may be targeted; `with check` decides what
+-- they may become. Without it an owner could rewrite owner_id and hand their
+-- route to (or pin it on) another account.
 drop policy if exists "owners can update their routes" on routes;
 create policy "owners can update their routes"
   on routes for update
-  using (auth.uid() = owner_id);
+  using (auth.uid() = owner_id)
+  with check (auth.uid() = owner_id);
 
 drop policy if exists "owners can delete their routes" on routes;
 create policy "owners can delete their routes"
@@ -108,10 +112,15 @@ create policy "users can rate as themselves"
   on route_ratings for insert
   with check (auth.uid() = user_id);
 
+-- Same reasoning as the routes update policy, but the consequence here is
+-- rating inflation: without `with check` a user could reassign their own
+-- rating row to someone else's user_id, freeing up the (route_id, user_id)
+-- primary key to rate the same route again, over and over.
 drop policy if exists "users can change their own rating" on route_ratings;
 create policy "users can change their own rating"
   on route_ratings for update
-  using (auth.uid() = user_id);
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 drop policy if exists "users can remove their own rating" on route_ratings;
 create policy "users can remove their own rating"
@@ -124,15 +133,38 @@ insert into storage.buckets (id, name, public)
 values ('gpx-uploads', 'gpx-uploads', true)
 on conflict (id) do nothing;
 
+-- The bucket is public, so anything uploaded here is served from the project's
+-- own domain with whatever content-type it was given. Without an allowlist that
+-- makes it free hosting for arbitrary files, and without a size cap the 1 GB
+-- free tier is a handful of uploads away from full. The client sets a
+-- content-type in publishRoute(), but a hostile client simply would not.
+update storage.buckets
+  set file_size_limit = 5242880, -- 5 MB; a very long GPX track is well under this
+      allowed_mime_types = array[
+        'application/gpx+xml',
+        'application/vnd.garmin.tcx+xml',
+        'application/xml',
+        'text/xml'
+      ]
+  where id = 'gpx-uploads';
+
 drop policy if exists "gpx uploads are publicly readable" on storage.objects;
 create policy "gpx uploads are publicly readable"
   on storage.objects for select
   using (bucket_id = 'gpx-uploads');
 
+-- The folder check matters: publishRoute() writes to `<userId>/<uuid>.<ext>` by
+-- convention, but only this policy makes that a rule. Without it a signed-in
+-- user can litter someone else's prefix with files that the owner's own purge
+-- pass will never clean up.
 drop policy if exists "signed-in users can upload their own gpx" on storage.objects;
 create policy "signed-in users can upload their own gpx"
   on storage.objects for insert
-  with check (bucket_id = 'gpx-uploads' and auth.uid() = owner);
+  with check (
+    bucket_id = 'gpx-uploads'
+    and auth.uid() = owner
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 -- Owners can delete their own GPX files, so purging a route after the grace
 -- period can also remove its stored track (not just the routes row).

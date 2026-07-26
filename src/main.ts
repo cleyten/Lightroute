@@ -2,7 +2,7 @@ import maplibregl from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
-import { fetchRoute, type LngLat, type RouteResult } from './routing';
+import { fetchRoute, RouteCancelledError, type LngLat, type RouteResult } from './routing';
 import { downloadGpx } from './gpx';
 import { downloadTcx } from './tcx';
 import { parseTcx } from './tcximport';
@@ -92,6 +92,7 @@ const routePills = document.querySelector<HTMLElement>('#route-pills')!;
 const gradeLegendEl = document.querySelector<HTMLElement>('#grade-legend')!;
 const btnShare = document.querySelector<HTMLButtonElement>('#btn-share')!;
 const statusEl = document.querySelector<HTMLElement>('#status')!;
+const statusBarEl = document.querySelector<HTMLElement>('#statusbar')!;
 const btnUndo = document.querySelector<HTMLButtonElement>('#btn-undo')!;
 const btnClear = document.querySelector<HTMLButtonElement>('#btn-clear')!;
 const btnReverse = document.querySelector<HTMLButtonElement>('#btn-reverse')!;
@@ -602,6 +603,7 @@ btnRoundtrip.addEventListener('click', async () => {
   const requestId = ++state.requestId;
   setStatus('Generating and checking loops… (this can take ~15 s)');
   btnRoundtrip.disabled = true;
+  setBusy(true);
   try {
     const result = await generateRoundTrips(
       state.waypoints[0],
@@ -638,7 +640,12 @@ btnRoundtrip.addEventListener('click', async () => {
     renderRouteDetails();
     setStatus(error instanceof Error ? error.message : 'Something went wrong.', true);
   } finally {
-    if (requestId === state.requestId) btnRoundtrip.disabled = false;
+    // Unconditionally: state.requestId is shared with recalculateRoute(), so
+    // any map interaction during generation would bump it and leave the button
+    // disabled forever. The stale-result guards above already prevent a
+    // superseded run from writing state.
+    btnRoundtrip.disabled = false;
+    setBusy(false);
   }
   updateControls();
 });
@@ -990,6 +997,7 @@ btnCafes.addEventListener('click', async () => {
   if (!state.route) return;
   btnCafes.disabled = true;
   setStatus('Searching cafés along the route…');
+  setBusy(true);
   try {
     state.cafes = await fetchCafes(state.route.coordinates);
     renderCafes();
@@ -997,6 +1005,7 @@ btnCafes.addEventListener('click', async () => {
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Café search failed.', true);
   } finally {
+    setBusy(false);
     btnCafes.disabled = false;
   }
 });
@@ -1069,6 +1078,7 @@ btnWater.addEventListener('click', async () => {
   if (!state.route) return;
   btnWater.disabled = true;
   setStatus('Searching drinking water along the route…');
+  setBusy(true);
   try {
     state.water = await fetchWater(state.route.coordinates);
     renderWater();
@@ -1076,6 +1086,7 @@ btnWater.addEventListener('click', async () => {
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Water search failed.', true);
   } finally {
+    setBusy(false);
     btnWater.disabled = false;
   }
 });
@@ -1357,22 +1368,53 @@ async function recalculateRoute(): Promise<void> {
     ? [...state.waypoints, state.waypoints[0]]
     : state.waypoints;
 
+  // Cancel whatever was in flight. Without this, dragging a point repeatedly
+  // leaves every earlier request running, and the public BRouter server queues
+  // the newest one (the only one anybody wants) behind all of them.
+  routeAbort?.abort();
+  const abort = new AbortController();
+  routeAbort = abort;
+
   setStatus('Calculating route…');
+  setBusy(true);
   try {
-    const route = await fetchRoute(routingWaypoints, currentProfile(), state.avoidZones);
+    const route = await fetchRoute(routingWaypoints, currentProfile(), state.avoidZones, abort.signal);
     if (requestId !== state.requestId) return; // a newer request superseded this one
     state.route = route;
     setRouteData(route.geojson);
     renderRouteDetails();
     setStatus('');
   } catch (error) {
+    if (error instanceof RouteCancelledError) return;
     if (requestId !== state.requestId) return;
     state.route = null;
     setRouteData({ type: 'FeatureCollection', features: [] });
     renderRouteDetails();
     setStatus(error instanceof Error ? error.message : 'Something went wrong.', true);
+  } finally {
+    setBusy(false);
+    if (routeAbort === abort) routeAbort = null;
   }
   updateControls();
+}
+
+/** In-flight manual route request, so a newer one can cancel it. */
+let routeAbort: AbortController | null = null;
+
+/**
+ * Komoot-style lazy re-validation: a saved or published route stores only its
+ * waypoints, so loading it re-runs the router against today's map data and the
+ * result can legitimately differ from what was saved. Say so when it does,
+ * rather than silently showing a different distance than the list promised.
+ *
+ * The threshold keeps ordinary router jitter quiet; only real reroutes speak up.
+ */
+function routeChangeNote(savedMeters: number | null | undefined): string {
+  if (!savedMeters || !state.route) return '';
+  const diff = state.route.distanceMeters - savedMeters;
+  if (Math.abs(diff) < Math.max(150, savedMeters * 0.01)) return '';
+  const km = (Math.abs(diff) / 1000).toFixed(1);
+  return ` Route updated to current map data: ${km} km ${diff > 0 ? 'longer' : 'shorter'} than when it was saved.`;
 }
 
 function setRouteData(data: FeatureCollection): void {
@@ -1565,7 +1607,7 @@ async function refreshSavedList(): Promise<void> {
     label.className = 'saved-name';
     label.textContent = `${route.name} · ${(route.distanceMeters / 1000).toFixed(1)} km`;
     label.title = 'Load this route';
-    label.addEventListener('click', () => loadSaved(route));
+    label.addEventListener('click', () => void loadSaved(route));
 
     const remove = document.createElement('button');
     remove.className = 'saved-delete';
@@ -1581,7 +1623,7 @@ async function refreshSavedList(): Promise<void> {
   }
 }
 
-function loadSaved(route: SavedRoute): void {
+async function loadSaved(route: SavedRoute): Promise<void> {
   state.waypoints = route.waypoints.map((wp) => [...wp] as LngLat);
   state.closed = route.closed ?? false;
   settings.bike = (['race', 'gravel', 'mtb'].includes(route.bike) ? route.bike : 'race') as BikeType;
@@ -1589,18 +1631,43 @@ function loadSaved(route: SavedRoute): void {
   persistSettings();
   syncProfileUi();
   rebuildMarkers();
-  void recalculateRoute();
 
   const bounds = state.waypoints.reduce(
     (acc, wp) => acc.extend(wp),
     new maplibregl.LngLatBounds(state.waypoints[0], state.waypoints[0]),
   );
   map.fitBounds(bounds, { padding: 60 });
+
+  // Awaited before setting the status, or recalculateRoute's own status flow
+  // would immediately clobber it.
+  await recalculateRoute();
+  setStatus(`Loaded "${route.name}".${routeChangeNote(route.distanceMeters)}`);
 }
 
 function setStatus(message: string, isError = false): void {
   statusEl.textContent = message;
   statusEl.classList.toggle('error', isError);
+  syncStatusBar();
+}
+
+/**
+ * Counted rather than boolean: several things can be in flight at once (a
+ * reroute plus a café search, say), and the first one to finish must not clear
+ * the indicator while the others are still running.
+ */
+let busyCount = 0;
+
+function setBusy(busy: boolean): void {
+  busyCount = Math.max(0, busyCount + (busy ? 1 : -1));
+  syncStatusBar();
+}
+
+function syncStatusBar(): void {
+  statusBarEl.dataset.state = busyCount > 0
+    ? 'busy'
+    : statusEl.textContent
+      ? 'message'
+      : 'idle';
 }
 
 function updateControls(): void {
@@ -1822,6 +1889,7 @@ if (isSupabaseConfigured) {
       routeNameInput.value.trim() || `Route ${new Date().toISOString().slice(0, 10)}`;
     btnPublish.disabled = true;
     setStatus('Publishing…');
+    setBusy(true);
     try {
       await community.publishRoute({
         name,
@@ -1841,6 +1909,7 @@ if (isSupabaseConfigured) {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not publish this route.', true);
     } finally {
+      setBusy(false);
       updatePublishButton();
     }
   });
@@ -2126,7 +2195,7 @@ async function loadCommunityRoute(route: CommunityRoute): Promise<void> {
   );
   map.fitBounds(bounds, { padding: 60 });
   await recalculateRoute();
-  if (state.route) setStatus(`Loaded "${route.name}".`);
+  if (state.route) setStatus(`Loaded "${route.name}".${routeChangeNote(route.distanceMeters)}`);
 }
 
 /** Soft-deletes the owner's own community route after a confirmation. */

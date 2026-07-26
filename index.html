@@ -210,10 +210,16 @@
         </section>
         </div>
 
-        <p id="status" role="status"></p>
         </div>
       </aside>
       <div id="map"></div>
+      <!-- Floats over the map rather than living at the bottom of the scrolling
+           panel, so progress is visible whatever the panel is scrolled to and
+           whichever snap point the mobile sheet is at. -->
+      <div id="statusbar" class="statusbar" data-state="idle">
+        <div class="statusbar-progress" aria-hidden="true"><span></span></div>
+        <p id="status" role="status"></p>
+      </div>
       <button id="gps-fab" class="gps-fab" type="button" aria-label="Use my GPS location">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
       </button>
