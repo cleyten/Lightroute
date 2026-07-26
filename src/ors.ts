@@ -79,12 +79,20 @@ export interface RoundTripResult {
   wind: WindInfo | null;
 }
 
+/**
+ * Reports how far along generation is. Generation takes tens of seconds and
+ * fans out over a hundred requests, so a single "please wait" is not enough to
+ * tell a slow run from a stuck one.
+ */
+export type ProgressReporter = (done: number, total: number, phase: string) => void;
+
 export async function generateRoundTrips(
   start: LngLat,
   minMeters: number,
   maxMeters: number,
   bike: string,
   hills: HillPreference,
+  onProgress: ProgressReporter = () => {},
 ): Promise<RoundTripResult> {
   // ORS wants a single target length; aim for the middle of the range.
   const targetMeters = (minMeters + maxMeters) / 2;
@@ -92,12 +100,14 @@ export async function generateRoundTrips(
   // start; fetch the cycle network for that area (plus margin) in parallel
   // with the first candidate batch.
   const networkRadius = Math.min(maxMeters / Math.PI / 2 + 3000, 20000);
+  onProgress(0, CANDIDATES, 'Planning loops');
   const [firstBatch, grid, wind] = await Promise.all([
-    fetchCandidates(start, targetMeters, bike),
+    fetchCandidates(start, targetMeters, bike, onProgress),
     fetchNetworkGrid(start, networkRadius),
     fetchWind(start),
   ]);
 
+  onProgress(CANDIDATES, CANDIDATES, 'Checking quality');
   let evaluated = firstBatch.map((route) =>
     evaluateCandidate(route, minMeters, maxMeters, bike, hills, grid, wind),
   );
@@ -111,7 +121,8 @@ export async function generateRoundTrips(
       targetMeters * Math.min(Math.max(targetMeters / median, 0.7), 1.3),
     );
     try {
-      const secondBatch = await fetchCandidates(start, corrected, bike);
+      onProgress(0, CANDIDATES, 'Trying a second batch');
+      const secondBatch = await fetchCandidates(start, corrected, bike, onProgress);
       evaluated = evaluated.concat(
         secondBatch.map((route) =>
           evaluateCandidate(route, minMeters, maxMeters, bike, hills, grid, wind),
@@ -244,28 +255,22 @@ function dominantReason(rejected: LoopOption[]): string {
   return REASON_TEXT[best] ?? REASON_TEXT.overlap;
 }
 
-export function rejectionText(option: LoopOption): string {
-  switch (option.rejection) {
-    case 'overlap':
-      return `${Math.round(option.overlap * 100)}% of it doubles back on itself`;
-    case 'shape':
-      return 'it is awkwardly shaped';
-    case 'surface':
-      return `only ${Math.round((option.unpaved ?? 0) * 100)}% of it is unpaved`;
-    case 'distance':
-      return `its distance is ${(option.route.distanceMeters / 1000).toFixed(1)} km`;
-    default:
-      return '';
-  }
-}
+// rejectionText lives in loopText.ts so the UI can format a rejection without
+// importing this module (and dragging the whole pipeline into the main bundle).
 
 async function fetchCandidates(
   start: LngLat,
   lengthMeters: number,
   bike: string,
+  onProgress: ProgressReporter = () => {},
 ): Promise<RouteResult[]> {
+  let settled = 0;
   const attempts = await Promise.allSettled(
-    Array.from({ length: CANDIDATES }, () => fetchOneRoundTrip(start, lengthMeters, bike)),
+    Array.from({ length: CANDIDATES }, () =>
+      fetchOneRoundTrip(start, lengthMeters, bike).finally(() => {
+        onProgress(++settled, CANDIDATES, 'Planning loops');
+      }),
+    ),
   );
   const candidates = attempts
     .filter((a): a is PromiseFulfilledResult<RouteResult> => a.status === 'fulfilled')
