@@ -13,7 +13,9 @@ import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
 // imports are erased at build time and do not affect that.
 // Kept out of chart.ts so the static grade swatches do not depend on Chart.js.
 import { renderGradeLegend } from './gradelegend';
-import { setBusy, setStatus } from './ui';
+import { escapeHtml, initDisclosure, setActiveInGroup, setBusy, setStatus } from './ui';
+import { initDualRange } from './dualRange';
+import { initBottomSheet } from './bottomSheet';
 import { sanitizeWaypoints } from './waypoints';
 import { surfaceBreakdown, renderSurfaceBar, surfaceRuns, type SurfaceClass } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
@@ -28,6 +30,20 @@ import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
 import { buildShareUrl, parseShareUrl } from './share';
 import { parseGpx, isClosedTrack } from './gpximport';
+import {
+  DEFAULT_SIGNIN_HINT, accountCode, accountEmail, accountName, accountSignedIn, accountSignedOut,
+  authorField, authorNameInput, avoidZoneRadiusButtons, bikeButtons, bottomTabButtons,
+  btnAvoidZone, btnCafes, btnClear, btnClearAvoidZones, btnExport, btnExportTcx, btnImportGpx,
+  btnLocate, btnPublish, btnReverse, btnRoundtrip, btnSave, btnShare, btnSignin, btnSigninBack,
+  btnSignout, btnUndo, btnVerify, btnWater, cafeKmInput, cafesEl, cafesList, chartCanvas,
+  chartWrap, climbsEl, climbsList, codeRow, communityBikeButtons, communityDistMax,
+  communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons, communityList,
+  communityPanel, communitySortButtons, emailRow, gpxFileInput, gradeLegendEl, hillsButtons,
+  loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, rangeTrack, rangeValue, roundtripMax,
+  roundtripMin, routeEmpty, routeNameInput, routePills, savedList, searchInput, searchResults,
+  signinHint, statAscend, statDistance, statsSection, surfaceEl, trafficLabel, trafficSelect,
+  waterEl, waterList, windChipEl,
+} from './dom';
 // ./auth and ./community both pull in @supabase/supabase-js. They are loaded on
 // demand via loadBackend() so the client stays out of the initial bundle; the
 // planner works without a backend at all. isSupabaseConfigured comes from
@@ -111,82 +127,6 @@ const state = {
   mode: 'normal' as 'normal' | 'avoid',
 };
 
-const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
-const statAscend = document.querySelector<HTMLElement>('#stat-ascend')!;
-const statsSection = document.querySelector<HTMLElement>('#stats')!;
-const routeEmpty = document.querySelector<HTMLElement>('#route-empty')!;
-const routePills = document.querySelector<HTMLElement>('#route-pills')!;
-const gradeLegendEl = document.querySelector<HTMLElement>('#grade-legend')!;
-const btnShare = document.querySelector<HTMLButtonElement>('#btn-share')!;
-const btnUndo = document.querySelector<HTMLButtonElement>('#btn-undo')!;
-const btnClear = document.querySelector<HTMLButtonElement>('#btn-clear')!;
-const btnReverse = document.querySelector<HTMLButtonElement>('#btn-reverse')!;
-const btnExport = document.querySelector<HTMLButtonElement>('#btn-export')!;
-const btnExportTcx = document.querySelector<HTMLButtonElement>('#btn-export-tcx')!;
-const btnSave = document.querySelector<HTMLButtonElement>('#btn-save')!;
-const routeNameInput = document.querySelector<HTMLInputElement>('#route-name')!;
-const savedList = document.querySelector<HTMLUListElement>('#saved-list')!;
-const bikeButtons = [...document.querySelectorAll<HTMLButtonElement>('#bike-type button')];
-const hillsButtons = [...document.querySelectorAll<HTMLButtonElement>('#hills-type button')];
-const trafficLabel = document.querySelector<HTMLElement>('#traffic-label')!;
-const trafficSelect = document.querySelector<HTMLSelectElement>('#traffic-select')!;
-const chartWrap = document.querySelector<HTMLElement>('#chart-wrap')!;
-const roundtripMin = document.querySelector<HTMLInputElement>('#roundtrip-min')!;
-const roundtripMax = document.querySelector<HTMLInputElement>('#roundtrip-max')!;
-const rangeValue = document.querySelector<HTMLElement>('#range-value')!;
-const rangeTrack = document.querySelector<HTMLElement>('#range-track')!;
-const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')!;
-const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
-const surfaceEl = document.querySelector<HTMLElement>('#surface')!;
-const loopOptionsEl = document.querySelector<HTMLElement>('#loop-options')!;
-const windChipEl = document.querySelector<HTMLElement>('#wind-chip')!;
-const climbsEl = document.querySelector<HTMLElement>('#climbs')!;
-const climbsList = document.querySelector<HTMLUListElement>('#climbs-list')!;
-const searchInput = document.querySelector<HTMLInputElement>('#search-input')!;
-const searchResults = document.querySelector<HTMLUListElement>('#search-results')!;
-const btnLocate = document.querySelector<HTMLButtonElement>('#btn-locate')!;
-const btnImportGpx = document.querySelector<HTMLButtonElement>('#btn-import-gpx')!;
-const gpxFileInput = document.querySelector<HTMLInputElement>('#gpx-file-input')!;
-const cafesEl = document.querySelector<HTMLElement>('#cafes')!;
-const cafeKmInput = document.querySelector<HTMLInputElement>('#cafe-km')!;
-const btnCafes = document.querySelector<HTMLButtonElement>('#btn-cafes')!;
-const cafesList = document.querySelector<HTMLUListElement>('#cafes-list')!;
-const waterEl = document.querySelector<HTMLElement>('#water')!;
-const btnWater = document.querySelector<HTMLButtonElement>('#btn-water')!;
-const btnAvoidZone = document.querySelector<HTMLButtonElement>('#btn-avoid-zone')!;
-const avoidZoneRadiusButtons = [...document.querySelectorAll<HTMLButtonElement>('#avoid-zone-radius button')];
-const btnClearAvoidZones = document.querySelector<HTMLButtonElement>('#btn-clear-avoid-zones')!;
-const waterList = document.querySelector<HTMLUListElement>('#water-list')!;
-const btnPublish = document.querySelector<HTMLButtonElement>('#btn-publish')!;
-const mainTabs = document.querySelector<HTMLElement>('#main-tabs')!;
-const mainTabButtons = [...document.querySelectorAll<HTMLButtonElement>('#main-tabs .main-tab')];
-// Mobile bottom tab bar mirrors the top tabs; both drive setActiveTab.
-const bottomTabButtons = [...document.querySelectorAll<HTMLButtonElement>('#bottom-nav .bottom-tab')];
-const plannerPanel = document.querySelector<HTMLElement>('#tab-planner')!;
-const communityPanel = document.querySelector<HTMLElement>('#tab-community')!;
-const accountSignedOut = document.querySelector<HTMLElement>('#account-signed-out')!;
-const accountSignedIn = document.querySelector<HTMLElement>('#account-signed-in')!;
-const accountEmail = document.querySelector<HTMLInputElement>('#account-email')!;
-const btnSignin = document.querySelector<HTMLButtonElement>('#btn-signin')!;
-const accountCode = document.querySelector<HTMLInputElement>('#account-code')!;
-const btnVerify = document.querySelector<HTMLButtonElement>('#btn-verify')!;
-const emailRow = document.querySelector<HTMLElement>('#email-row')!;
-const codeRow = document.querySelector<HTMLElement>('#code-row')!;
-const signinHint = document.querySelector<HTMLElement>('#signin-hint')!;
-const btnSigninBack = document.querySelector<HTMLButtonElement>('#btn-signin-back')!;
-const DEFAULT_SIGNIN_HINT = signinHint.textContent ?? '';
-const accountName = document.querySelector<HTMLElement>('#account-name')!;
-const btnSignout = document.querySelector<HTMLButtonElement>('#btn-signout')!;
-const communitySortButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-sort button')];
-const communityBikeButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-bike button')];
-const communityHillsButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-hills button')];
-const communityDistMin = document.querySelector<HTMLInputElement>('#community-dist-min')!;
-const communityDistMax = document.querySelector<HTMLInputElement>('#community-dist-max')!;
-const communityDistValue = document.querySelector<HTMLElement>('#community-dist-value')!;
-const communityDistTrack = document.querySelector<HTMLElement>('#community-dist-track')!;
-const authorField = document.querySelector<HTMLElement>('#author-field')!;
-const authorNameInput = document.querySelector<HTMLInputElement>('#author-name')!;
-const communityList = document.querySelector<HTMLUListElement>('#community-list')!;
 
 // Last GPS fix, shared between the planner's locate button and the community
 // "Near me" sort / distance-away labels. Null until the user grants location.
@@ -1217,34 +1157,13 @@ gpxFileInput.addEventListener('change', async () => {
 
 // --- Round-trip distance range slider ----------------------------------------
 
-/** Keeps the two thumbs apart and paints the label and the selected track segment. */
-function syncRangeSlider(moved: 'min' | 'max'): void {
-  const step = Number(roundtripMin.step) || 5;
-  let min = Number(roundtripMin.value);
-  let max = Number(roundtripMax.value);
-  if (min > max - step) {
-    if (moved === 'min') {
-      min = max - step;
-      roundtripMin.value = String(min);
-    } else {
-      max = min + step;
-      roundtripMax.value = String(max);
-    }
-  }
-  rangeValue.textContent = `${min} – ${max}`;
-  const lo = Number(roundtripMin.min);
-  const hi = Number(roundtripMin.max);
-  const fromPct = ((min - lo) / (hi - lo)) * 100;
-  const toPct = ((max - lo) / (hi - lo)) * 100;
-  rangeTrack.style.background =
-    `linear-gradient(to right, var(--color-border) ${fromPct}%, ` +
-    `var(--color-accent) ${fromPct}%, var(--color-accent) ${toPct}%, ` +
-    `var(--color-border) ${toPct}%)`;
-}
-
-roundtripMin.addEventListener('input', () => syncRangeSlider('min'));
-roundtripMax.addEventListener('input', () => syncRangeSlider('max'));
-syncRangeSlider('min');
+initDualRange({
+  min: roundtripMin,
+  max: roundtripMax,
+  label: rangeValue,
+  track: rangeTrack,
+  format: (min, max) => `${min} – ${max}`,
+});
 
 // --- Cafés along the route ---------------------------------------------------
 
@@ -1398,29 +1317,6 @@ function clearWater(): void {
   state.water = [];
   waterList.innerHTML = '';
   setWaterData([]);
-}
-
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-/**
- * Wires a chevron toggle button to show/hide the content it controls, collapsed
- * by default. Used for "Bike, traffic & hills" and "Sort & filter" so the
- * primary action (search/generate, the route list) sits above the fold on
- * mobile instead of being pushed down by settings most visits don't change.
- */
-function initDisclosure(toggleSelector: string, bodySelector: string): void {
-  const toggle = document.querySelector<HTMLButtonElement>(toggleSelector);
-  const body = document.querySelector<HTMLElement>(bodySelector);
-  if (!toggle || !body) return;
-  toggle.addEventListener('click', () => {
-    const expanded = toggle.getAttribute('aria-expanded') === 'true';
-    toggle.setAttribute('aria-expanded', String(!expanded));
-    body.hidden = expanded;
-  });
 }
 
 initDisclosure('#community-filters-toggle', '#community-filters-body');
@@ -2386,13 +2282,17 @@ if (isSupabaseConfigured) {
     });
   });
 
-  const onDistInput = (moved: 'min' | 'max') => () => {
-    syncCommunityDistSlider(moved);
-    renderCommunityList(filteredCommunityRoutes(), communityRatings);
-  };
-  communityDistMin.addEventListener('input', onDistInput('min'));
-  communityDistMax.addEventListener('input', onDistInput('max'));
-  syncCommunityDistSlider('min');
+  initDualRange({
+    min: communityDistMin,
+    max: communityDistMax,
+    label: communityDistValue,
+    track: communityDistTrack,
+    format: (min, max) =>
+      min === 0 && max >= DIST_MAX
+        ? 'Any length'
+        : `${min} – ${max >= DIST_MAX ? `${DIST_MAX}+` : max} km`,
+    onInput: () => renderCommunityList(filteredCommunityRoutes(), communityRatings),
+  });
 }
 
 /** Resolves to the user's location, requesting a GPS fix once if needed. */
@@ -2416,42 +2316,6 @@ function ensureLocation(): Promise<[number, number] | null> {
       },
       { timeout: 10000, maximumAge: 60000 },
     );
-  });
-}
-
-/** Keeps the two distance thumbs apart and paints the label and track fill. */
-function syncCommunityDistSlider(moved: 'min' | 'max'): void {
-  const step = Number(communityDistMin.step) || 5;
-  let min = Number(communityDistMin.value);
-  let max = Number(communityDistMax.value);
-  if (min > max - step) {
-    if (moved === 'min') {
-      min = max - step;
-      communityDistMin.value = String(min);
-    } else {
-      max = min + step;
-      communityDistMax.value = String(max);
-    }
-  }
-  const maxLabel = max >= DIST_MAX ? `${DIST_MAX}+` : String(max);
-  communityDistValue.textContent =
-    min === 0 && max >= DIST_MAX ? 'Any length' : `${min} – ${maxLabel} km`;
-  const lo = Number(communityDistMin.min);
-  const hi = Number(communityDistMin.max);
-  const fromPct = ((min - lo) / (hi - lo)) * 100;
-  const toPct = ((max - lo) / (hi - lo)) * 100;
-  communityDistTrack.style.background =
-    `linear-gradient(to right, var(--color-border) ${fromPct}%, ` +
-    `var(--color-accent) ${fromPct}%, var(--color-accent) ${toPct}%, ` +
-    `var(--color-border) ${toPct}%)`;
-}
-
-/** Marks one button active within a segmented group, clearing the rest. */
-function setActiveInGroup(buttons: HTMLButtonElement[], active: HTMLButtonElement): void {
-  buttons.forEach((b) => {
-    const on = b === active;
-    b.classList.toggle('active', on);
-    b.setAttribute('aria-pressed', String(on));
   });
 }
 
@@ -2684,144 +2548,7 @@ async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
 }
 
 // --- Mobile bottom sheet ---
-// On phones the panel is a draggable sheet over a full-screen map. Dragging
-// the handle snaps it between peek / half / full; tapping the handle cycles up.
-(() => {
-  const sheet = document.querySelector<HTMLElement>('#sidebar');
-  const handle = document.querySelector<HTMLElement>('#sheet-handle');
-  if (!sheet || !handle) return;
-  const sheetEl = sheet;
-  const handleEl = handle;
-  const fab = document.querySelector<HTMLElement>('#gps-fab');
-  const locateEl = document.querySelector<HTMLButtonElement>('#btn-locate');
-  const distEl = document.querySelector<HTMLElement>('#stat-distance');
-
-  const isMobile = () => window.matchMedia('(max-width: 700px)').matches;
-  // Default to half (not peek): search/generate and the community list should
-  // be visible without dragging first, and the map shouldn't dominate the
-  // screen on load.
-  let snap = 1; // 0 = peek, 1 = half, 2 = full
-
-  // Offsets in px to translate the sheet down by, per snap level.
-  // Peek shows the handle + top of the panel; half ~48% of the viewport;
-  // full is the whole 92vh sheet.
-  function offsets(): number[] {
-    const h = sheetEl.offsetHeight;
-    const peekVisible = 112;
-    return [Math.max(0, h - peekVisible), Math.round(h * 0.48), 0];
-  }
-
-  function currentY(): number {
-    const m = /translateY\(([-\d.]+)px\)/.exec(sheetEl.style.transform);
-    return m ? parseFloat(m[1]) : offsets()[snap];
-  }
-
-  function apply(index: number, animate = true): void {
-    snap = Math.max(0, Math.min(2, index));
-    sheetEl.style.transition = animate ? '' : 'none';
-    sheetEl.style.transform = `translateY(${offsets()[snap]}px)`;
-    handleEl.setAttribute('aria-expanded', String(snap > 0));
-  }
-
-  // Clear inline styles on desktop so the sheet transform never leaks there.
-  function reset(): void {
-    if (isMobile()) {
-      apply(snap, false);
-    } else {
-      sheetEl.style.transform = '';
-      sheetEl.style.transition = '';
-    }
-  }
-
-  let dragging = false;
-  let startY = 0;
-  let startOffset = 0;
-
-  handleEl.addEventListener('pointerdown', (e) => {
-    if (!isMobile()) return;
-    dragging = true;
-    startY = e.clientY;
-    startOffset = currentY();
-    sheetEl.style.transition = 'none';
-    handleEl.setPointerCapture(e.pointerId);
-  });
-  handleEl.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const h = sheetEl.offsetHeight;
-    const y = Math.min(Math.max(0, startOffset + (e.clientY - startY)), h - 80);
-    sheetEl.style.transform = `translateY(${y}px)`;
-  });
-  const endDrag = (): void => {
-    if (!dragging) return;
-    dragging = false;
-    sheetEl.style.transition = '';
-    const y = currentY();
-    // A tap (barely moved) cycles peek -> half -> full -> peek.
-    if (Math.abs(y - startOffset) < 6) {
-      apply(snap >= 2 ? 0 : snap + 1);
-      return;
-    }
-    const offs = offsets();
-    let best = 0;
-    let bestDist = Infinity;
-    offs.forEach((o, i) => {
-      const d = Math.abs(o - y);
-      if (d < bestDist) {
-        bestDist = d;
-        best = i;
-      }
-    });
-    apply(best);
-  };
-  handleEl.addEventListener('pointerup', endDrag);
-  handleEl.addEventListener('pointercancel', endDrag);
-
-  // Keyboard: Enter/Space cycles up, arrows step between snap levels.
-  handleEl.addEventListener('keydown', (e) => {
-    if (!isMobile()) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      apply(snap >= 2 ? 0 : snap + 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      apply(snap + 1);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      apply(snap - 1);
-    }
-  });
-
-  // Raise to half the first time a route appears so the stats come into view.
-  if (distEl) {
-    const observer = new MutationObserver(() => {
-      const text = distEl.textContent ?? '';
-      if (isMobile() && snap === 0 && text && text !== '–') apply(1);
-    });
-    observer.observe(distEl, { childList: true, characterData: true, subtree: true });
-  }
-
-  if (fab && locateEl) {
-    fab.addEventListener('click', () => locateEl.click());
-  }
-
-  window.addEventListener('resize', reset);
-
-  // When the PWA comes back to the foreground (or is restored from the page
-  // cache), iOS can leave the web view scrolled with the sheet transform stale
-  // — the map ends up unreachable. Reset any errant page scroll and re-assert
-  // the sheet's snap position.
-  const restore = (): void => {
-    if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
-    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
-    reset();
-  };
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') restore();
-  });
-  window.addEventListener('pageshow', restore);
-
-  reset();
-})();
+initBottomSheet();
 
 // Dev-only handle for verification in the browser console; stripped from
 // the production build by the `import.meta.env.DEV` guard.

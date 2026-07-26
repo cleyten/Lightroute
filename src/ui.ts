@@ -41,3 +41,38 @@ window.addEventListener('online', () => {
   if (statusEl.classList.contains('error')) setStatus('Back online.');
 });
 
+export function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * Wires a chevron toggle button to show/hide the content it controls, collapsed
+ * by default. Used for "Bike, traffic & hills" and "Sort & filter" so the
+ * primary action (search/generate, the route list) sits above the fold on
+ * mobile instead of being pushed down by settings most visits don't change.
+ */
+export function initDisclosure(toggleSelector: string, bodySelector: string): void {
+  const toggle = document.querySelector<HTMLButtonElement>(toggleSelector);
+  const body = document.querySelector<HTMLElement>(bodySelector);
+  if (!toggle || !body) return;
+  toggle.addEventListener('click', () => {
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!expanded));
+    body.hidden = expanded;
+  });
+}
+
+/** Marks one button in a segmented control active, clearing the others. */
+export function setActiveInGroup(
+  buttons: HTMLButtonElement[],
+  active: HTMLButtonElement,
+): void {
+  buttons.forEach((button) => {
+    const on = button === active;
+    button.classList.toggle('active', on);
+    button.setAttribute('aria-pressed', String(on));
+  });
+}
+
