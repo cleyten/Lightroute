@@ -38,6 +38,8 @@ export interface PublishInput {
   distanceMeters: number;
   ascendMeters: number;
   source: 'planned' | 'imported';
+  /** Simplified [lng, lat] track for the community heatmap (no elevation). */
+  geometry?: LngLat[] | null;
   /** Original file text for imported routes; uploaded to storage when present. */
   originalFileText?: string | null;
   /** Format of `originalFileText`; required alongside it so the upload gets
@@ -103,11 +105,12 @@ export async function publishRoute(input: PublishInput): Promise<void> {
     if (uploadError) throw uploadError;
   }
 
-  const { error } = await db.from('routes').insert({
+  const row = {
     owner_id: userId,
     name: input.name,
     author_name: input.authorName?.trim() || null,
     waypoints: input.waypoints,
+    geometry: input.geometry ?? null,
     bike: input.bike,
     traffic: input.traffic,
     closed: input.closed,
@@ -116,8 +119,36 @@ export async function publishRoute(input: PublishInput): Promise<void> {
     source: input.source,
     gpx_path: filePath,
     file_format: fileFormat,
-  });
+  };
+  let { error } = await db.from('routes').insert(row);
+  // Forward-compatible: if the DB has not had the `geometry` column added yet,
+  // publish the route without it rather than failing outright.
+  if (error && isMissingGeometryColumn(error)) {
+    const { geometry: _drop, ...withoutGeometry } = row;
+    ({ error } = await db.from('routes').insert(withoutGeometry));
+  }
   if (error) throw error;
+}
+
+function isMissingGeometryColumn(error: { code?: string; message?: string }): boolean {
+  return error.code === 'PGRST204' || /geometry/i.test(error.message ?? '');
+}
+
+/**
+ * Simplified [lng, lat] geometries of every visible community route, for the
+ * heatmap. Returns [] if the `geometry` column has not been added yet (so the
+ * feature degrades quietly until the migration is applied).
+ */
+export async function fetchRouteGeometries(): Promise<LngLat[][]> {
+  const { data, error } = await client()
+    .from('routes')
+    .select('geometry')
+    .is('deleted_at', null)
+    .not('geometry', 'is', null);
+  if (error) return [];
+  return ((data as { geometry: LngLat[] | null }[] | null) ?? [])
+    .map((row) => row.geometry ?? [])
+    .filter((geometry) => geometry.length > 1);
 }
 
 export async function fetchCommunityRoutes(sort: CommunitySort): Promise<CommunityRoute[]> {

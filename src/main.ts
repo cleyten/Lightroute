@@ -3,13 +3,19 @@ import type { FeatureCollection } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
 import { fetchRoute, RouteCancelledError, type LngLat, type RouteResult } from './routing';
-import { sanitizeWaypoints } from './waypoints';
+import { buildAvoidZonesGeoJson, type AvoidZone } from './avoidZones';
 import { downloadGpx } from './gpx';
 import { downloadTcx } from './tcx';
 import { parseTcx } from './tcximport';
 import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
+// ./chart pulls in chart.js/auto and is only needed once a route exists, so it
+// is dynamically imported (see loadChartModule) and never statically. Type-only
+// imports are erased at build time and do not affect that.
+// Kept out of chart.ts so the static grade swatches do not depend on Chart.js.
 import { renderGradeLegend } from './gradelegend';
-import { surfaceBreakdown, renderSurfaceBar } from './surface';
+import { setBusy, setStatus } from './ui';
+import { sanitizeWaypoints } from './waypoints';
+import { surfaceBreakdown, renderSurfaceBar, surfaceRuns, type SurfaceClass } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
 import type { LoopOption } from './ors';
 import { rejectionText } from './loopText';
@@ -22,32 +28,32 @@ import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
 import { buildShareUrl, parseShareUrl } from './share';
 import { parseGpx, isClosedTrack } from './gpximport';
-import { buildAvoidZonesGeoJson, type AvoidZone } from './avoidZones';
+// ./auth and ./community both pull in @supabase/supabase-js. They are loaded on
+// demand via loadBackend() so the client stays out of the initial bundle; the
+// planner works without a backend at all. isSupabaseConfigured comes from
+// supabaseConfig.ts specifically so it can be checked eagerly without
+// triggering that load. Type-only imports below are erased at build time.
 import { isSupabaseConfigured } from './supabaseConfig';
-import { initBottomSheet } from './bottomSheet';
-import { initDualRange } from './dualRange';
-import {
-  escapeHtml, initDisclosure, setActiveInGroup, setBusy, setStatus,
-} from './ui';
-import {
-  accountEmail, accountName, accountSignedIn, accountSignedOut, authorField, authorNameInput,
-  avoidZoneRadiusButtons, bikeButtons, brandSub, btnAvoidZone, btnCafes, btnClear,
-  btnClearAvoidZones, btnExport, btnExportTcx, btnImportGpx, btnLocate, btnPublish, btnReverse,
-  btnRoundtrip, btnSave, btnShare, btnSignin, btnSignout, btnUndo, btnWater, cafeKmInput,
-  cafesEl, cafesList, chartCanvas, chartWrap, climbsEl, climbsList, communityBikeButtons,
-  communityDistMax, communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons,
-  communityList, communityPanel, communitySortButtons, gpxFileInput, gradeLegendEl, hillsButtons,
-  loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, rangeTrack, rangeValue, roundtripMax,
-  roundtripMin, routeEmpty, routeNameInput, routePills, savedList, searchInput, searchResults,
-  statAscend, statDistance, statsSection, surfaceEl, trafficLabel,
-  trafficSelect, waterEl, waterList, windChipEl,
-} from './dom';
-// `./chart` (chart.js/auto) and `./auth`/`./community` (@supabase/supabase-js)
-// are code-split: only dynamically import()-ed below (loadChartModule(),
-// loadCommunityBackend()), never statically, so neither heavy library is in
-// the initial bundle. Type-only imports below are erased at build time and
-// have no effect on this — they're the one safe exception.
 import type { CommunityRoute, CommunitySort } from './community';
+
+type AuthModule = typeof import('./auth');
+type CommunityModule = typeof import('./community');
+
+/** Resolved backend modules once loaded, for the few synchronous call sites. */
+let backend: { auth: AuthModule; community: CommunityModule } | null = null;
+let backendPromise: Promise<{ auth: AuthModule; community: CommunityModule }> | null = null;
+
+function loadBackend(): Promise<{ auth: AuthModule; community: CommunityModule }> {
+  if (!backendPromise) {
+    backendPromise = Promise.all([import('./auth'), import('./community')]).then(
+      ([auth, community]) => {
+        backend = { auth, community };
+        return backend;
+      },
+    );
+  }
+  return backendPromise;
+}
 import type { User } from '@supabase/supabase-js';
 import { registerSW } from 'virtual:pwa-register';
 
@@ -105,6 +111,83 @@ const state = {
   mode: 'normal' as 'normal' | 'avoid',
 };
 
+const statDistance = document.querySelector<HTMLElement>('#stat-distance')!;
+const statAscend = document.querySelector<HTMLElement>('#stat-ascend')!;
+const statsSection = document.querySelector<HTMLElement>('#stats')!;
+const routeEmpty = document.querySelector<HTMLElement>('#route-empty')!;
+const routePills = document.querySelector<HTMLElement>('#route-pills')!;
+const gradeLegendEl = document.querySelector<HTMLElement>('#grade-legend')!;
+const btnShare = document.querySelector<HTMLButtonElement>('#btn-share')!;
+const btnUndo = document.querySelector<HTMLButtonElement>('#btn-undo')!;
+const btnClear = document.querySelector<HTMLButtonElement>('#btn-clear')!;
+const btnReverse = document.querySelector<HTMLButtonElement>('#btn-reverse')!;
+const btnExport = document.querySelector<HTMLButtonElement>('#btn-export')!;
+const btnExportTcx = document.querySelector<HTMLButtonElement>('#btn-export-tcx')!;
+const btnSave = document.querySelector<HTMLButtonElement>('#btn-save')!;
+const routeNameInput = document.querySelector<HTMLInputElement>('#route-name')!;
+const savedList = document.querySelector<HTMLUListElement>('#saved-list')!;
+const bikeButtons = [...document.querySelectorAll<HTMLButtonElement>('#bike-type button')];
+const hillsButtons = [...document.querySelectorAll<HTMLButtonElement>('#hills-type button')];
+const trafficLabel = document.querySelector<HTMLElement>('#traffic-label')!;
+const trafficSelect = document.querySelector<HTMLSelectElement>('#traffic-select')!;
+const chartWrap = document.querySelector<HTMLElement>('#chart-wrap')!;
+const roundtripMin = document.querySelector<HTMLInputElement>('#roundtrip-min')!;
+const roundtripMax = document.querySelector<HTMLInputElement>('#roundtrip-max')!;
+const rangeValue = document.querySelector<HTMLElement>('#range-value')!;
+const rangeTrack = document.querySelector<HTMLElement>('#range-track')!;
+const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')!;
+const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
+const surfaceEl = document.querySelector<HTMLElement>('#surface')!;
+const routeBadge = document.querySelector<HTMLElement>('#route-badge');
+const loopOptionsEl = document.querySelector<HTMLElement>('#loop-options')!;
+const windChipEl = document.querySelector<HTMLElement>('#wind-chip')!;
+const climbsEl = document.querySelector<HTMLElement>('#climbs')!;
+const climbsList = document.querySelector<HTMLUListElement>('#climbs-list')!;
+const searchInput = document.querySelector<HTMLInputElement>('#search-input')!;
+const searchResults = document.querySelector<HTMLUListElement>('#search-results')!;
+const btnLocate = document.querySelector<HTMLButtonElement>('#btn-locate')!;
+const btnImportGpx = document.querySelector<HTMLButtonElement>('#btn-import-gpx')!;
+const gpxFileInput = document.querySelector<HTMLInputElement>('#gpx-file-input')!;
+const cafesEl = document.querySelector<HTMLElement>('#cafes')!;
+const cafeKmInput = document.querySelector<HTMLInputElement>('#cafe-km')!;
+const btnCafes = document.querySelector<HTMLButtonElement>('#btn-cafes')!;
+const cafesList = document.querySelector<HTMLUListElement>('#cafes-list')!;
+const waterEl = document.querySelector<HTMLElement>('#water')!;
+const btnWater = document.querySelector<HTMLButtonElement>('#btn-water')!;
+const btnAvoidZone = document.querySelector<HTMLButtonElement>('#btn-avoid-zone')!;
+const avoidZoneRadiusButtons = [...document.querySelectorAll<HTMLButtonElement>('#avoid-zone-radius button')];
+const btnClearAvoidZones = document.querySelector<HTMLButtonElement>('#btn-clear-avoid-zones')!;
+const waterList = document.querySelector<HTMLUListElement>('#water-list')!;
+const btnPublish = document.querySelector<HTMLButtonElement>('#btn-publish')!;
+const mainTabs = document.querySelector<HTMLElement>('#main-tabs')!;
+const mainTabButtons = [...document.querySelectorAll<HTMLButtonElement>('#main-tabs .main-tab')];
+// Mobile bottom tab bar mirrors the top tabs; both drive setActiveTab.
+const bottomTabButtons = [...document.querySelectorAll<HTMLButtonElement>('#bottom-nav .bottom-tab')];
+const plannerPanel = document.querySelector<HTMLElement>('#tab-planner')!;
+const communityPanel = document.querySelector<HTMLElement>('#tab-community')!;
+const accountSignedOut = document.querySelector<HTMLElement>('#account-signed-out')!;
+const accountSignedIn = document.querySelector<HTMLElement>('#account-signed-in')!;
+const accountEmail = document.querySelector<HTMLInputElement>('#account-email')!;
+const btnSignin = document.querySelector<HTMLButtonElement>('#btn-signin')!;
+const accountCode = document.querySelector<HTMLInputElement>('#account-code')!;
+const btnVerify = document.querySelector<HTMLButtonElement>('#btn-verify')!;
+const emailRow = document.querySelector<HTMLElement>('#email-row')!;
+const codeRow = document.querySelector<HTMLElement>('#code-row')!;
+const signinHint = document.querySelector<HTMLElement>('#signin-hint')!;
+const btnSigninBack = document.querySelector<HTMLButtonElement>('#btn-signin-back')!;
+const DEFAULT_SIGNIN_HINT = signinHint.textContent ?? '';
+const accountName = document.querySelector<HTMLElement>('#account-name')!;
+const btnSignout = document.querySelector<HTMLButtonElement>('#btn-signout')!;
+const communitySortButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-sort button')];
+const communityBikeButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-bike button')];
+const communityHillsButtons = [...document.querySelectorAll<HTMLButtonElement>('#community-hills button')];
+const communityDistMin = document.querySelector<HTMLInputElement>('#community-dist-min')!;
+const communityDistMax = document.querySelector<HTMLInputElement>('#community-dist-max')!;
+const communityDistValue = document.querySelector<HTMLElement>('#community-dist-value')!;
+const communityDistTrack = document.querySelector<HTMLElement>('#community-dist-track')!;
+const authorField = document.querySelector<HTMLElement>('#author-field')!;
+const authorNameInput = document.querySelector<HTMLInputElement>('#author-name')!;
+const communityList = document.querySelector<HTMLUListElement>('#community-list')!;
 
 // Last GPS fix, shared between the planner's locate button and the community
 // "Near me" sort / distance-away labels. Null until the user grants location.
@@ -136,23 +219,30 @@ const RASTER_BASEMAPS: Record<
   },
 };
 
-// The "cycling" basemap is OpenCycleMap (Thunderforest), which needs a free API
-// key injected at build time from VITE_THUNDERFOREST_KEY (never hardcoded).
-// Registered only when the key is present; the button is removed otherwise
-// (see the load handler).
+// The "cycling" basemap is OpenCycleMap (Thunderforest), which needs an API
+// key. When no key is baked into the bundle (the Cloudflare build) the tiles
+// go through the same-origin Worker proxy, which adds the key server-side;
+// GitHub Pages / local dev bake a key and fetch tiles directly. The button is
+// removed when neither is available (see the load handler). The PROD guard
+// keeps local dev without a key from showing a broken OpenCycleMap option.
 const THUNDERFOREST_KEY: string = import.meta.env.VITE_THUNDERFOREST_KEY ?? '';
-if (THUNDERFOREST_KEY) {
+const USE_PROXY =
+  import.meta.env.VITE_USE_PROXY === '1' || (import.meta.env.PROD && !THUNDERFOREST_KEY);
+const CYCLING_AVAILABLE = USE_PROXY || Boolean(THUNDERFOREST_KEY);
+if (CYCLING_AVAILABLE) {
   RASTER_BASEMAPS.cycling = {
-    tiles: ['a', 'b', 'c'].map(
-      (s) => `https://${s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=${THUNDERFOREST_KEY}`,
-    ),
+    tiles: USE_PROXY
+      ? ['/api/tiles/thunderforest/cycle/{z}/{x}/{y}.png']
+      : ['a', 'b', 'c'].map(
+          (s) => `https://${s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=${THUNDERFOREST_KEY}`,
+        ),
     attribution: 'Maps © Thunderforest, Data © OpenStreetMap contributors',
     maxzoom: 22,
   };
 }
 
-// Route line color, the same across every basemap.
-const ROUTE_COLOR = '#2424e8';
+// Route line color, the same across every basemap (matches the UI accent).
+const ROUTE_COLOR = '#2f5bff';
 
 function setBasemap(style: string): void {
   if (map.getLayer('basemap-raster')) map.removeLayer('basemap-raster');
@@ -167,10 +257,89 @@ function setBasemap(style: string): void {
       maxzoom: cfg.maxzoom,
       attribution: cfg.attribution,
     });
-    // Keep the raster below the route overlays so the route stays on top.
-    const beforeId = map.getLayer('route-casing') ? 'route-casing' : undefined;
+    // Keep the raster at the bottom of our overlays: below the heatmap (when
+    // present) and below the route, so both always read on top of it.
+    const beforeId = map.getLayer('heatmap-layer')
+      ? 'heatmap-layer'
+      : map.getLayer('route-casing')
+        ? 'route-casing'
+        : undefined;
     map.addLayer({ id: 'basemap-raster', type: 'raster', source: 'basemap-raster' }, beforeId);
   }
+}
+
+// --- Community heatmap ------------------------------------------------------
+let heatmapLoaded = false;
+let heatmapStale = false; // set after publishing so the next open refetches
+
+/** Down-sample a dense routed line to ~one point per `minGapM` metres and drop
+ *  elevation — compact enough to store per route and to feed the heatmap. */
+function simplifyForHeatmap(
+  coords: [number, number, number][],
+  minGapM = 40,
+): LngLat[] {
+  const round = (n: number): number => Number(n.toFixed(5));
+  const out: LngLat[] = [];
+  let last: LngLat | null = null;
+  for (const c of coords) {
+    const p: LngLat = [round(c[0]), round(c[1])];
+    if (!last || haversineMeters(last, p) >= minGapM) {
+      out.push(p);
+      last = p;
+    }
+  }
+  const end = coords[coords.length - 1];
+  if (end) {
+    const p: LngLat = [round(end[0]), round(end[1])];
+    if (!last || last[0] !== p[0] || last[1] !== p[1]) out.push(p);
+  }
+  return out;
+}
+
+/** Loads every community route's geometry as heatmap points. Returns the
+ *  number of routes mapped. */
+async function loadHeatmapData(): Promise<number> {
+  const { community } = await loadBackend();
+  const geometries = await community.fetchRouteGeometries();
+  const features = geometries.flatMap((geometry) =>
+    geometry.map((coord) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: coord },
+      properties: {},
+    })),
+  );
+  const source = map.getSource('heatmap') as maplibregl.GeoJSONSource | undefined;
+  source?.setData({ type: 'FeatureCollection', features });
+  heatmapLoaded = true;
+  heatmapStale = false;
+  return geometries.length;
+}
+
+/** Wires the map's Heatmap toggle. Shown only when the community backend is
+ *  configured, since the heatmap is built from published community routes. */
+function initHeatmap(): void {
+  const toggle = document.querySelector<HTMLButtonElement>('#heatmap-toggle');
+  if (!toggle || !isSupabaseConfigured) return;
+  toggle.hidden = false;
+  toggle.addEventListener('click', async () => {
+    const on = toggle.getAttribute('aria-pressed') !== 'true';
+    toggle.setAttribute('aria-pressed', String(on));
+    toggle.classList.toggle('active', on);
+    if (!map.getLayer('heatmap-layer')) return;
+    map.setLayoutProperty('heatmap-layer', 'visibility', on ? 'visible' : 'none');
+    if (on && (!heatmapLoaded || heatmapStale)) {
+      toggle.disabled = true;
+      setStatus('Loading community heatmap…');
+      try {
+        const count = await loadHeatmapData();
+        setStatus(count > 0 ? '' : 'No community routes on the heatmap yet.');
+      } catch {
+        setStatus('Could not load the community heatmap.', true);
+      } finally {
+        toggle.disabled = false;
+      }
+    }
+  });
 }
 
 // Dot shown on the map while hovering the elevation chart.
@@ -206,6 +375,31 @@ map.on('load', () => {
       'line-color': ROUTE_COLOR,
       'line-width': 4,
       'line-opacity': 0.95,
+    },
+  });
+  // Surface-coloured overlay on top of the base line: paved reads as the
+  // accent, cobbles amber, unpaved warm brown. Empty (falls back to the solid
+  // line) when no surface data is available.
+  map.addSource('route-surface', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+  map.addLayer({
+    id: 'route-surface-line',
+    type: 'line',
+    source: 'route-surface',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-width': 4,
+      'line-opacity': 0.98,
+      'line-color': [
+        'match',
+        ['get', 'surface'],
+        'unpaved', '#b8641e',
+        'cobbles', '#d98a1e',
+        'paved', ROUTE_COLOR,
+        ROUTE_COLOR,
+      ],
     },
   });
   // Café markers along the current route.
@@ -276,29 +470,6 @@ map.on('load', () => {
     map.getCanvas().style.cursor = '';
   });
 
-  // Highlight layer for a selected climb, drawn on top of the route.
-  map.addSource('climb-highlight', {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [] },
-  });
-  map.addLayer({
-    id: 'climb-line',
-    type: 'line',
-    source: 'climb-highlight',
-    layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: {
-      'line-color': '#e8571a',
-      'line-width': 5,
-      'line-opacity': 0.95,
-    },
-  });
-  map.on('mouseenter', 'route-line', () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
-  map.on('mouseleave', 'route-line', () => {
-    map.getCanvas().style.cursor = '';
-  });
-
   // Circular "avoid this area" zones for manual routes.
   map.addSource('avoid-zones', {
     type: 'geojson',
@@ -340,12 +511,84 @@ map.on('load', () => {
     map.getCanvas().style.cursor = '';
   });
 
-  // Wire the basemap switcher now that the overlay layers exist.
+  // Community heatmap: density of published routes, below the route overlays.
+  // Hidden until toggled on; populated on first activation (see initHeatmap).
+  map.addSource('heatmap', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+  map.addLayer(
+    {
+      id: 'heatmap-layer',
+      type: 'heatmap',
+      source: 'heatmap',
+      layout: { visibility: 'none' },
+      paint: {
+        'heatmap-weight': 0.7,
+        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 7, 0.7, 14, 1.5],
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 7, 6, 11, 14, 15, 26],
+        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.85, 15, 0.6],
+        'heatmap-color': [
+          'interpolate',
+          ['linear'],
+          ['heatmap-density'],
+          0, 'rgba(47, 91, 255, 0)',
+          0.15, 'rgba(47, 91, 255, 0.55)',
+          0.4, 'rgba(56, 150, 255, 0.75)',
+          0.65, 'rgba(90, 200, 170, 0.85)',
+          0.85, 'rgba(240, 180, 40, 0.9)',
+          1, 'rgba(230, 80, 30, 0.95)',
+        ],
+      },
+    },
+    map.getLayer('route-casing') ? 'route-casing' : undefined,
+  );
+
+  // Highlight layer for a selected climb, drawn on top of the route.
+  map.addSource('climb-highlight', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+  map.addLayer({
+    id: 'climb-line',
+    type: 'line',
+    source: 'climb-highlight',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': '#e8571a',
+      'line-width': 5,
+      'line-opacity': 0.95,
+    },
+  });
+  map.on('mouseenter', 'route-line', () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', 'route-line', () => {
+    map.getCanvas().style.cursor = '';
+  });
+
+  // Map-style chooser: a popover opened from the layers tool in the stack.
   const mapstyleEl = document.querySelector<HTMLDivElement>('#mapstyle');
-  if (mapstyleEl) {
-    mapstyleEl.hidden = false;
-    // OpenCycleMap (the cycling layer) only works with a Thunderforest key.
-    if (!THUNDERFOREST_KEY) mapstyleEl.querySelector('[data-style="cycling"]')?.remove();
+  const layersToggle = document.querySelector<HTMLButtonElement>('#layers-toggle');
+  if (mapstyleEl && layersToggle) {
+    // OpenCycleMap (the cycling layer) needs a Thunderforest key or the proxy.
+    if (!CYCLING_AVAILABLE) mapstyleEl.querySelector('[data-style="cycling"]')?.remove();
+    const setStyleMenuOpen = (open: boolean): void => {
+      mapstyleEl.hidden = !open;
+      layersToggle.setAttribute('aria-expanded', String(open));
+    };
+    layersToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setStyleMenuOpen(Boolean(mapstyleEl.hidden));
+    });
+    // A click anywhere else closes the popover.
+    document.addEventListener('click', (event) => {
+      if (mapstyleEl.hidden) return;
+      const target = event.target as Node;
+      if (!mapstyleEl.contains(target) && !layersToggle.contains(target)) {
+        setStyleMenuOpen(false);
+      }
+    });
     mapstyleEl.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
       btn.addEventListener('click', () => {
         setBasemap(btn.dataset.style ?? 'clean');
@@ -354,9 +597,12 @@ map.on('load', () => {
           b.classList.toggle('active', active);
           b.setAttribute('aria-pressed', String(active));
         });
+        setStyleMenuOpen(false);
       });
     });
   }
+
+  initHeatmap();
 
   // A shared route needs the 'route' source/layers above to already exist.
   void applySharedRoute();
@@ -441,6 +687,47 @@ btnClear.addEventListener('click', () => {
   rebuildMarkers();
   void recalculateRoute();
 });
+
+btnAvoidZone.addEventListener('click', () => {
+  state.mode = state.mode === 'avoid' ? 'normal' : 'avoid';
+  syncAvoidZoneUi();
+});
+
+avoidZoneRadiusButtons.forEach((button) =>
+  button.addEventListener('click', () => {
+    state.avoidZoneRadius = Number(button.dataset.radius);
+    setActiveInGroup(avoidZoneRadiusButtons, button);
+  }),
+);
+
+btnClearAvoidZones.addEventListener('click', () => {
+  state.avoidZones = [];
+  updateAvoidZonesSource();
+  syncAvoidZoneUi();
+  void recalculateRoute();
+});
+
+function updateAvoidZonesSource(): void {
+  const source = map.getSource('avoid-zones') as maplibregl.GeoJSONSource | undefined;
+  source?.setData(buildAvoidZonesGeoJson(state.avoidZones));
+}
+
+/**
+ * Round trips (ORS) don't support avoid zones yet (BRouter's nogos and ORS's
+ * avoid_polygons are incompatible shapes), so the toggle is disabled whenever
+ * a round trip is active.
+ */
+function syncAvoidZoneUi(): void {
+  btnAvoidZone.disabled = state.closed;
+  btnAvoidZone.title = state.closed
+    ? 'Not available for round trips yet'
+    : 'Click the map to mark a circular area to avoid';
+  btnAvoidZone.classList.toggle('active', state.mode === 'avoid');
+  btnAvoidZone.setAttribute('aria-pressed', String(state.mode === 'avoid'));
+  btnAvoidZone.textContent = state.mode === 'avoid' ? 'Click the map…' : 'Mark area';
+  avoidZoneRadiusButtons.forEach((button) => (button.disabled = state.closed));
+  btnClearAvoidZones.hidden = state.avoidZones.length === 0;
+}
 
 btnReverse.addEventListener('click', () => {
   if (!state.route) return;
@@ -561,6 +848,7 @@ btnRoundtrip.addEventListener('click', async () => {
   const requestId = ++state.requestId;
   setStatus('Planning loops…');
   btnRoundtrip.disabled = true;
+  btnRoundtrip.classList.add('is-loading');
   setBusy(true);
   try {
     const result = await generateRoundTripsAsync({
@@ -608,6 +896,7 @@ btnRoundtrip.addEventListener('click', async () => {
     // disabled forever. The stale-result guards above already prevent a
     // superseded run from writing state.
     btnRoundtrip.disabled = false;
+    btnRoundtrip.classList.remove('is-loading');
     setBusy(false);
   }
   updateControls();
@@ -795,8 +1084,9 @@ function renderWindChip(wind: WindInfo | null): void {
   windChipEl.innerHTML = '';
   const arrow = document.createElement('span');
   arrow.className = 'wind-arrow';
-  arrow.textContent = '➤';
-  // The arrow glyph points east; rotate it to where the wind blows TO.
+  arrow.innerHTML =
+    '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h14"/><path d="M12 6l6 6-6 6"/></svg>';
+  // The arrow points east; rotate it to where the wind blows TO.
   arrow.style.transform = `rotate(${Math.round(wind.fromDeg + 90)}deg)`;
   const label = document.createElement('span');
   label.textContent = ` Wind now: ${Math.round(wind.speedKmh)} km/h from ${compassLabel(wind.fromDeg)}`;
@@ -908,6 +1198,9 @@ gpxFileInput.addEventListener('change', async () => {
     // ridden track. recalculateRoute() cleared it above, so set it back here.
     state.importedFileText = text;
     state.importedFileFormat = isTcx ? 'tcx' : 'gpx';
+    // Import lives on the Community tab now; jump back to the planner so the
+    // imported route is visible and editable.
+    setActiveTab('planner');
     if (state.route) {
       const bounds = coords.reduce(
         (acc, c) => acc.extend([c[0], c[1]]),
@@ -925,13 +1218,34 @@ gpxFileInput.addEventListener('change', async () => {
 
 // --- Round-trip distance range slider ----------------------------------------
 
-initDualRange({
-  min: roundtripMin,
-  max: roundtripMax,
-  label: rangeValue,
-  track: rangeTrack,
-  format: (min, max) => `${min} – ${max}`,
-});
+/** Keeps the two thumbs apart and paints the label and the selected track segment. */
+function syncRangeSlider(moved: 'min' | 'max'): void {
+  const step = Number(roundtripMin.step) || 5;
+  let min = Number(roundtripMin.value);
+  let max = Number(roundtripMax.value);
+  if (min > max - step) {
+    if (moved === 'min') {
+      min = max - step;
+      roundtripMin.value = String(min);
+    } else {
+      max = min + step;
+      roundtripMax.value = String(max);
+    }
+  }
+  rangeValue.textContent = `${min} – ${max}`;
+  const lo = Number(roundtripMin.min);
+  const hi = Number(roundtripMin.max);
+  const fromPct = ((min - lo) / (hi - lo)) * 100;
+  const toPct = ((max - lo) / (hi - lo)) * 100;
+  rangeTrack.style.background =
+    `linear-gradient(to right, var(--color-border) ${fromPct}%, ` +
+    `var(--color-accent) ${fromPct}%, var(--color-accent) ${toPct}%, ` +
+    `var(--color-border) ${toPct}%)`;
+}
+
+roundtripMin.addEventListener('input', () => syncRangeSlider('min'));
+roundtripMax.addEventListener('input', () => syncRangeSlider('max'));
+syncRangeSlider('min');
 
 // --- Cafés along the route ---------------------------------------------------
 
@@ -1087,8 +1401,77 @@ function clearWater(): void {
   setWaterData([]);
 }
 
-initDisclosure('#planner-options-toggle', '#planner-options-body');
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * Wires a chevron toggle button to show/hide the content it controls, collapsed
+ * by default. Used for "Bike, traffic & hills" and "Sort & filter" so the
+ * primary action (search/generate, the route list) sits above the fold on
+ * mobile instead of being pushed down by settings most visits don't change.
+ */
+function initDisclosure(toggleSelector: string, bodySelector: string): void {
+  const toggle = document.querySelector<HTMLButtonElement>(toggleSelector);
+  const body = document.querySelector<HTMLElement>(bodySelector);
+  if (!toggle || !body) return;
+  toggle.addEventListener('click', () => {
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!expanded));
+    body.hidden = expanded;
+  });
+}
+
 initDisclosure('#community-filters-toggle', '#community-filters-body');
+
+// --- Light/dark theme toggle -------------------------------------------------
+// The UI follows the OS by default; toggling sets an explicit, persisted
+// preference on <html data-theme>. The map basemap stays light either way.
+(() => {
+  const toggle = document.querySelector<HTMLButtonElement>('#theme-toggle');
+  if (!toggle) return;
+  const THEME_KEY = 'lightmile-theme';
+  const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+  const effectiveTheme = (): 'light' | 'dark' => {
+    const forced = document.documentElement.getAttribute('data-theme');
+    if (forced === 'light' || forced === 'dark') return forced;
+    return darkQuery.matches ? 'dark' : 'light';
+  };
+
+  const sync = (): void => {
+    const dark = effectiveTheme() === 'dark';
+    toggle.classList.toggle('is-dark', dark);
+    toggle.setAttribute('aria-pressed', String(dark));
+    toggle.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+  };
+
+  toggle.addEventListener('click', () => {
+    const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      /* private mode: preference just won't persist */
+    }
+    sync();
+  });
+
+  // Reflect OS changes while the user hasn't set an explicit preference.
+  darkQuery.addEventListener('change', () => {
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(THEME_KEY);
+    } catch {
+      stored = null;
+    }
+    if (stored !== 'light' && stored !== 'dark') sync();
+  });
+
+  sync();
+})();
 
 bikeButtons.forEach((button) =>
   button.addEventListener('click', () => {
@@ -1111,29 +1494,6 @@ hillsButtons.forEach((button) =>
 trafficSelect.addEventListener('change', () => {
   settings.traffic = Number(trafficSelect.value);
   persistSettings();
-  void recalculateRoute();
-});
-
-btnAvoidZone.addEventListener('click', () => {
-  state.mode = state.mode === 'avoid' ? 'normal' : 'avoid';
-  syncAvoidZoneUi();
-});
-
-avoidZoneRadiusButtons.forEach((button) =>
-  button.addEventListener('click', () => {
-    state.avoidZoneRadius = Number(button.dataset.radius);
-    avoidZoneRadiusButtons.forEach((b) => {
-      const active = b === button;
-      b.classList.toggle('active', active);
-      b.setAttribute('aria-pressed', String(active));
-    });
-  }),
-);
-
-btnClearAvoidZones.addEventListener('click', () => {
-  state.avoidZones = [];
-  updateAvoidZonesSource();
-  syncAvoidZoneUi();
   void recalculateRoute();
 });
 
@@ -1199,7 +1559,8 @@ function rebuildMarkers(): void {
   state.markers.forEach((marker) => marker.remove());
   state.markers = state.waypoints.map((waypoint, index) => {
     const el = document.createElement('div');
-    el.className = 'waypoint-marker';
+    // The start point (1) reads green like a route origin; the rest are accent.
+    el.className = index === 0 ? 'waypoint-marker start' : 'waypoint-marker';
     el.textContent = String(index + 1);
     el.title =
       index === 0
@@ -1315,7 +1676,12 @@ async function recalculateRoute(): Promise<void> {
   setStatus('Calculating route…');
   setBusy(true);
   try {
-    const route = await fetchRoute(routingWaypoints, currentProfile(), state.avoidZones, abort.signal);
+    const route = await fetchRoute(
+      routingWaypoints,
+      currentProfile(),
+      state.avoidZones,
+      abort.signal,
+    );
     if (requestId !== state.requestId) return; // a newer request superseded this one
     state.route = route;
     setRouteData(route.geojson);
@@ -1359,32 +1725,84 @@ function setRouteData(data: FeatureCollection): void {
   source?.setData(data);
 }
 
-function updateAvoidZonesSource(): void {
-  const source = map.getSource('avoid-zones') as maplibregl.GeoJSONSource | undefined;
-  source?.setData(buildAvoidZonesGeoJson(state.avoidZones));
+/**
+ * Splits the route geometry into per-surface LineString runs so the line can be
+ * coloured by surface (paved / cobbles / unpaved). BRouter's messages give a
+ * distance + surface per way; we walk them in step with the cumulative
+ * geometry distance and assign each coordinate segment a class, then merge
+ * consecutive same-class segments. Any problem yields an empty collection, so
+ * the solid fallback line underneath simply shows through.
+ */
+function buildSurfaceLine(
+  coords: [number, number, number][],
+  messages: string[][],
+): FeatureCollection {
+  const empty: FeatureCollection = { type: 'FeatureCollection', features: [] };
+  try {
+    const runs = surfaceRuns(messages);
+    if (!runs || runs.length === 0 || coords.length < 2) return empty;
+    const cum = cumulativeDistances(coords);
+    const runEnds: number[] = [];
+    let acc = 0;
+    for (const r of runs) {
+      acc += r.meters;
+      runEnds.push(acc);
+    }
+    // Class per coordinate segment (i → i+1), by its midpoint distance.
+    const segClass: SurfaceClass[] = [];
+    let ri = 0;
+    for (let i = 0; i + 1 < coords.length; i++) {
+      const mid = (cum[i] + cum[i + 1]) / 2;
+      while (ri < runs.length - 1 && mid > runEnds[ri]) ri++;
+      segClass.push(runs[ri].cls);
+    }
+    // Merge consecutive same-class segments into LineStrings (sharing the
+    // boundary vertex so there is no visual gap between runs).
+    const features: FeatureCollection['features'] = [];
+    let start = 0;
+    for (let i = 1; i <= segClass.length; i++) {
+      if (i === segClass.length || segClass[i] !== segClass[start]) {
+        features.push({
+          type: 'Feature',
+          properties: { surface: segClass[start] },
+          geometry: {
+            type: 'LineString',
+            coordinates: coords.slice(start, i + 1).map((c) => [c[0], c[1]]),
+          },
+        });
+        start = i;
+      }
+    }
+    return { type: 'FeatureCollection', features };
+  } catch {
+    return empty;
+  }
 }
 
-/**
- * Round trips (ORS) don't support avoid zones yet (BRouter's nogos and ORS's
- * avoid_polygons are incompatible shapes), so the toggle is disabled whenever
- * a round trip is active.
- */
-function syncAvoidZoneUi(): void {
-  btnAvoidZone.disabled = state.closed;
-  btnAvoidZone.title = state.closed
-    ? 'Not available for round trips yet'
-    : 'Click the map to mark a circular area to avoid';
-  btnAvoidZone.classList.toggle('active', state.mode === 'avoid');
-  btnAvoidZone.setAttribute('aria-pressed', String(state.mode === 'avoid'));
-  btnAvoidZone.textContent = state.mode === 'avoid' ? 'Click the map…' : 'Mark area';
-  avoidZoneRadiusButtons.forEach((button) => (button.disabled = state.closed));
-  btnClearAvoidZones.hidden = state.avoidZones.length === 0;
+/** On-map chip summarising the route's paved vs unpaved split (Strava-style). */
+function updateRouteBadge(totals: ReturnType<typeof surfaceBreakdown>): void {
+  if (!routeBadge) return;
+  const known = totals ? totals.totalMeters - totals.unknown : 0;
+  if (!totals || known < totals.totalMeters * 0.4) {
+    routeBadge.hidden = true;
+    return;
+  }
+  const pavedPct = Math.round((totals.paved / known) * 100);
+  const offPct = 100 - pavedPct;
+  routeBadge.textContent = pavedPct >= offPct ? `${pavedPct}% paved` : `${offPct}% unpaved`;
+  routeBadge.hidden = false;
+}
+
+/** Updates the surface-coloured overlay for the current route (or clears it). */
+function setSurfaceLine(): void {
+  const source = map.getSource('route-surface') as maplibregl.GeoJSONSource | undefined;
+  if (!source) return;
+  source.setData(
+    state.route ? buildSurfaceLine(state.route.coordinates, state.route.messages) : { type: 'FeatureCollection', features: [] },
+  );
 }
 
 /** Renders stats, elevation chart, surface bar and climbs for the current route (or clears them). */
-// The elevation chart (chart.js/auto) is only ever needed once a route
-// exists, so it's dynamically imported here rather than statically at the
-// top of the file, keeping the heavy library out of the initial bundle.
 // Cached after the first load so later route updates reuse the same module.
 type ChartModule = typeof import('./chart');
 let chartModulePromise: Promise<ChartModule> | null = null;
@@ -1399,12 +1817,23 @@ function renderRouteDetails(): void {
   clearWater();
   cafesEl.hidden = !state.route;
   waterEl.hidden = !state.route;
+  const statsWereHidden = statsSection.hidden;
   statsSection.hidden = !state.route;
   routeEmpty.hidden = !!state.route;
+  setSurfaceLine();
 
   if (state.route) {
-    statDistance.textContent = `${(state.route.distanceMeters / 1000).toFixed(1)} km`;
-    statAscend.textContent = `${Math.round(state.route.ascendMeters)} m`;
+    const km = state.route.distanceMeters / 1000;
+    const ascend = Math.round(state.route.ascendMeters);
+    // Count the numbers up the first time a route appears; snap on later
+    // re-routes (e.g. while dragging) so it doesn't flicker.
+    if (statsWereHidden) {
+      animateStat(statDistance, km, 'km', 1);
+      animateStat(statAscend, ascend, 'm', 0);
+    } else {
+      setStatValue(statDistance, km, 'km', 1);
+      setStatValue(statAscend, ascend, 'm', 0);
+    }
 
     state.climbs = detectClimbs(state.route.coordinates);
     state.selectedClimb = -1;
@@ -1414,12 +1843,13 @@ function renderRouteDetails(): void {
     chartWrap.hidden = false;
     gradeLegendEl.hidden = false;
     void loadChartModule().then(({ renderElevationChart }) => {
-      // The route may have changed again while the chart module was loading;
-      // read state.route fresh here rather than capturing it earlier.
+      // The route may have changed again while the chart module was loading,
+      // so read state.route fresh here rather than capturing it earlier.
       if (!state.route) return;
       renderElevationChart(chartCanvas, state.route.coordinates, (index) => {
-        const [lng, lat] = state.route!.coordinates[index];
-        hoverMarker.setLngLat([lng, lat]);
+        const coord = state.route?.coordinates[index];
+        if (!coord) return; // chart still holds indices from a previous route
+        hoverMarker.setLngLat([coord[0], coord[1]]);
         if (!hoverMarkerVisible) {
           hoverMarker.addTo(map);
           hoverMarkerVisible = true;
@@ -1434,7 +1864,9 @@ function renderRouteDetails(): void {
     } else {
       surfaceEl.hidden = true;
     }
+    updateRouteBadge(totals);
   } else {
+    updateRouteBadge(null);
     statDistance.textContent = '–';
     statAscend.textContent = '–';
     chartWrap.hidden = true;
@@ -1456,27 +1888,72 @@ function renderRouteDetails(): void {
   renderRoutePills();
 }
 
+/** Consistent outline icons for the at-a-glance summary pills. */
+const PILL_ICONS = {
+  climb:
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18L13.5 6l-3.5 6-2-3z"/></svg>',
+  cafe:
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h11v5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z"/><path d="M16 9h2a2 2 0 0 1 0 4h-2"/><path d="M6 3v2M10 3v2"/></svg>',
+  water:
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6.2 6 10.2A6 6 0 0 1 6 13.2C6 9.2 12 3 12 3z"/></svg>',
+};
+
 /** Compact at-a-glance pills summarizing climbs and coffee stops. */
 function renderRoutePills(): void {
   const pills: string[] = [];
   if (state.climbs.length > 0) {
     const n = state.climbs.length;
     const gain = Math.round(state.climbs.reduce((sum, c) => sum + c.gainM, 0));
-    pills.push(`<span class="pill climb">▲ ${n} climb${n > 1 ? 's' : ''} · +${gain} m</span>`);
+    pills.push(
+      `<span class="pill climb">${PILL_ICONS.climb} ${n} climb${n > 1 ? 's' : ''} · +${gain} m</span>`,
+    );
   }
   if (state.cafes.length > 0) {
     const n = state.cafes.length;
-    pills.push(`<span class="pill cafe">☕ ${n} coffee stop${n > 1 ? 's' : ''}</span>`);
+    pills.push(
+      `<span class="pill cafe">${PILL_ICONS.cafe} ${n} coffee stop${n > 1 ? 's' : ''}</span>`,
+    );
   }
   if (state.water.length > 0) {
     const n = state.water.length;
-    pills.push(`<span class="pill water">💧 ${n} water</span>`);
+    pills.push(`<span class="pill water">${PILL_ICONS.water} ${n} water</span>`);
   }
   routePills.innerHTML = pills.join('');
   routePills.hidden = pills.length === 0;
 }
 
 /** Lists detected climbs; clicking one highlights it on the map and zooms to it. */
+/** Writes a stat value with its small unit label. */
+function setStatValue(el: HTMLElement, value: number, unit: string, decimals: number): void {
+  el.innerHTML = `${value.toFixed(decimals)}<span class="unit">${unit}</span>`;
+}
+
+/** Counts a stat up from zero (easeOutCubic); snaps instantly under reduced motion. */
+function animateStat(el: HTMLElement, target: number, unit: string, decimals: number): void {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    setStatValue(el, target, unit, decimals);
+    return;
+  }
+  const duration = 550;
+  const start = performance.now();
+  const step = (now: number): void => {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    setStatValue(el, target * eased, unit, decimals);
+    if (t < 1) requestAnimationFrame(step);
+    else setStatValue(el, target, unit, decimals);
+  };
+  requestAnimationFrame(step);
+}
+
+/** Steepness → chip colour, mild green through to hard red (Strava-like). */
+function climbGradeColor(pct: number): string {
+  if (pct >= 10) return '#c0392b';
+  if (pct >= 7) return '#e0621a';
+  if (pct >= 4.5) return '#d98a1e';
+  return '#4a9e5b';
+}
+
 function renderClimbsList(): void {
   climbsEl.hidden = state.climbs.length === 0;
   climbsList.innerHTML = '';
@@ -1485,10 +1962,11 @@ function renderClimbsList(): void {
     const button = document.createElement('button');
     button.className = 'climb-item';
     button.innerHTML =
-      `<span class="climb-where">km ${climb.startKm.toFixed(1)}</span>` +
-      `<span>${(climb.lengthM / 1000).toFixed(1)} km at ${climb.avgPct.toFixed(1)}%</span>` +
+      `<span class="climb-grade" style="background:${climbGradeColor(climb.avgPct)}">${climb.avgPct.toFixed(1)}%</span>` +
+      `<span class="climb-info"><span class="climb-where">km ${climb.startKm.toFixed(1)}</span>` +
+      `<span class="climb-len">${(climb.lengthM / 1000).toFixed(1)} km climb</span></span>` +
       `<span class="climb-gain">+${Math.round(climb.gainM)} m</span>`;
-    button.title = `Steepest 100 m: ${climb.maxPct.toFixed(0)}%`;
+    button.title = `Average ${climb.avgPct.toFixed(1)}%, steepest 100 m ${climb.maxPct.toFixed(0)}%`;
     button.addEventListener('click', () => {
       if (state.selectedClimb === index) {
         state.selectedClimb = -1;
@@ -1539,11 +2017,19 @@ async function refreshSavedList(): Promise<void> {
   savedList.innerHTML = '';
   for (const route of routes) {
     const item = document.createElement('li');
+    item.className = 'saved-item';
+
+    const preview = buildRoutePreviewSvg(route.waypoints, route.closed ?? false);
+    preview.classList.add('saved-preview');
 
     const label = document.createElement('button');
     label.className = 'saved-name';
-    label.textContent = `${route.name} · ${(route.distanceMeters / 1000).toFixed(1)} km`;
     label.title = 'Load this route';
+    const bikeLabel =
+      route.bike === 'mtb' ? 'MTB' : route.bike.charAt(0).toUpperCase() + route.bike.slice(1);
+    label.innerHTML =
+      `<span class="saved-title">${escapeHtml(route.name)}</span>` +
+      `<span class="saved-meta">${(route.distanceMeters / 1000).toFixed(1)} km · ${bikeLabel}</span>`;
     label.addEventListener('click', () => void loadSaved(route));
 
     const remove = document.createElement('button');
@@ -1560,12 +2046,14 @@ async function refreshSavedList(): Promise<void> {
       await refreshSavedList();
     });
 
-    item.append(label, remove);
+    item.append(preview, label, remove);
     savedList.append(item);
   }
 }
 
 async function loadSaved(route: SavedRoute): Promise<void> {
+  // Records written by an older version, or a partially-written one, must not
+  // reach maplibre as NaN coordinates.
   const waypoints = sanitizeWaypoints(route.waypoints);
   if (!waypoints) {
     setStatus(`"${route.name}" could not be loaded; its saved points are unreadable.`, true);
@@ -1624,7 +2112,6 @@ async function applySharedRoute(): Promise<void> {
 }
 
 syncProfileUi();
-syncAvoidZoneUi();
 void refreshSavedList();
 renderGradeLegend(gradeLegendEl);
 
@@ -1727,80 +2214,131 @@ function updatePublishButton(): void {
   btnPublish.title = currentUser ? '' : 'Sign in on the Community tab to publish';
 }
 
-// Everything below, up to the end of deleteCommunityRoute(), only runs once
-// the community backend chunk (chart-free, but pulls in @supabase/supabase-js
-// via ./auth and ./community) has loaded — see loadCommunityBackend() and its
-// call site further down. `auth`/`community` are the resolved module
-// namespaces, passed in once, rather than re-imported at each call site.
-function initCommunityFeature(
-  auth: typeof import('./auth'),
-  community: typeof import('./community'),
-): void {
 /** Switches between the Route planner and Community tabs. */
 function setActiveTab(name: 'planner' | 'community'): void {
-  mainTabButtons.forEach((btn) => {
+  [...mainTabButtons, ...bottomTabButtons].forEach((btn) => {
     const active = btn.dataset.tab === name;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-selected', String(active));
   });
   plannerPanel.hidden = name !== 'planner';
   communityPanel.hidden = name !== 'community';
-  brandSub.textContent = name === 'community' ? 'Community' : 'Route planner';
   if (name === 'community') void refreshCommunity();
 }
 
 if (isSupabaseConfigured) {
   mainTabs.hidden = false;
   btnPublish.hidden = false;
+  // Reveals the mobile bottom tab bar and docks the sheet above it (see CSS).
+  document.body.classList.add('has-community');
 
-  mainTabButtons.forEach((btn) => {
+  [...mainTabButtons, ...bottomTabButtons].forEach((btn) => {
     btn.addEventListener('click', () =>
       setActiveTab(btn.dataset.tab === 'community' ? 'community' : 'planner'),
     );
   });
 
-  auth.onAuthChange((user) => {
-    currentUser = user;
-    accountSignedOut.hidden = !!user;
-    accountSignedIn.hidden = !user;
-    authorField.hidden = !user;
-    if (user) {
-      accountName.textContent = user.email ?? 'you';
-      // Prefill the display name from last time, else the email's local part.
-      if (!authorNameInput.value) {
-        authorNameInput.value =
-          localStorage.getItem(AUTHOR_KEY) ?? user.email?.split('@')[0] ?? '';
+  void loadBackend().then(({ auth, community }) => {
+    auth.onAuthChange((user) => {
+      currentUser = user;
+      accountSignedOut.hidden = !!user;
+      accountSignedIn.hidden = !user;
+      authorField.hidden = !user;
+      if (user) {
+        accountName.textContent = user.email ?? 'you';
+        // Prefill the display name from last time, else the email's local part.
+        if (!authorNameInput.value) {
+          authorNameInput.value =
+            localStorage.getItem(AUTHOR_KEY) ?? user.email?.split('@')[0] ?? '';
+        }
+        // Clean up this owner's routes whose grace period has passed.
+        void community.purgeExpiredRoutes();
       }
-      // Clean up this owner's routes whose grace period has passed.
-      void community.purgeExpiredRoutes();
-    }
-    updatePublishButton();
-    void refreshCommunity();
+      updatePublishButton();
+      void refreshCommunity();
+    });
   });
 
   authorNameInput.addEventListener('input', () => {
-    localStorage.setItem(AUTHOR_KEY, authorNameInput.value.trim());
+    try {
+      localStorage.setItem(AUTHOR_KEY, authorNameInput.value.trim());
+    } catch {
+      // Blocked storage just means the name is not remembered next visit.
+    }
   });
+
+  // Email code (OTP) sign-in. A typed code rather than a magic link so it works
+  // inside an installed PWA, where a link would open Safari (see auth.ts).
+  let pendingEmail = '';
+
+  function showCodeEntry(email: string): void {
+    pendingEmail = email;
+    emailRow.hidden = true;
+    codeRow.hidden = false;
+    btnSigninBack.hidden = false;
+    signinHint.textContent = `Enter the code we emailed to ${email}.`;
+    accountCode.value = '';
+    accountCode.focus();
+  }
+
+  function resetSignInForm(): void {
+    pendingEmail = '';
+    codeRow.hidden = true;
+    emailRow.hidden = false;
+    btnSigninBack.hidden = true;
+    signinHint.textContent = DEFAULT_SIGNIN_HINT;
+  }
 
   btnSignin.addEventListener('click', async () => {
     const email = accountEmail.value.trim();
     if (!email) {
-      setStatus('Enter your email to get a sign-in link.', true);
+      setStatus('Enter your email to get a sign-in code.', true);
       return;
     }
     btnSignin.disabled = true;
     try {
-      await auth.sendMagicLink(email);
-      setStatus(`Sign-in link sent to ${email}. Open it on this device to finish.`);
+      await (await loadBackend()).auth.sendEmailCode(email);
+      showCodeEntry(email);
+      setStatus(`Code sent to ${email}. Enter it here to finish.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not send the sign-in link.', true);
+      setStatus(error instanceof Error ? error.message : 'Could not send the sign-in code.', true);
     } finally {
       btnSignin.disabled = false;
     }
   });
 
+  async function submitCode(): Promise<void> {
+    // Supabase's OTP length is a per-project setting, not always 6, so accept
+    // any plausible numeric code rather than assuming a fixed length.
+    const token = accountCode.value.trim();
+    if (!/^\d{4,12}$/.test(token)) {
+      setStatus('Enter the code from the email.', true);
+      return;
+    }
+    btnVerify.disabled = true;
+    try {
+      await (await loadBackend()).auth.verifyEmailCode(pendingEmail, token);
+      // onAuthChange swaps to the signed-in UI; tidy the form for next time.
+      resetSignInForm();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'That code was not valid. Try again.', true);
+    } finally {
+      btnVerify.disabled = false;
+    }
+  }
+
+  btnVerify.addEventListener('click', () => void submitCode());
+  accountCode.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') void submitCode();
+  });
+  accountEmail.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') btnSignin.click();
+  });
+  btnSigninBack.addEventListener('click', resetSignInForm);
+
   btnSignout.addEventListener('click', async () => {
-    await auth.signOut();
+    await (await loadBackend()).auth.signOut();
+    resetSignInForm();
     setStatus('Signed out.');
   });
 
@@ -1812,7 +2350,7 @@ if (isSupabaseConfigured) {
     setStatus('Publishing…');
     setBusy(true);
     try {
-      await community.publishRoute({
+      await (await loadBackend()).community.publishRoute({
         name,
         authorName: authorNameInput.value.trim() || null,
         waypoints: state.waypoints.map((wp) => [...wp] as LngLat),
@@ -1822,9 +2360,11 @@ if (isSupabaseConfigured) {
         distanceMeters: state.route.distanceMeters,
         ascendMeters: state.route.ascendMeters,
         source: state.importedFileText ? 'imported' : 'planned',
+        geometry: simplifyForHeatmap(state.route.coordinates),
         originalFileText: state.importedFileText,
         originalFileFormat: state.importedFileFormat,
       });
+      heatmapStale = true; // a new route should appear next time the heatmap opens
       setStatus(`Published "${name}" to the community library.`);
       await refreshCommunity();
     } catch (error) {
@@ -1863,17 +2403,13 @@ if (isSupabaseConfigured) {
     });
   });
 
-  initDualRange({
-    min: communityDistMin,
-    max: communityDistMax,
-    label: communityDistValue,
-    track: communityDistTrack,
-    format: (min, max) =>
-      min === 0 && max >= DIST_MAX
-        ? 'Any length'
-        : `${min} – ${max >= DIST_MAX ? `${DIST_MAX}+` : max} km`,
-    onInput: () => renderCommunityList(filteredCommunityRoutes(), communityRatings),
-  });
+  const onDistInput = (moved: 'min' | 'max') => () => {
+    syncCommunityDistSlider(moved);
+    renderCommunityList(filteredCommunityRoutes(), communityRatings);
+  };
+  communityDistMin.addEventListener('input', onDistInput('min'));
+  communityDistMax.addEventListener('input', onDistInput('max'));
+  syncCommunityDistSlider('min');
 }
 
 /** Resolves to the user's location, requesting a GPS fix once if needed. */
@@ -1900,11 +2436,50 @@ function ensureLocation(): Promise<[number, number] | null> {
   });
 }
 
+/** Keeps the two distance thumbs apart and paints the label and track fill. */
+function syncCommunityDistSlider(moved: 'min' | 'max'): void {
+  const step = Number(communityDistMin.step) || 5;
+  let min = Number(communityDistMin.value);
+  let max = Number(communityDistMax.value);
+  if (min > max - step) {
+    if (moved === 'min') {
+      min = max - step;
+      communityDistMin.value = String(min);
+    } else {
+      max = min + step;
+      communityDistMax.value = String(max);
+    }
+  }
+  const maxLabel = max >= DIST_MAX ? `${DIST_MAX}+` : String(max);
+  communityDistValue.textContent =
+    min === 0 && max >= DIST_MAX ? 'Any length' : `${min} – ${maxLabel} km`;
+  const lo = Number(communityDistMin.min);
+  const hi = Number(communityDistMin.max);
+  const fromPct = ((min - lo) / (hi - lo)) * 100;
+  const toPct = ((max - lo) / (hi - lo)) * 100;
+  communityDistTrack.style.background =
+    `linear-gradient(to right, var(--color-border) ${fromPct}%, ` +
+    `var(--color-accent) ${fromPct}%, var(--color-accent) ${toPct}%, ` +
+    `var(--color-border) ${toPct}%)`;
+}
+
+/** Marks one button active within a segmented group, clearing the rest. */
+function setActiveInGroup(buttons: HTMLButtonElement[], active: HTMLButtonElement): void {
+  buttons.forEach((b) => {
+    const on = b === active;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+
 async function refreshCommunity(): Promise<void> {
   if (!isSupabaseConfigured) return;
+  // Show skeletons on the first load (empty list) so the panel doesn't flash blank.
+  if (communityList.childElementCount === 0) renderCommunitySkeletons();
   try {
     // 'near' has no server ordering; fetch newest and sort by distance client-side.
     const serverSort: CommunitySort = communitySort === 'near' ? 'newest' : communitySort;
+    const { community } = await loadBackend();
     const [routes, myRatings] = await Promise.all([
       community.fetchCommunityRoutes(serverSort),
       community.fetchMyRatings(),
@@ -1915,6 +2490,23 @@ async function refreshCommunity(): Promise<void> {
   } catch (error) {
     // Non-fatal: the planner keeps working even if the library can't load.
     console.warn('Could not load community routes:', error);
+  }
+}
+
+/** Placeholder shimmer rows shown while the community library loads. */
+function renderCommunitySkeletons(count = 3): void {
+  communityList.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const li = document.createElement('li');
+    li.className = 'community-item skeleton';
+    li.innerHTML =
+      '<div class="sk sk-thumb"></div>' +
+      '<div class="community-body">' +
+      '<div class="sk sk-line sk-line-lg"></div>' +
+      '<div class="sk sk-line"></div>' +
+      '<div class="sk sk-line sk-line-sm"></div>' +
+      '</div>';
+    communityList.append(li);
   }
 }
 
@@ -1941,8 +2533,10 @@ function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, nu
     name.textContent = route.name;
     const meta = document.createElement('span');
     meta.className = 'community-meta';
+    const bikeLabel =
+      route.bike === 'mtb' ? 'MTB' : route.bike.charAt(0).toUpperCase() + route.bike.slice(1);
     meta.textContent =
-      `${(route.distanceMeters / 1000).toFixed(1)} km · +${Math.round(route.ascendMeters)} m · ${route.bike}`;
+      `${(route.distanceMeters / 1000).toFixed(1)} km · +${Math.round(route.ascendMeters)} m · ${bikeLabel}`;
     const author = document.createElement('span');
     author.className = 'community-author';
     const authorName = route.authorName?.trim() || 'Anonymous';
@@ -1977,7 +2571,9 @@ function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, nu
     load.addEventListener('click', () => void loadCommunityRoute(route));
     actions.append(load);
     if (route.gpxPath) {
-      const url = community.fileDownloadUrl(route.gpxPath);
+      // Safe to read synchronously: the list only renders after the routes
+      // were fetched through this same module.
+      const url = backend?.community.fileDownloadUrl(route.gpxPath) ?? null;
       if (url) {
         // Rows published before file_format existed are all GPX (the only
         // format the app produced back then).
@@ -2056,7 +2652,7 @@ function buildStars(route: CommunityRoute, myStars: number): HTMLElement {
       button.setAttribute('aria-label', `Rate ${n} star${n > 1 ? 's' : ''}`);
       button.addEventListener('click', async () => {
         try {
-          await community.rateRoute(route.id, n);
+          await (await loadBackend()).community.rateRoute(route.id, n);
           setStatus(`Rated "${route.name}" ${n} star${n > 1 ? 's' : ''}.`);
           await refreshCommunity();
         } catch (error) {
@@ -2089,6 +2685,7 @@ async function loadCommunityRoute(route: CommunityRoute): Promise<void> {
 
 /** Soft-deletes the owner's own community route after a confirmation. */
 async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
+  const { community } = await loadBackend();
   const confirmed = window.confirm(
     `Delete "${route.name}" from the community? It disappears from the library right away, ` +
       `and is kept recoverable for ${community.GRACE_DAYS} days before it is removed for good.`,
@@ -2102,31 +2699,146 @@ async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
     setStatus(error instanceof Error ? error.message : 'Could not delete this route.', true);
   }
 }
-} // end initCommunityFeature
-
-// Load the community backend (chart-free, but pulls in the heavy
-// @supabase/supabase-js via ./auth and ./community) off the critical path:
-// kicked off during idle time rather than gated behind the user actually
-// opening the Community tab, so it's typically ready by the time they do,
-// without delaying first paint/interactivity of the map and planner.
-// isSupabaseConfigured itself needs no heavy import (see supabaseConfig.ts),
-// so this only ever runs when the backend is actually configured. One
-// consequence: the Community tab and Publish button (revealed inside
-// initCommunityFeature) pop in a beat after first paint rather than being
-// present immediately.
-if (isSupabaseConfigured) {
-  const runWhenIdle: (cb: () => void) => void =
-    window.requestIdleCallback ?? ((cb) => window.setTimeout(cb, 2000));
-  runWhenIdle(() => {
-    void Promise.all([import('./auth'), import('./community')]).then(([auth, community]) =>
-      initCommunityFeature(auth, community),
-    );
-  });
-}
 
 // --- Mobile bottom sheet ---
-initBottomSheet();
+// On phones the panel is a draggable sheet over a full-screen map. Dragging
+// the handle snaps it between peek / half / full; tapping the handle cycles up.
+(() => {
+  const sheet = document.querySelector<HTMLElement>('#sidebar');
+  const handle = document.querySelector<HTMLElement>('#sheet-handle');
+  if (!sheet || !handle) return;
+  const sheetEl = sheet;
+  const handleEl = handle;
+  const fab = document.querySelector<HTMLElement>('#gps-fab');
+  const locateEl = document.querySelector<HTMLButtonElement>('#btn-locate');
+  const distEl = document.querySelector<HTMLElement>('#stat-distance');
 
+  const isMobile = () => window.matchMedia('(max-width: 700px)').matches;
+  // Default to half (not peek): search/generate and the community list should
+  // be visible without dragging first, and the map shouldn't dominate the
+  // screen on load.
+  let snap = 1; // 0 = peek, 1 = half, 2 = full
+
+  // Offsets in px to translate the sheet down by, per snap level.
+  // Peek shows the handle + top of the panel; half ~48% of the viewport;
+  // full is the whole 92vh sheet.
+  function offsets(): number[] {
+    const h = sheetEl.offsetHeight;
+    const peekVisible = 112;
+    return [Math.max(0, h - peekVisible), Math.round(h * 0.48), 0];
+  }
+
+  function currentY(): number {
+    const m = /translateY\(([-\d.]+)px\)/.exec(sheetEl.style.transform);
+    return m ? parseFloat(m[1]) : offsets()[snap];
+  }
+
+  function apply(index: number, animate = true): void {
+    snap = Math.max(0, Math.min(2, index));
+    sheetEl.style.transition = animate ? '' : 'none';
+    sheetEl.style.transform = `translateY(${offsets()[snap]}px)`;
+    handleEl.setAttribute('aria-expanded', String(snap > 0));
+  }
+
+  // Clear inline styles on desktop so the sheet transform never leaks there.
+  function reset(): void {
+    if (isMobile()) {
+      apply(snap, false);
+    } else {
+      sheetEl.style.transform = '';
+      sheetEl.style.transition = '';
+    }
+  }
+
+  let dragging = false;
+  let startY = 0;
+  let startOffset = 0;
+
+  handleEl.addEventListener('pointerdown', (e) => {
+    if (!isMobile()) return;
+    dragging = true;
+    startY = e.clientY;
+    startOffset = currentY();
+    sheetEl.style.transition = 'none';
+    handleEl.setPointerCapture(e.pointerId);
+  });
+  handleEl.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const h = sheetEl.offsetHeight;
+    const y = Math.min(Math.max(0, startOffset + (e.clientY - startY)), h - 80);
+    sheetEl.style.transform = `translateY(${y}px)`;
+  });
+  const endDrag = (): void => {
+    if (!dragging) return;
+    dragging = false;
+    sheetEl.style.transition = '';
+    const y = currentY();
+    // A tap (barely moved) cycles peek -> half -> full -> peek.
+    if (Math.abs(y - startOffset) < 6) {
+      apply(snap >= 2 ? 0 : snap + 1);
+      return;
+    }
+    const offs = offsets();
+    let best = 0;
+    let bestDist = Infinity;
+    offs.forEach((o, i) => {
+      const d = Math.abs(o - y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    apply(best);
+  };
+  handleEl.addEventListener('pointerup', endDrag);
+  handleEl.addEventListener('pointercancel', endDrag);
+
+  // Keyboard: Enter/Space cycles up, arrows step between snap levels.
+  handleEl.addEventListener('keydown', (e) => {
+    if (!isMobile()) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      apply(snap >= 2 ? 0 : snap + 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      apply(snap + 1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      apply(snap - 1);
+    }
+  });
+
+  // Raise to half the first time a route appears so the stats come into view.
+  if (distEl) {
+    const observer = new MutationObserver(() => {
+      const text = distEl.textContent ?? '';
+      if (isMobile() && snap === 0 && text && text !== '–') apply(1);
+    });
+    observer.observe(distEl, { childList: true, characterData: true, subtree: true });
+  }
+
+  if (fab && locateEl) {
+    fab.addEventListener('click', () => locateEl.click());
+  }
+
+  window.addEventListener('resize', reset);
+
+  // When the PWA comes back to the foreground (or is restored from the page
+  // cache), iOS can leave the web view scrolled with the sheet transform stale
+  // — the map ends up unreachable. Reset any errant page scroll and re-assert
+  // the sheet's snap position.
+  const restore = (): void => {
+    if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+    reset();
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') restore();
+  });
+  window.addEventListener('pageshow', restore);
+
+  reset();
+})();
 
 // Dev-only handle for verification in the browser console; stripped from
 // the production build by the `import.meta.env.DEV` guard.

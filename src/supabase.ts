@@ -14,6 +14,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from './supabaseConfig';
 
+// The publicly-safe fallback values live in supabaseConfig.ts, so the eager
+// check in main.ts and the client here read the same values from one place.
 export { isSupabaseConfigured };
 
 // A single shared client, or null when the env vars are absent (e.g. a build

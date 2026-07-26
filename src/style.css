@@ -1,75 +1,173 @@
+/* =============================================================================
+   Lightmile — visual layer
+   Calm, map-first, premium. Sections:
+     1. Tokens          design variables + light/dark themes
+     2. Base            reset, typography, motion, focus, scrollbars
+     3. Layout          app, map, panel, sheet, brand, tabs, groups
+     4. Components       buttons, toolbar, segmented, fields, metrics, rows…
+     5. States          hover/active/disabled/error, hidden
+     6. Map overlays    markers, floating controls
+     7. Community
+     8. Mobile          bottom sheet (<= 700px)
+   ============================================================================ */
+
+/* =============================================================================
+   1. TOKENS
+   ============================================================================ */
 :root {
   /* Surfaces */
-  --color-bg: #f6f3ec;
-  --color-panel: #fffdf7;
-  --color-surface: #efece3;
-  --color-hover: #e8e3d6;
+  --color-bg: #f5f5f7; /* page + map backdrop */
+  --color-panel: rgba(255, 255, 255, 0.98); /* floating panel / sheet */
+  --color-raised: #ffffff; /* raised surface (selected segment, thumbnails) */
+  --color-surface: #f0f0f3; /* secondary surface (fields, quiet rows) */
+  --color-hover: #e7e7ec; /* hover on a quiet surface */
+
   /* Text */
-  --color-text: #181820;
-  --color-muted: #6f6c62;
+  --color-text: #1d1d1f;
+  --color-muted: #6e6e73;
+  --color-faint: #8e8e93;
+
   /* Lines */
-  --color-border: #e4dfd3;
-  --color-line-soft: #efebe1;
-  /* Accent (brand blue). `-fg` is the readable variant for text on the page. */
-  --color-accent: #2424e8;
-  --color-accent-fg: #2424e8;
-  --color-accent-tint: #eceafe;
-  /* Semantic */
-  --color-climb: #e8571a;
+  --color-border: rgba(0, 0, 0, 0.07);
+  --color-border-strong: rgba(0, 0, 0, 0.12);
+  --color-track: rgba(0, 0, 0, 0.14);
+
+  /* Accent — electric cobalt, used with depth via tints. */
+  --color-accent: #2f5bff;
+  --color-accent-hi: #4d74ff; /* lifted for hover */
+  --color-accent-fg: #1f49e0; /* readable-on-page text accent */
+  --color-accent-tint: rgba(47, 91, 255, 0.09);
+  --color-accent-tint-strong: rgba(47, 91, 255, 0.15);
+  --color-on-accent: #ffffff;
+  --shadow-accent: 0 1px 2px rgba(33, 72, 236, 0.26),
+    0 6px 18px rgba(33, 72, 236, 0.26);
+
+  /* The "Lightmile" wordmark keeps its original brand blue in both themes —
+     integral to the logo. Used by #brand h1, independent of the UI accent. */
+  --brand-mark: #2424e8;
+
+  /* Semantic (map + summary): climbs, cafés, water. */
+  --color-climb: #c2571a;
   --color-cafe: #8a5a2b;
   --color-water: #1f8fbf;
-  /* Shape */
-  --radius: 12px;
-  --radius-sm: 9px;
-  --shadow-sm: 0 3px 12px rgba(24, 24, 50, 0.1);
-  --shadow: 0 8px 30px rgba(24, 24, 50, 0.13), 0 2px 8px rgba(24, 24, 50, 0.07);
 
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Shape — 8px spacing system, 10–14px control radii, 20px panel. */
+  --radius-panel: 20px;
+  --radius-lg: 14px;
+  --radius: 12px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+
+  /* Elevation — layered, neutral. Reserved for the floating panel + controls. */
+  --shadow-panel: 0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    0 2px 6px rgba(0, 0, 0, 0.06), 0 12px 28px rgba(0, 0, 0, 0.1),
+    0 28px 56px rgba(0, 0, 0, 0.08);
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.08), 0 6px 20px rgba(0, 0, 0, 0.16);
+  --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.1);
+
+  /* Shading — subtle gradients, top highlights and recesses give depth. */
+  --panel-grad: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.99),
+    rgba(248, 248, 251, 0.96)
+  );
+  --grad-raised: linear-gradient(180deg, #ffffff, #f1f1f5);
+  --grad-surface: linear-gradient(180deg, #f7f7f9, #eaeaee);
+  --grad-primary: linear-gradient(180deg, #4570ff, #2148ec);
+  --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.07);
+  --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
+    Roboto, Helvetica, Arial, sans-serif;
   color-scheme: light dark;
 }
 
-/* Dark mode follows the OS unless the page is explicitly forced to light. */
+/* Dark mode: neutral charcoal, never tinted. Follows the OS unless forced. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --color-bg: #0f0f18;
-    --color-panel: #1a1a25;
-    --color-surface: #20202c;
-    --color-hover: #262633;
-    --color-text: #f1eee6;
-    --color-muted: #9c988c;
-    --color-border: #2b2b39;
-    --color-line-soft: #232330;
-    --color-accent: #2424e8;
-    --color-accent-fg: #a9a9ff;
-    --color-accent-tint: #23233b;
-    --color-climb: #ff7a44;
+    --color-bg: #101012;
+    --color-panel: rgba(30, 30, 33, 0.97);
+    --color-raised: #3a3a3e;
+    --color-surface: #2a2a2e;
+    --color-hover: #36363b;
+    --color-text: #f5f5f7;
+    --color-muted: #9d9da3;
+    --color-faint: #8a8a90;
+    --color-border: rgba(255, 255, 255, 0.1);
+    --color-border-strong: rgba(255, 255, 255, 0.18);
+    --color-track: rgba(255, 255, 255, 0.22);
+    --color-accent: #3f68ff;
+    --color-accent-hi: #5a7dff;
+    --color-accent-fg: #8fa8ff;
+    --color-accent-tint: rgba(143, 168, 255, 0.13);
+    --color-accent-tint-strong: rgba(143, 168, 255, 0.22);
+    --color-on-accent: #ffffff;
+    --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.45);
+    --color-climb: #e8823f;
     --color-cafe: #c39058;
-    --color-water: #4cc2ee;
-    --shadow-sm: 0 3px 12px rgba(0, 0, 0, 0.45);
-    --shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --color-water: #57c1e8;
+    --shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.06),
+      0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.6);
+    --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);
+    --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --panel-grad: linear-gradient(
+      180deg,
+      rgba(38, 38, 42, 0.98),
+      rgba(24, 24, 27, 0.97)
+    );
+    --grad-raised: linear-gradient(180deg, #434349, #373739);
+    --grad-surface: linear-gradient(180deg, #313137, #262629);
+    --grad-primary: linear-gradient(180deg, #4d74ff, #2f5bff);
+    --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.35);
   }
 }
 
 /* Manual override wins over the media query in both directions. */
 :root[data-theme='dark'] {
-  --color-bg: #0f0f18;
-  --color-panel: #1a1a25;
-  --color-surface: #20202c;
-  --color-hover: #262633;
-  --color-text: #f1eee6;
-  --color-muted: #9c988c;
-  --color-border: #2b2b39;
-  --color-line-soft: #232330;
-  --color-accent: #2424e8;
-  --color-accent-fg: #a9a9ff;
-  --color-accent-tint: #23233b;
-  --color-climb: #ff7a44;
+  --color-bg: #101012;
+  --color-panel: rgba(30, 30, 33, 0.97);
+  --color-raised: #3a3a3e;
+  --color-surface: #2a2a2e;
+  --color-hover: #36363b;
+  --color-text: #f5f5f7;
+  --color-muted: #9d9da3;
+  --color-faint: #8a8a90;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-track: rgba(255, 255, 255, 0.22);
+  --color-accent: #3f68ff;
+  --color-accent-hi: #5a7dff;
+  --color-accent-fg: #8fa8ff;
+  --color-accent-tint: rgba(143, 168, 255, 0.13);
+  --color-accent-tint-strong: rgba(143, 168, 255, 0.22);
+  --color-on-accent: #ffffff;
+  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.45);
+  --color-climb: #e8823f;
   --color-cafe: #c39058;
-  --color-water: #4cc2ee;
-  --shadow-sm: 0 3px 12px rgba(0, 0, 0, 0.45);
-  --shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --color-water: #57c1e8;
+  --shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --panel-grad: linear-gradient(
+    180deg,
+    rgba(38, 38, 42, 0.98),
+    rgba(24, 24, 27, 0.97)
+  );
+  --grad-raised: linear-gradient(180deg, #434349, #373739);
+  --grad-surface: linear-gradient(180deg, #313137, #262629);
+  --grad-primary: linear-gradient(180deg, #4d74ff, #2f5bff);
+  --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
+/* =============================================================================
+   2. BASE
+   ============================================================================ */
 * {
   box-sizing: border-box;
 }
@@ -85,150 +183,37 @@ body,
 #app {
   margin: 0;
   height: 100%;
-}
-
-#app {
-  position: relative;
+  /* Only the panel/sheet scrolls; the page itself never does. Without this,
+     iOS standalone PWAs rubber-band the whole web view and can get stuck
+     scrolled (map pushed out of view) after backgrounding the app. */
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
-#map {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-/* Desktop: the panel floats over a full-bleed map. */
-#sidebar {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  bottom: 1rem;
-  width: 330px;
-  max-height: calc(100% - 2rem);
-  padding: 0;
-  background: var(--color-panel);
+body {
   color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow-y: auto;
-  z-index: 2;
-}
-
-/* Grouped sections inside the panel. */
-.group {
-  padding: 0.85rem 1.15rem;
-  border-top: 1px solid var(--color-line-soft);
-}
-
-.group-label {
-  display: block;
-  margin: 0 0 0.55rem;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-muted);
-  font-weight: 700;
-}
-
-/* Collapsible "Options"/"Sort & filter" header: a button styled like the
-   group-label it replaces, plus a chevron that flips via [aria-expanded]. */
-.disclosure-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  margin: 0 0 0.55rem;
-  padding: 0;
-  background: none;
-  border: none;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.disclosure-toggle .group-label {
-  margin: 0;
-}
-
-.disclosure-toggle:hover .group-label {
-  color: var(--color-text);
-}
-
-.disclosure-chevron {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  margin-left: 0.5rem;
-  border-right: 2px solid var(--color-muted);
-  border-bottom: 2px solid var(--color-muted);
-  transform: rotate(45deg);
-  transition: transform 0.15s ease;
-}
-
-.disclosure-toggle[aria-expanded='true'] .disclosure-chevron {
-  transform: rotate(225deg);
-}
-
-/* Map style switcher, floating bottom-left of the map beside the panel. */
-.mapstyle {
-  position: absolute;
-  left: calc(330px + 2rem);
-  bottom: 1rem;
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  max-width: 360px;
-  gap: 2px;
-  padding: 3px;
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-sm);
-}
-
-.mapstyle button {
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.32rem 0.62rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.mapstyle button:hover:not(.active) {
-  background: var(--color-hover);
-}
-
-.mapstyle button.active {
-  background: var(--color-accent);
-  color: #fff;
-}
-
-/* The drag handle and GPS FAB only exist on the mobile bottom sheet. */
-#sheet-handle {
-  display: none;
-}
-
-.gps-fab {
-  display: none;
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* Interactive elements share one transition and one focus ring. */
 button,
 input,
 select {
-  transition: border-color 0.15s ease, background-color 0.15s ease,
-    color 0.15s ease, box-shadow 0.15s ease;
+  font-family: inherit;
+  transition: border-color 0.18s ease, background-color 0.18s ease,
+    color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease,
+    opacity 0.18s ease, filter 0.18s ease;
 }
 
 :where(button, input, select, a):focus-visible {
   outline: 2px solid var(--color-accent-fg);
   outline-offset: 2px;
+}
+
+::placeholder {
+  color: var(--color-faint);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -238,54 +223,231 @@ select {
   }
 }
 
+/* Thin, quiet scrollbars — a small but load-bearing polish detail. */
+#sidebar,
+#cafes-list,
+#water-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-track) transparent;
+}
+
+#sidebar::-webkit-scrollbar,
+#cafes-list::-webkit-scrollbar,
+#water-list::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+#sidebar::-webkit-scrollbar-thumb,
+#cafes-list::-webkit-scrollbar-thumb,
+#water-list::-webkit-scrollbar-thumb {
+  background: var(--color-track);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+#sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* =============================================================================
+   3. LAYOUT
+   ============================================================================ */
+#app {
+  position: relative;
+  overflow: hidden;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--color-bg);
+}
+
+/* Desktop: one floating panel over a full-bleed map. It is the primary
+   container; groups inside are separated by hairlines, not nested cards. */
+#sidebar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  bottom: 12px;
+  width: 380px;
+  max-height: calc(100% - 24px);
+  padding: 0;
+  background: var(--panel-grad);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  color: var(--color-text);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 2;
+}
+
+#sheet-body {
+  padding-bottom: 0.5rem;
+}
+
+/* Grouped sections: generous padding, a hairline divider between them. */
+.group {
+  padding: 1.15rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.tab-panel > .group:first-child {
+  border-top: none;
+}
+
+.group-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--color-text);
+}
+
+/* Collapsible headers ("Route preferences", "Sort & filter"). */
+.disclosure-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.disclosure-toggle .group-label {
+  margin: 0;
+}
+
+.disclosure-toggle:hover .group-label {
+  color: var(--color-accent-fg);
+}
+
+.disclosure-chevron {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-left: 0.5rem;
+  border-right: 2px solid var(--color-faint);
+  border-bottom: 2px solid var(--color-faint);
+  transform: rotate(45deg);
+  transition: transform 0.22s ease;
+}
+
+.disclosure-toggle[aria-expanded='true'] .disclosure-chevron {
+  transform: rotate(225deg);
+}
+
+/* --- Brand ---------------------------------------------------------------- */
+/* The wordmark keeps its established look (see --brand-mark). Only its
+   surrounding spacing and the sub-label typography are adjusted. */
 #brand {
-  margin-bottom: 0.15rem;
-  padding: 1.05rem 1.15rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.brand-mark {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+/* Light/dark toggle, top-right of the panel header. */
+.theme-toggle {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.theme-toggle .ico.sun {
+  display: none;
+}
+
+.theme-toggle.is-dark .ico.moon {
+  display: none;
+}
+
+.theme-toggle.is-dark .ico.sun {
+  display: inline-flex;
 }
 
 #brand h1 {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: 1.6rem;
   font-weight: 900;
   font-style: italic;
   text-transform: uppercase;
   letter-spacing: -0.03em;
   line-height: 1;
-  color: var(--color-accent-fg);
+  color: var(--brand-mark);
 }
 
 .brand-sub {
-  display: block;
-  text-align: right;
-  margin-top: 0.15rem;
-  font-size: 0.8rem;
-  font-weight: 800;
-  font-style: italic;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--color-accent-fg);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-faint);
 }
 
-/* Top-level tabs: Route planner vs. Community. Underline style so they read as
-   section navigation, distinct from the pill-shaped .segmented filters. */
+/* --- Top-level tabs ------------------------------------------------------- */
 .main-tabs {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.4rem 1.15rem 0;
+  gap: 1.5rem;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .main-tab {
-  flex: 1;
-  padding: 0.55rem 0.5rem;
+  padding: 0.65rem 0;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  font-family: inherit;
-  font-size: 0.9rem;
-  font-weight: 800;
-  font-style: italic;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  margin-bottom: -1px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--color-muted);
   cursor: pointer;
 }
@@ -295,96 +457,486 @@ select {
 }
 
 .main-tab.active {
-  color: var(--color-accent-fg);
+  color: var(--color-text);
   border-bottom-color: var(--color-accent-fg);
 }
 
 .hint {
   color: var(--color-muted);
-  font-size: 0.85rem;
-  line-height: 1.4;
-  padding: 0 1.15rem;
-  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0 1.25rem;
+  margin: 0 0 0.6rem;
 }
 
+/* Inline text button (e.g. "Use a different email") that reads as a link. */
+.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.linklike:hover {
+  opacity: 0.8;
+}
+
+/* =============================================================================
+   4. COMPONENTS
+   ============================================================================ */
+
+/* Icons living inside labelled buttons. */
+.btn-ico {
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+
+/* --- Secondary buttons (default surface) --------------------------------- */
+.save-actions button,
+.save-row button,
+.find-btn,
+#btn-locate,
+#account-signed-in button,
+.community-load {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.9375rem;
+  font-weight: 550;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--grad-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-tile), var(--edge-hi);
+  cursor: pointer;
+}
+
+.save-actions button:hover:not(:disabled),
+.save-row button:hover:not(:disabled),
+.find-btn:hover:not(:disabled),
+#btn-locate:hover:not(:disabled),
+#account-signed-in button:hover,
+.community-load:hover {
+  background: var(--color-hover);
+  border-color: var(--color-border-strong);
+}
+
+.save-actions button:disabled,
+.save-row button:disabled,
+.find-btn:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+  cursor: default;
+}
+
+/* --- Primary: accent fill, white text, real elevation (no glow) ---------- */
+button.generate,
+button.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 46px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--grad-primary);
+  color: var(--color-on-accent);
+  font-weight: 600;
+  box-shadow: var(--shadow-accent), var(--edge-hi);
+  cursor: pointer;
+}
+
+button.generate .btn-ico,
+button.primary .btn-ico {
+  opacity: 0.95;
+}
+
+button.generate:hover:not(:disabled),
+button.primary:hover:not(:disabled) {
+  background: var(--color-accent-hi);
+}
+
+button.generate {
+  width: 100%;
+  margin: 0.6rem 0 0;
+  padding: 0.8rem;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+}
+
+button.generate:disabled,
+button.primary:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+  cursor: default;
+}
+
+/* Loading state on the generate button: swap the icon for a spinner. */
+button.generate.is-loading {
+  opacity: 1;
+}
+
+button.generate.is-loading .btn-ico {
+  display: none;
+}
+
+button.generate.is-loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Edit toolbar (undo / clear / reverse) ------------------------------- */
+/* Compact icon buttons with micro-captions — reads as an app editing bar,
+   not a stack of form buttons. */
+#controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.icon-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  min-height: 62px;
+  padding: 0.5rem 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--grad-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-tile), var(--edge-hi);
+  font-size: 0.75rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.icon-btn svg {
+  color: var(--color-muted);
+  transition: color 0.18s ease;
+}
+
+.icon-btn span {
+  line-height: 1;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--color-hover);
+  border-color: var(--color-border-strong);
+}
+
+.icon-btn:hover:not(:disabled) svg {
+  color: var(--color-accent-fg);
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* --- Segmented control: quiet track, raised selection -------------------- */
 .segmented {
   display: flex;
-  gap: 0;
-  margin: 0.75rem 0 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  gap: 2px;
+  margin: 0.5rem 0;
+  padding: 3px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: var(--inset-field);
   overflow: hidden;
 }
 
 .segmented button {
   flex: 1;
-  padding: 0.5rem 0;
-  font-size: 0.85rem;
+  min-height: 36px;
+  padding: 0.45rem 0;
+  font-size: 0.875rem;
+  font-weight: 550;
   border: none;
-  background: var(--color-surface);
-  color: var(--color-text);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-muted);
   cursor: pointer;
 }
 
 .segmented button + button {
-  border-left: 1px solid var(--color-border);
+  border-left: none;
 }
 
 .segmented button:hover:not(.active) {
-  background: var(--color-hover);
-}
-
-.segmented button.active {
-  background: var(--color-accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-/* Shared micro-label typography: uppercase, bold, muted but readable.
-   Used by field labels, stat labels, section labels and group labels. */
-.field {
-  display: block;
-  margin: 0.5rem 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--color-muted);
-}
-
-#hills-type {
-  margin-top: 0.3rem;
-}
-
-.field select,
-.field input {
-  display: block;
-  width: 100%;
-  margin-top: 0.3rem;
-  padding: 0.45rem 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 400;
-  letter-spacing: normal;
-  text-transform: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
   color: var(--color-text);
 }
 
+.segmented button.active {
+  background: var(--grad-raised);
+  color: var(--color-text);
+  font-weight: 650;
+  box-shadow: var(--shadow-tile), var(--edge-hi);
+}
+
+#hills-type {
+  margin-top: 0.4rem;
+}
+
+/* Always-visible route preferences (no longer collapsed) — keep them tight. */
+.pref-grid > .field:first-child {
+  margin-top: 0.15rem;
+}
+
+/* --- Fields + inputs ------------------------------------------------------ */
+.field {
+  display: block;
+  margin: 0.85rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 550;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-muted);
+}
+
+.field select,
+.field input,
+.save-row input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 450;
+  letter-spacing: normal;
+  text-transform: none;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--inset-field);
+}
+
+.field select:focus,
+.field input:focus,
+.save-row input:focus {
+  border-color: var(--color-accent-fg);
+  outline: none;
+  box-shadow: 0 0 0 3.5px var(--color-accent-tint);
+}
+
+.save-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.save-row input {
+  flex: 1;
+  margin-top: 0;
+}
+
+#search-box {
+  margin: 0;
+}
+
+#search-input {
+  padding-left: 2.4rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.2-4.2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.75rem center;
+  background-size: 16px;
+}
+
+#btn-locate {
+  flex: 0 0 auto;
+  width: 44px;
+  padding: 0;
+  color: var(--color-text);
+}
+
+#search-results {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-raised);
+  box-shadow: var(--shadow-raise);
+  overflow: hidden;
+}
+
+.search-result {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 0.1rem;
+  padding: 0.55rem 0.6rem;
+  font-size: 0.875rem;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-result:hover {
+  background: var(--color-hover);
+}
+
+.search-label {
+  font-weight: 550;
+}
+
+.search-detail {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+/* --- Button rows ---------------------------------------------------------- */
+.save-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.save-actions button {
+  flex: 1 1 calc(50% - 0.25rem);
+}
+
+.find-btn {
+  width: 100%;
+  margin-top: 0.6rem;
+}
+
+/* --- Route summary: metric tiles ----------------------------------------- */
 #stats {
   display: flex;
   gap: 0.6rem;
-  margin: 1rem 0;
+  margin: 0.9rem 0 0.75rem;
 }
 
+.stat {
+  flex: 1;
+  padding: 0.85rem 0.95rem;
+  background: var(--grad-raised);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-tile), var(--edge-hi);
+}
+
+.stat-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--color-muted);
+}
+
+.stat-value {
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value .unit {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--color-muted);
+}
+
+/* --- Summary pills (quiet chips, colored icon only) ---------------------- */
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.2rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 550;
+  padding: 0.38rem 0.7rem;
+  border-radius: 999px;
+  background: var(--grad-surface);
+  color: var(--color-text);
+  box-shadow: var(--edge-hi);
+}
+
+.pill svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.pill.climb svg {
+  color: var(--color-climb);
+}
+
+.pill.cafe svg {
+  color: var(--color-cafe);
+}
+
+.pill.water svg {
+  color: var(--color-water);
+}
+
+/* --- Elevation chart + legends ------------------------------------------- */
 #chart-wrap {
   height: 150px;
-  margin: 0.5rem 0 0.75rem;
+  margin: 0.7rem 0 0.75rem;
 }
 
 #surface {
-  margin: 1.1rem 0 0.9rem;
+  margin: 1rem 0 0.75rem;
 }
 
 .surface-track {
@@ -394,8 +946,6 @@ select {
   overflow: hidden;
 }
 
-/* Fixed two-column grid (like .grade-legend) so the surface labels line up in
-   an even block instead of wrapping raggedly across the panel width. */
 .surface-legend {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -416,18 +966,15 @@ select {
   width: 9px;
   height: 9px;
   border-radius: 2px;
-  margin-right: 0.3rem;
+  margin-right: 0.35rem;
   flex: 0 0 auto;
 }
 
-/* Grade-color legend: a fixed 3-column grid instead of free-wrapping flex,
-   so the six labels of uneven length ("Descent" vs "12%+") line up neatly
-   rather than wrapping raggedly at the sidebar's width. */
 .grade-legend {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.3rem 0.5rem;
-  margin-top: 0.4rem;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.5rem;
   font-size: 0.72rem;
   color: var(--color-muted);
 }
@@ -447,151 +994,1054 @@ select {
   flex: 0 0 auto;
 }
 
-/* Map overlay: fixed brand blue so it stays consistent with the route line
-   regardless of the UI theme. */
+/* --- Section labels (with leading icon) ---------------------------------- */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+}
+
+.sec-ico {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+}
+
+#climbs .sec-ico {
+  color: var(--color-climb);
+}
+
+#cafes .sec-ico {
+  color: var(--color-cafe);
+}
+
+#water .sec-ico {
+  color: var(--color-water);
+}
+
+/* --- Reusable list-row --------------------------------------------------- */
+/* Climbs, cafés, water and loop options share one row language. */
+.climb-item,
+.cafe-item,
+.loop-option {
+  display: flex;
+  width: 100%;
+  gap: 0.6rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--grad-surface);
+  color: var(--color-text);
+  box-shadow: var(--edge-hi);
+  text-align: left;
+  cursor: pointer;
+}
+
+#climbs {
+  margin: 0 0 0.75rem;
+}
+
+#climbs-list,
+#cafes-list,
+#water-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+#cafes-list,
+#water-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.climb-item {
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.climb-item:hover {
+  border-color: var(--color-climb);
+  background: var(--color-hover);
+}
+
+.climb-item.active {
+  border-color: var(--color-climb);
+  box-shadow: inset 2px 0 0 var(--color-climb);
+}
+
+/* Severity chip: fixed steepness colours read on both themes. */
+.climb-grade {
+  flex: 0 0 auto;
+  min-width: 3rem;
+  text-align: center;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-xs);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.climb-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.climb-where {
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.climb-len {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+.climb-gain {
+  margin-left: auto;
+  font-weight: 650;
+  color: var(--color-climb);
+  font-variant-numeric: tabular-nums;
+}
+
+#cafes,
+#water {
+  margin: 0 0 0.75rem;
+}
+
+.cafe-item {
+  align-items: baseline;
+}
+
+.cafe-item:hover {
+  border-color: var(--color-cafe);
+  background: var(--color-hover);
+}
+
+.cafe-where {
+  color: var(--color-muted);
+  min-width: 3.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cafe-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cafe-detour {
+  color: var(--color-cafe);
+  font-weight: 650;
+}
+
+.cafe-empty {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  padding: 0.25rem 0;
+}
+
+.water-item:hover {
+  border-color: var(--color-water);
+  background: var(--color-hover);
+}
+
+.water-detour {
+  color: var(--color-water);
+  font-weight: 650;
+}
+
+/* --- Loop options (round-trip alternatives) ------------------------------ */
+#loop-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.loop-option {
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.loop-option:hover {
+  border-color: var(--color-accent);
+  background: var(--color-hover);
+}
+
+.loop-option.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tint);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.loop-option.fallback {
+  border-style: dashed;
+}
+
+.loop-title {
+  font-weight: 650;
+  font-size: 0.875rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+}
+
+.loop-detail {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+
+.loop-wind {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.78rem;
+  color: var(--color-accent-fg);
+}
+
+/* --- Round-trip range ----------------------------------------------------- */
+.range-label {
+  float: right;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Two native sliders stacked on one track; only the thumbs receive clicks. */
+.dual-range {
+  position: relative;
+  height: 28px;
+  margin: 0.65rem 0 0.2rem;
+}
+
+/* Centered on the container's mid-line (top: 50%) so it always lines up with
+   the thumbs regardless of how tall the native control renders. */
+.range-track {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-track);
+}
+
+/* The input box is sized to the thumb and vertically centered in the row, and
+   the runnable track fills that box — so the thumb sits dead-centre on the
+   line in every browser (iOS Safari otherwise drops it below the track). */
+.dual-range input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 0;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  pointer-events: none;
+}
+
+.dual-range input[type='range']::-webkit-slider-runnable-track {
+  height: 22px;
+  background: transparent;
+  border: none;
+}
+
+.dual-range input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--grad-raised);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12),
+    var(--edge-hi);
+  cursor: grab;
+}
+
+.dual-range input[type='range']::-webkit-slider-thumb:active {
+  cursor: grabbing;
+}
+
+.dual-range input[type='range']::-moz-range-track {
+  height: 22px;
+  background: transparent;
+  border: none;
+}
+
+.dual-range input[type='range']::-moz-range-thumb {
+  pointer-events: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-raised);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+  cursor: grab;
+}
+
+/* --- Wind chip ------------------------------------------------------------ */
+#wind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: var(--grad-surface);
+  box-shadow: var(--edge-hi);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-muted);
+}
+
+.wind-arrow {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-accent-fg);
+  line-height: 1;
+}
+
+.wind-arrow svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* --- Empty / status notes ------------------------------------------------- */
+.empty-note {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+  margin: 0.15rem 0 0.25rem;
+}
+
+/* Friendly empty state for the route summary before a route exists. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  padding: 1.1rem 1rem 0.6rem;
+}
+
+.empty-state .empty-ico {
+  color: var(--color-accent-fg);
+  opacity: 0.85;
+}
+
+.empty-state p {
+  margin: 0;
+  max-width: 26ch;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+#status {
+  margin: 0 1.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+
+/* Only becomes a chip when it actually carries a message. */
+#status:not(:empty) {
+  margin: 0.35rem 1.25rem 0.6rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+#status.error {
+  color: #c0392b;
+}
+
+#status.error:not(:empty) {
+  background: color-mix(in srgb, #c0392b 12%, transparent);
+}
+
+/* --- Saved routes --------------------------------------------------------- */
+#save-section {
+  margin-top: 0;
+}
+
+#saved-list {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+}
+
+#saved-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+
+.saved-preview {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-xs);
+  background: var(--color-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent-fg);
+}
+
+.saved-name {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  text-align: left;
+  min-height: 40px;
+  padding: 0.3rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.saved-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-meta {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.saved-name:hover {
+  background: var(--color-hover);
+}
+
+.saved-delete {
+  border: none;
+  background: transparent;
+  color: var(--color-faint);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.4rem;
+  border-radius: var(--radius-xs);
+}
+
+.saved-delete:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+/* =============================================================================
+   5. STATES — press feedback
+   ============================================================================ */
+button.generate:active:not(:disabled),
+button.primary:active:not(:disabled),
+.save-actions button:active:not(:disabled),
+.save-row button:active:not(:disabled),
+.find-btn:active:not(:disabled),
+.icon-btn:active:not(:disabled),
+.mapstyle button:active,
+.map-tool:active,
+.community-load:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* =============================================================================
+   6. MAP OVERLAYS (fixed colors: match the route line on any base)
+   ============================================================================ */
 .hover-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   background: #fff;
-  border: 3px solid #2424e8;
+  border: 3px solid #2f5bff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
-.stat {
-  flex: 1;
-  padding: 0.6rem 0.75rem;
-  background: var(--color-surface);
-  border-radius: var(--radius-sm);
+.waypoint-marker {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2f5bff;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
 }
 
-.stat-label {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--color-muted);
+/* Start point reads as a route origin (green), like Strava/Komoot. */
+.waypoint-marker.start {
+  background: #34a853;
 }
 
-.stat-value {
-  font-size: 1.3rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+/* On-map surface chip: floating pill, top-centre of the map. */
+.route-badge {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: var(--color-panel);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border: 0.5px solid var(--color-border);
+  box-shadow: var(--shadow-float);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-#controls {
+/* Circular map-tool stack (top-right, under the zoom controls) — GPS,
+   heatmap and the map-style opener, matching a premium map app. */
+.map-tools {
+  position: absolute;
+  top: 104px;
+  right: 12px;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-top: 0.6rem;
 }
 
-#controls button {
-  padding: 0.6rem 0.75rem;
-  font-size: 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
+.map-tool {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0.5px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-panel);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
   color: var(--color-text);
+  box-shadow: var(--shadow-float);
   cursor: pointer;
 }
 
-#controls button:hover:not(:disabled) {
-  border-color: var(--color-accent);
+.map-tool svg {
+  color: var(--color-muted);
+}
+
+.map-tool:hover:not(.active):not([aria-expanded='true']) {
   background: var(--color-hover);
 }
 
-#controls button:disabled {
-  opacity: 0.45;
-  cursor: default;
+.map-tool:hover svg {
+  color: var(--color-text);
 }
 
-#controls button.primary {
+.map-tool.active,
+.map-tool[aria-expanded='true'] {
   background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #fff;
+  border-color: transparent;
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-accent);
+}
+
+.map-tool.active svg,
+.map-tool[aria-expanded='true'] svg {
+  color: var(--color-on-accent);
+}
+
+/* Map-style chooser: a popover that opens to the left of the tool stack. */
+.mapstyle {
+  position: absolute;
+  top: 104px;
+  right: 68px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 152px;
+  padding: 5px;
+  background: var(--color-panel);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-float);
+}
+
+.mapstyle button {
+  min-height: 40px;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 550;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.mapstyle button:hover:not(.active) {
+  background: var(--color-hover);
+}
+
+.mapstyle button.active {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 650;
+}
+
+#sheet-handle {
+  display: none;
+}
+
+/* Bottom tab bar — mobile only (see the media query); desktop uses top tabs. */
+.bottom-nav {
+  display: none;
+}
+
+.bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.5rem 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.bottom-tab svg {
+  color: var(--color-muted);
+}
+
+.bottom-tab.active,
+.bottom-tab.active svg {
+  color: var(--color-accent-fg);
+}
+
+/* =============================================================================
+   7. COMMUNITY LIBRARY
+   ============================================================================ */
+#account-signed-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.account-who {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+
+.account-who strong {
+  color: var(--color-text);
   font-weight: 600;
 }
 
-.checkbox {
+#account-signed-in button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.875rem;
+}
+
+#author-field {
+  padding: 0 1.25rem;
+  margin-top: 0.6rem;
+}
+
+.community-controls {
+  padding: 0 1.25rem;
+}
+
+.community-controls .field {
+  margin: 0.85rem 0 0;
+}
+
+.community-controls .segmented {
+  margin: 0.4rem 0 0;
+}
+
+#community-list {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.community-empty {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Loading skeletons for the community list. */
+.community-item.skeleton {
+  pointer-events: none;
+}
+
+.sk {
+  background: var(--color-hover);
+  border-radius: 6px;
+  animation: sk-pulse 1.3s ease-in-out infinite;
+}
+
+.sk-thumb {
+  flex: 0 0 auto;
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius);
+}
+
+.community-item.skeleton .community-body {
+  width: 100%;
+}
+
+.sk-line {
+  height: 0.7rem;
+  margin: 0.35rem 0;
+}
+
+.sk-line-lg {
+  width: 62%;
+  height: 0.95rem;
+}
+
+.sk-line-sm {
+  width: 38%;
+}
+
+@keyframes sk-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.community-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--grad-surface);
+  box-shadow: var(--edge-hi);
+}
+
+.route-preview {
+  flex: 0 0 auto;
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius);
+  background: var(--color-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent-fg);
+}
+
+.community-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.community-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+/* Icon-led metadata lines (bike stats, location) — Strava-style. */
+.community-meta,
+.community-loc {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.community-meta::before,
+.community-loc::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  background: center / contain no-repeat;
+}
+
+.community-meta::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8a90' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='17' r='3.2'/%3E%3Ccircle cx='18' cy='17' r='3.2'/%3E%3Cpath d='M6 17l4-9h4l3.6 9'/%3E%3Cpath d='M9 8h5'/%3E%3C/svg%3E");
+}
+
+.community-loc::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8a90' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z'/%3E%3Ccircle cx='12' cy='11' r='2.2'/%3E%3C/svg%3E");
+}
+
+.community-name {
+  font-weight: 650;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
   color: var(--color-text);
-  cursor: pointer;
 }
 
-.checkbox input {
-  width: auto;
-  margin: 0;
-  accent-color: var(--color-accent);
+.community-author {
+  font-size: 0.78rem;
+  color: var(--color-muted);
 }
 
-#save-section {
-  margin-top: 0;
+.community-author strong {
+  color: var(--color-text);
+  font-weight: 600;
 }
 
-.save-row {
+.community-rating {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
-  margin-top: 0.25rem;
+  margin-top: 0.4rem;
 }
 
-.save-row input {
-  flex: 1;
-  margin-top: 0;
-  padding: 0.45rem 0.5rem;
-  font-size: 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
+.stars {
+  display: inline-flex;
+  gap: 0.05rem;
 }
 
-#search-input {
-  padding-left: 2rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a978c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.2-4.2'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: 0.55rem center;
-  background-size: 15px;
-}
-
-.save-row button {
-  padding: 0.45rem 0.75rem;
-  font-size: 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.save-row button:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  background: var(--color-hover);
-}
-
-.save-row button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-#saved-list {
-  list-style: none;
-  margin: 0.5rem 0 0;
+.stars .star {
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--color-track);
+  background: none;
+  border: none;
   padding: 0;
 }
 
-/* Avoid-zone row: the "Mark area" toggle plus the radius presets share one
-   line, so the presets' own .segmented margin is zeroed and it grows to fill
-   the remaining width instead. */
+.stars .star.filled {
+  color: #e0a800;
+}
+
+.stars.interactive .star {
+  cursor: pointer;
+}
+
+.stars.interactive .star:hover {
+  color: #e0a800;
+}
+
+.rating-summary {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.community-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.community-load {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8125rem;
+  background: var(--color-raised);
+}
+
+.community-gpx {
+  font-size: 0.8125rem;
+  color: var(--color-accent-fg);
+  text-decoration: none;
+}
+
+.community-gpx:hover {
+  text-decoration: underline;
+}
+
+.community-delete {
+  margin-left: auto;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8125rem;
+  border: 0;
+  background: none;
+  color: var(--color-faint);
+  cursor: pointer;
+}
+
+.community-delete:hover {
+  color: #c0392b;
+}
+
+/* =============================================================================
+   8. MOBILE — full-screen map with a draggable bottom sheet (<= 700px)
+   ============================================================================ */
+@media (max-width: 700px) {
+  /* Pin the page to the viewport so iOS can't leave the web view scrolled. */
+  body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+  }
+
+  /* Top tabs give way to a native-style bottom tab bar on phones. The bar and
+     the sheet's raised bottom only apply when the community backend exists
+     (body.has-community), so a config-less build keeps the sheet flush. */
+  .main-tabs {
+    display: none;
+  }
+
+  .has-community .bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(56px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 5;
+    background: var(--color-panel);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    border-top: 0.5px solid var(--color-border);
+  }
+
+  /* With the bottom tab bar present, the sheet sits above it AND is shortened
+     by the same amount — otherwise (bottom + 92vh) exceeds the screen and the
+     full-state sheet clips its own drag handle off the top of the viewport,
+     leaving no way to lower it back to the map. */
+  .has-community #sidebar {
+    bottom: calc(56px + env(safe-area-inset-bottom));
+    height: calc(92vh - 56px - env(safe-area-inset-bottom));
+    max-height: calc(92vh - 56px - env(safe-area-inset-bottom));
+  }
+
+  #sidebar {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 92vh;
+    max-height: 92vh;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    box-shadow: 0 -8px 34px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(64vh);
+    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 3;
+  }
+
+  #sheet-handle {
+    display: block;
+    flex: 0 0 auto;
+    height: 28px;
+    position: relative;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  #sheet-handle::before {
+    content: '';
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 38px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--color-track);
+  }
+
+  #sheet-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  #brand {
+    padding-top: 0.15rem;
+    padding-bottom: 0.7rem;
+  }
+
+  /* Keep the tool stack + style popover under the safe-area-shifted zoom stack. */
+  .map-tools {
+    top: calc(104px + env(safe-area-inset-top));
+    right: max(0.75rem, env(safe-area-inset-right));
+  }
+
+  .mapstyle {
+    top: calc(104px + env(safe-area-inset-top));
+    right: calc(max(0.75rem, env(safe-area-inset-right)) + 56px);
+  }
+}
+
+/* --- Avoid-zone row ------------------------------------------------------- */
+/* The "Mark area" toggle plus the radius presets share one line, so the
+   presets' own .segmented margin is zeroed and it grows to fill the rest. */
 #avoid-zone-row {
   align-items: stretch;
 }
@@ -611,59 +2061,27 @@ select {
   margin: 0;
 }
 
-#saved-list li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.15rem 0;
-}
-
-.saved-name {
-  flex: 1;
-  text-align: left;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.85rem;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.saved-name:hover {
-  background: var(--color-hover);
-}
-
-.saved-delete {
-  border: none;
-  background: transparent;
-  color: var(--color-muted);
-  cursor: pointer;
-  font-size: 0.85rem;
-  padding: 0.25rem;
-}
-
-.saved-delete:hover {
-  color: var(--color-accent-fg);
-}
-
-/* Floating status bar over the map. Never display:none, so that #status stays
-   a live region screen readers keep announcing; it fades out instead. */
+/* --- Floating status bar -------------------------------------------------- */
+/* Progress used to be reported into the last element of the scrolling panel,
+   where no mobile snap point could show it next to the button that started the
+   work. It floats over the map instead, in the same pill language as
+   .route-badge and directly below it. Never display:none, so #status stays a
+   live region screen readers keep announcing; it fades out instead. */
 .statusbar {
   position: absolute;
-  top: 1rem;
-  /* Centred over the map only, not the whole app, so a long message cannot
-     drift over the floating sidebar on a narrow desktop window. */
-  left: calc(330px + 2rem);
-  right: 1rem;
-  margin-inline: auto;
-  z-index: 5;
+  top: calc(60px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
   width: max-content;
-  max-width: min(28rem, 100%);
+  max-width: min(26rem, calc(100% - 8rem));
   overflow: hidden;
+  border-radius: 999px;
   background: var(--color-panel);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border: 0.5px solid var(--color-border);
+  box-shadow: var(--shadow-float);
   opacity: 1;
   transition: opacity 0.2s ease;
 }
@@ -675,8 +2093,8 @@ select {
 
 #status {
   margin: 0;
-  padding: 0.5rem 0.9rem;
-  font-size: 0.85rem;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
   line-height: 1.35;
   color: var(--color-text);
   text-align: center;
@@ -692,7 +2110,7 @@ select {
 
 /* Indeterminate progress strip, shown only while something is in flight. */
 .statusbar-progress {
-  height: 3px;
+  height: 2px;
   background: var(--color-surface);
 }
 
@@ -725,796 +2143,9 @@ select {
   }
 }
 
-#map {
-  flex: 1;
-  min-width: 0;
-}
-
-/* Map overlay: fixed brand blue (see .hover-dot). */
-.waypoint-marker {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #2424e8;
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-#wind-chip {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--color-muted);
-}
-
-.wind-arrow {
-  display: inline-block;
-  color: var(--color-accent-fg);
-  font-size: 0.9rem;
-  line-height: 1;
-}
-
-#loop-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  margin-top: 0.6rem;
-}
-
-.loop-option {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  text-align: left;
-  padding: 0.5rem 0.6rem;
-  font-size: 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.loop-option:hover {
-  border-color: var(--color-accent);
-  background: var(--color-hover);
-}
-
-.loop-option.active {
-  border-color: var(--color-accent);
-  box-shadow: inset 0 0 0 1px var(--color-accent);
-}
-
-.loop-option.fallback {
-  border-style: dashed;
-}
-
-.loop-title {
-  font-weight: 700;
-  font-size: 0.8rem;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--color-text);
-}
-
-.loop-detail {
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--color-muted);
-  font-size: 0.78rem;
-}
-
-.loop-wind {
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
-  font-size: 0.75rem;
-  color: var(--color-accent-fg);
-}
-
-#climbs {
-  margin: 0 0 0.75rem;
-}
-
-.section-label {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--color-muted);
-  margin-bottom: 0.35rem;
-}
-
-#climbs-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.climb-item {
-  display: flex;
-  width: 100%;
-  align-items: baseline;
-  gap: 0.6rem;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-  text-align: left;
-}
-
-.climb-item:hover {
-  border-color: var(--color-climb);
-}
-
-.climb-item.active {
-  border-color: var(--color-climb);
-  box-shadow: inset 0 0 0 1px var(--color-climb);
-}
-
-.climb-where {
-  color: var(--color-muted);
-  min-width: 3.6rem;
-}
-
-.climb-gain {
-  margin-left: auto;
-  font-weight: 600;
-  color: var(--color-climb);
-}
-
-#search-box {
-  margin: 0.25rem 0 0.5rem;
-}
-
-#btn-locate {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-#btn-locate:hover {
-  border-color: var(--color-accent);
-  background: var(--color-hover);
-}
-
-#search-results {
-  list-style: none;
-  margin: 0.35rem 0 0;
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.search-result {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  gap: 0.05rem;
-  padding: 0.45rem 0.6rem;
-  font-size: 0.85rem;
-  border: none;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  text-align: left;
-  cursor: pointer;
-}
-
-#search-results li:last-child .search-result {
-  border-bottom: none;
-}
-
-.search-result:hover {
-  background: var(--color-hover);
-}
-
-.search-label {
-  font-weight: 600;
-}
-
-.search-detail {
-  font-size: 0.75rem;
-  color: var(--color-muted);
-}
-
-.range-label {
-  float: right;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--color-text);
-}
-
-/* Two native sliders stacked on one track; only the thumbs receive clicks. */
-.dual-range {
-  position: relative;
-  height: 26px;
-  margin: 0.45rem 0 0.2rem;
-}
-
-.range-track {
-  position: absolute;
-  top: 11px;
-  left: 0;
-  right: 0;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--color-border);
-}
-
-.dual-range input[type='range'] {
-  -webkit-appearance: none;
-  appearance: none;
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 26px;
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  border: none;
-  pointer-events: none;
-}
-
-.dual-range input[type='range']::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  pointer-events: auto;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  border: 2px solid var(--color-panel);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  cursor: grab;
-}
-
-.dual-range input[type='range']::-moz-range-thumb {
-  pointer-events: auto;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  border: 2px solid var(--color-panel);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  cursor: grab;
-}
-
-button.generate {
-  display: block;
-  width: 100%;
-  margin: 0.35rem 0 0.15rem;
-  padding: 0.7rem 0.75rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
-  background: var(--color-accent);
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(36, 36, 232, 0.28);
-}
-
-button.generate:disabled {
-  opacity: 0.55;
-  cursor: default;
-  box-shadow: none;
-}
-
-.save-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.save-actions button {
-  flex: 1 1 calc(50% - 0.25rem);
-  padding: 0.6rem 0.75rem;
-  font-size: 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.save-actions button:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  background: var(--color-hover);
-}
-
-.save-actions button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.save-actions button.primary {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-#cafes {
-  margin: 0 0 0.75rem;
-}
-
-#cafes-list {
-  list-style: none;
-  margin: 0.4rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.cafe-item {
-  display: flex;
-  width: 100%;
-  align-items: baseline;
-  gap: 0.6rem;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-  text-align: left;
-}
-
-.cafe-item:hover {
-  border-color: var(--color-cafe);
-}
-
-.cafe-where {
-  color: var(--color-muted);
-  min-width: 3.6rem;
-}
-
-.cafe-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cafe-detour {
-  color: var(--color-cafe);
-  font-weight: 600;
-}
-
-.cafe-empty {
-  font-size: 0.8rem;
-  color: var(--color-muted);
-  padding: 0.25rem 0;
-}
-
-/* Drinking-water finder: reuses the café item layout, water-colored. */
-#water {
-  margin: 0 0 0.75rem;
-}
-
-.find-btn {
-  width: 100%;
-  margin-top: 0.4rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.find-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  background: var(--color-hover);
-}
-
-.find-btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-#water-list {
-  list-style: none;
-  margin: 0.4rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.water-item:hover {
-  border-color: var(--color-water);
-}
-
-.water-detour {
-  color: var(--color-water);
-  font-weight: 600;
-}
-
-.empty-note {
-  font-size: 0.82rem;
-  line-height: 1.45;
-  color: var(--color-muted);
-  margin: 0.15rem 0 0.25rem;
-}
-
-/* At-a-glance summary pills (climbs, coffee stops). */
-.pill-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0.7rem 0 0.2rem;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.28rem 0.6rem;
-  border-radius: 20px;
-}
-
-.pill.climb {
-  background: color-mix(in srgb, var(--color-climb) 16%, transparent);
-  color: var(--color-climb);
-}
-
-.pill.cafe {
-  background: color-mix(in srgb, var(--color-cafe) 18%, transparent);
-  color: var(--color-cafe);
-}
-
-.pill.water {
-  background: color-mix(in srgb, var(--color-water) 18%, transparent);
-  color: var(--color-water);
-}
-
-/* Subtle press feedback on the main action buttons. */
-button.generate:active:not(:disabled),
-#controls button:active:not(:disabled),
-.save-actions button:active:not(:disabled),
-.save-row button:active:not(:disabled),
-.mapstyle button:active {
-  transform: translateY(1px);
-}
-
-/* Phone: full-screen map with a draggable bottom sheet over it. */
 @media (max-width: 700px) {
-  #sidebar {
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    height: 92vh;
-    max-height: 92vh;
-    padding: 0;
-    border: none;
-    border-radius: 18px 18px 0 0;
-    box-shadow: 0 -6px 24px rgba(24, 24, 50, 0.18);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transform: translateY(64vh);
-    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
-    z-index: 3;
-  }
-
-  #sheet-handle {
-    display: block;
-    flex: 0 0 auto;
-    height: 26px;
-    position: relative;
-    cursor: grab;
-    touch-action: none;
-  }
-
-  #sheet-handle::before {
-    content: '';
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 40px;
-    height: 5px;
-    border-radius: 3px;
-    background: var(--color-border);
-  }
-
-  #sheet-body {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 1rem;
-  }
-
-  #brand {
-    padding-top: 0.15rem;
-  }
-
-  .mapstyle {
-    left: 0.75rem;
-    right: auto;
-    top: 0.75rem;
-    bottom: auto;
-  }
-
-  /* There is no sidebar to dodge here, but the map-style switcher now sits at
-     the top left, so drop below it (clears two rows of buttons). */
+  /* Keep clear of the map-tool column on the right (44px plus margins). */
   .statusbar {
-    left: 0.75rem;
-    right: 0.75rem;
-    top: 4.6rem;
-    max-width: 100%;
+    max-width: calc(100% - 7.5rem);
   }
-
-  .gps-fab {
-    display: flex;
-    position: fixed;
-    right: 1rem;
-    bottom: calc(30vh + 1rem);
-    z-index: 4;
-    width: 48px;
-    height: 48px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    border: 1px solid var(--color-border);
-    background: var(--color-panel);
-    color: var(--color-accent-fg);
-    font-size: 1.25rem;
-    box-shadow: var(--shadow-sm);
-    cursor: pointer;
-    transition: opacity 0.2s ease;
-  }
-}
-
-/* --- Community library --- */
-#account-signed-in {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0 1.15rem;
-  margin-top: 0.25rem;
-}
-
-.account-who {
-  font-size: 0.85rem;
-  color: var(--color-muted);
-}
-
-.account-who strong {
-  color: var(--color-text);
-}
-
-#account-signed-in button {
-  padding: 0.35rem 0.65rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-#account-signed-in button:hover {
-  border-color: var(--color-accent);
-  background: var(--color-hover);
-}
-
-#author-field {
-  padding: 0 1.15rem;
-  margin-top: 0.4rem;
-}
-
-.community-controls {
-  padding: 0 1.15rem;
-}
-
-.community-controls .field {
-  margin: 0.7rem 0 0;
-}
-
-.community-controls .segmented {
-  margin: 0.3rem 0 0;
-}
-
-#community-list {
-  list-style: none;
-  margin: 0.5rem 0 0;
-  padding: 0 1.15rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.community-empty {
-  color: var(--color-muted);
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-
-.community-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  padding: 0.6rem 0.7rem;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-}
-
-/* Waypoint-outline thumbnail of the route, drawn in preview.ts. */
-.route-preview {
-  flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  background: var(--color-panel);
-  border: 1px solid var(--color-line-soft);
-  color: var(--color-accent-fg);
-}
-
-.community-body {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.community-head {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-
-.community-loc {
-  font-size: 0.78rem;
-  color: var(--color-muted);
-}
-
-.community-name {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--color-text);
-}
-
-.community-meta {
-  font-size: 0.78rem;
-  color: var(--color-muted);
-}
-
-.community-author {
-  font-size: 0.78rem;
-  color: var(--color-muted);
-}
-
-.community-author strong {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
-.community-rating {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.35rem;
-}
-
-.stars {
-  display: inline-flex;
-  gap: 0.05rem;
-}
-
-.stars .star {
-  font-size: 1rem;
-  line-height: 1;
-  color: var(--color-line-soft);
-  background: none;
-  border: none;
-  padding: 0;
-}
-
-.stars .star.filled {
-  color: #e6b800;
-}
-
-.stars.interactive .star {
-  cursor: pointer;
-}
-
-.stars.interactive .star:hover {
-  color: #e6b800;
-}
-
-.rating-summary {
-  font-size: 0.78rem;
-  color: var(--color-muted);
-}
-
-.community-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.45rem;
-}
-
-.community-load {
-  padding: 0.3rem 0.7rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-panel);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.community-load:hover {
-  border-color: var(--color-accent);
-  background: var(--color-hover);
-}
-
-.community-gpx {
-  font-size: 0.8rem;
-  color: var(--color-accent-fg);
-  text-decoration: none;
-}
-
-.community-gpx:hover {
-  text-decoration: underline;
-}
-
-/* Destructive, so kept quiet (muted text) and pushed to the far right, away
-   from Load/GPX; only reddens on hover. */
-.community-delete {
-  margin-left: auto;
-  padding: 0.3rem 0.5rem;
-  font-size: 0.8rem;
-  border: 0;
-  background: none;
-  color: var(--color-muted);
-  cursor: pointer;
-}
-
-.community-delete:hover {
-  color: #d64545;
 }
