@@ -2,8 +2,8 @@ import maplibregl from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
-import { fetchRoute, RouteCancelledError, type LngLat, type RouteResult } from './routing';
-import { buildAvoidZonesGeoJson, type AvoidZone } from './avoidZones';
+import { fetchRoute, RouteCancelledError, type LngLat } from './routing';
+import { buildAvoidZonesGeoJson } from './avoidZones';
 import { downloadGpx } from './gpx';
 import { downloadTcx } from './tcx';
 import { parseTcx } from './tcximport';
@@ -16,6 +16,11 @@ import { renderGradeLegend } from './gradelegend';
 import { escapeHtml, initDisclosure, setActiveInGroup, setBusy, setStatus } from './ui';
 import { initDualRange } from './dualRange';
 import { initBottomSheet } from './bottomSheet';
+import {
+  currentProfile, persistSettings, settings, syncProfileUi,
+  type BikeType, type HillPreference,
+} from './settings';
+import { state } from './state';
 import { sanitizeWaypoints } from './waypoints';
 import { surfaceBreakdown, renderSurfaceBar, surfaceRuns, type SurfaceClass } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
@@ -41,7 +46,7 @@ import {
   communityPanel, communitySortButtons, emailRow, gpxFileInput, gradeLegendEl, hillsButtons,
   loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, rangeTrack, rangeValue, roundtripMax,
   roundtripMin, routeEmpty, routeNameInput, routePills, savedList, searchInput, searchResults,
-  signinHint, statAscend, statDistance, statsSection, surfaceEl, trafficLabel, trafficSelect,
+  signinHint, statAscend, statDistance, statsSection, surfaceEl, trafficSelect,
   waterEl, waterList, windChipEl,
 } from './dom';
 // ./auth and ./community both pull in @supabase/supabase-js. They are loaded on
@@ -80,57 +85,7 @@ import { registerSW } from 'virtual:pwa-register';
 // as soon as an update is detected, so a fresh deploy actually shows up.
 registerSW({ immediate: true, onNeedRefresh: () => window.location.reload() });
 
-type BikeType = 'race' | 'gravel' | 'mtb';
 
-type HillPreference = 'avoid' | 'mix' | 'prefer';
-
-interface Settings {
-  bike: BikeType;
-  traffic: number; // 0 = fastest, 1 = low traffic, 2 = very low traffic (race only)
-  hills: HillPreference; // round-trip elevation preference
-}
-
-const SETTINGS_KEY = 'lightroute-settings';
-const TRAFFIC_PROFILES = ['fastbike', 'fastbike-lowtraffic', 'fastbike-verylowtraffic'];
-
-const settings: Settings = loadSettings();
-
-// All application state lives in this one object.
-const state = {
-  waypoints: [] as LngLat[],
-  markers: [] as maplibregl.Marker[],
-  route: null as RouteResult | null,
-  // Incremented per routing request so stale responses can be ignored.
-  requestId: 0,
-  // Round-trip suggestions currently on offer, and the selected one.
-  loopOptions: [] as LoopOption[],
-  selectedLoop: -1,
-  climbs: [] as Climb[],
-  selectedClimb: -1,
-  cafes: [] as Cafe[],
-  water: [] as WaterPoint[],
-  // Route returns to waypoint 1 (a closed loop): set by generating a round
-  // trip or by clicking near point 1.
-  closed: false,
-  // Raw text of a freshly imported, still-unedited route's original file (and
-  // its format), so publishing can keep the original file. Cleared by any
-  // reroute (see recalculateRoute).
-  importedFileText: null as string | null,
-  importedFileFormat: null as 'gpx' | 'tcx' | null,
-  // Circular "avoid this area" zones for manual routes (BRouter nogos).
-  // Round trips (ORS) don't support these yet; see syncAvoidZoneUi().
-  avoidZones: [] as AvoidZone[],
-  // Radius used for the NEXT zone placed, in meters.
-  avoidZoneRadius: 60,
-  // 'avoid' is a one-shot mode: the next map click places a zone, then this
-  // reverts to 'normal' automatically.
-  mode: 'normal' as 'normal' | 'avoid',
-};
-
-
-// Last GPS fix, shared between the planner's locate button and the community
-// "Near me" sort / distance-away labels. Null until the user grants location.
-let lastKnownLocation: [number, number] | null = null;
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -1110,8 +1065,8 @@ btnLocate.addEventListener('click', () => {
   setStatus('Getting your location…');
   navigator.geolocation.getCurrentPosition(
     (position) => {
-      lastKnownLocation = [position.coords.longitude, position.coords.latitude];
-      addWaypoint(lastKnownLocation, 'your location');
+      state.lastKnownLocation = [position.coords.longitude, position.coords.latitude];
+      addWaypoint(state.lastKnownLocation, 'your location');
     },
     () => setStatus('Could not get your location. Check the location permission.', true),
     { timeout: 10000, maximumAge: 60000 },
@@ -1398,56 +1353,6 @@ chartCanvas.addEventListener('mouseleave', () => {
     hoverMarkerVisible = false;
   }
 });
-
-function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (['race', 'gravel', 'mtb'].includes(parsed.bike)) {
-        return {
-          bike: parsed.bike,
-          traffic: [0, 1, 2].includes(parsed.traffic) ? parsed.traffic : 0,
-          hills: ['avoid', 'mix', 'prefer'].includes(parsed.hills) ? parsed.hills : 'mix',
-        };
-      }
-    }
-  } catch {
-    // Corrupt settings fall through to the defaults.
-  }
-  return { bike: 'race', traffic: 0, hills: 'mix' };
-}
-
-function persistSettings(): void {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  } catch {
-    // Blocked or full storage must not abort the caller: persistSettings runs
-    // partway through the bike/traffic/hills handlers and through every route
-    // load, and throwing here would leave the UI half-updated.
-  }
-}
-
-function currentProfile(): string {
-  if (settings.bike === 'gravel') return 'gravel';
-  if (settings.bike === 'mtb') return 'mtb';
-  return TRAFFIC_PROFILES[settings.traffic];
-}
-
-function syncProfileUi(): void {
-  bikeButtons.forEach((button) => {
-    const active = button.dataset.bike === settings.bike;
-    button.classList.toggle('active', active);
-    button.setAttribute('aria-pressed', String(active));
-  });
-  hillsButtons.forEach((button) => {
-    const active = button.dataset.hills === settings.hills;
-    button.classList.toggle('active', active);
-    button.setAttribute('aria-pressed', String(active));
-  });
-  trafficLabel.hidden = settings.bike !== 'race';
-  trafficSelect.value = String(settings.traffic);
-}
 
 /** Recreates all markers from state.waypoints, keeping numbering correct. */
 function rebuildMarkers(): void {
@@ -2058,10 +1963,10 @@ function routeCentroid(route: CommunityRoute): [number, number] {
 
 /** Nearest approach (metres) of the route to the user, or null without a fix. */
 function routeDistanceFromUser(route: CommunityRoute): number | null {
-  if (!lastKnownLocation) return null;
+  if (!state.lastKnownLocation) return null;
   let min = Infinity;
   for (const wp of route.waypoints) {
-    const d = haversineMeters(lastKnownLocation, wp);
+    const d = haversineMeters(state.lastKnownLocation, wp);
     if (d < min) min = d;
   }
   return Number.isFinite(min) ? min : null;
@@ -2079,7 +1984,7 @@ function filteredCommunityRoutes(): CommunityRoute[] {
     if (distMax < DIST_MAX && km > distMax) return false;
     return true;
   });
-  if (communitySort === 'near' && lastKnownLocation) {
+  if (communitySort === 'near' && state.lastKnownLocation) {
     list.sort(
       (a, b) => (routeDistanceFromUser(a) ?? Infinity) - (routeDistanceFromUser(b) ?? Infinity),
     );
@@ -2297,7 +2202,7 @@ if (isSupabaseConfigured) {
 
 /** Resolves to the user's location, requesting a GPS fix once if needed. */
 function ensureLocation(): Promise<[number, number] | null> {
-  if (lastKnownLocation) return Promise.resolve(lastKnownLocation);
+  if (state.lastKnownLocation) return Promise.resolve(state.lastKnownLocation);
   if (!('geolocation' in navigator)) {
     setStatus('This browser does not support GPS location.', true);
     return Promise.resolve(null);
@@ -2306,9 +2211,9 @@ function ensureLocation(): Promise<[number, number] | null> {
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        lastKnownLocation = [position.coords.longitude, position.coords.latitude];
+        state.lastKnownLocation = [position.coords.longitude, position.coords.latitude];
         setStatus('');
-        resolve(lastKnownLocation);
+        resolve(state.lastKnownLocation);
       },
       () => {
         setStatus('Could not get your location. Check the location permission.', true);
