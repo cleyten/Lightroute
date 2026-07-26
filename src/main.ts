@@ -138,7 +138,6 @@ const rangeTrack = document.querySelector<HTMLElement>('#range-track')!;
 const btnRoundtrip = document.querySelector<HTMLButtonElement>('#btn-roundtrip')!;
 const chartCanvas = document.querySelector<HTMLCanvasElement>('#elevation-chart')!;
 const surfaceEl = document.querySelector<HTMLElement>('#surface')!;
-const routeBadge = document.querySelector<HTMLElement>('#route-badge');
 const loopOptionsEl = document.querySelector<HTMLElement>('#loop-options')!;
 const windChipEl = document.querySelector<HTMLElement>('#wind-chip')!;
 const climbsEl = document.querySelector<HTMLElement>('#climbs')!;
@@ -1779,20 +1778,6 @@ function buildSurfaceLine(
   }
 }
 
-/** On-map chip summarising the route's paved vs unpaved split (Strava-style). */
-function updateRouteBadge(totals: ReturnType<typeof surfaceBreakdown>): void {
-  if (!routeBadge) return;
-  const known = totals ? totals.totalMeters - totals.unknown : 0;
-  if (!totals || known < totals.totalMeters * 0.4) {
-    routeBadge.hidden = true;
-    return;
-  }
-  const pavedPct = Math.round((totals.paved / known) * 100);
-  const offPct = 100 - pavedPct;
-  routeBadge.textContent = pavedPct >= offPct ? `${pavedPct}% paved` : `${offPct}% unpaved`;
-  routeBadge.hidden = false;
-}
-
 /** Updates the surface-coloured overlay for the current route (or clears it). */
 function setSurfaceLine(): void {
   const source = map.getSource('route-surface') as maplibregl.GeoJSONSource | undefined;
@@ -1864,9 +1849,7 @@ function renderRouteDetails(): void {
     } else {
       surfaceEl.hidden = true;
     }
-    updateRouteBadge(totals);
   } else {
-    updateRouteBadge(null);
     statDistance.textContent = '–';
     statAscend.textContent = '–';
     chartWrap.hidden = true;
