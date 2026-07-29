@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  backtrackReport,
   edgeSet,
   initialBearing,
   loopRoundness,
@@ -42,6 +43,24 @@ function outAndBack(lengthM: number, steps = 80): [number, number][] {
   for (let s = 0; s <= steps; s++) out.push([5.47 + (dLng * s) / steps, 51.44]);
   for (let s = steps - 1; s >= 0; s--) out.push([5.47 + (dLng * s) / steps, 51.44]);
   return out;
+}
+
+const LAT0 = 51.44;
+const M_PER_LAT = 6371000 * (Math.PI / 180);
+const M_PER_LNG = M_PER_LAT * Math.cos((LAT0 * Math.PI) / 180);
+
+/** Turns a polyline given in meters east/north of a fixed origin into coords. */
+function fromMeters(points: [number, number][]): [number, number][] {
+  return points.map(([x, y]) => [5.47 + x / M_PER_LNG, LAT0 + y / M_PER_LAT]);
+}
+
+/** Straight line from a to b, with a vertex every `stepM` meters. */
+function line(a: [number, number], b: [number, number], stepM = 20): [number, number][] {
+  const steps = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / stepM));
+  return Array.from({ length: steps + 1 }, (_, s) => [
+    a[0] + ((b[0] - a[0]) * s) / steps,
+    a[1] + ((b[1] - a[1]) * s) / steps,
+  ]);
 }
 
 describe('projectToMeters', () => {
@@ -90,6 +109,59 @@ describe('overlapRatio', () => {
 
   it('returns 0 rather than throwing on a degenerate route', () => {
     expect(overlapRatio([[5, 51], [5, 51]])).toBe(0);
+  });
+});
+
+describe('backtrackReport', () => {
+  it('finds nothing in a clean loop', () => {
+    expect(backtrackReport(square(2000))).toEqual({ totalMeters: 0, longestMeters: 0 });
+  });
+
+  it('reports almost the whole distance of a full out-and-back', () => {
+    // Each leg registers up to within half the separation of the turn.
+    const report = backtrackReport(outAndBack(2000));
+    expect(report.totalMeters).toBeGreaterThan(3500);
+  });
+
+  it('catches a U-turn that comes back on the road beside the road', () => {
+    // The case overlapRatio is blind to: the return leg is 25 m to the side, so
+    // it lands in different grid cells and never counts as a repeat. Measured
+    // over real ORS loops, overlapRatio stays under 0.01 while this reports
+    // hundreds of meters, which is why the quality gate uses this instead.
+    const loop = fromMeters([
+      ...line([0, 0], [1000, 0]),
+      ...line([1000, 0], [1000, 300]),
+      ...line([1025, 300], [1025, 0]),
+      ...line([1025, 0], [2000, 0]),
+      ...line([2000, 0], [2000, 2000]),
+      ...line([2000, 2000], [0, 2000]),
+      ...line([0, 2000], [0, 0]),
+    ]);
+    expect(overlapRatio(loop)).toBeLessThan(0.02);
+
+    const report = backtrackReport(loop);
+    expect(report.longestMeters).toBeGreaterThan(150);
+    expect(report.totalMeters).toBeGreaterThan(300);
+  });
+
+  it('leaves an honest hairpin bend alone', () => {
+    // A switchback: the legs touch at the apex and separate quickly, so there
+    // is no stretch of riding beside itself.
+    const hairpin = fromMeters([
+      ...line([0, 0], [200, 0]),
+      ...line([200, 0], [180, 30]),
+      ...line([180, 30], [0, 140]),
+    ]);
+    expect(backtrackReport(hairpin)).toEqual({ totalMeters: 0, longestMeters: 0 });
+  });
+
+  it('does not count a loop closing where it started', () => {
+    const closed = square(1200);
+    expect(backtrackReport([...closed, closed[0]]).totalMeters).toBe(0);
+  });
+
+  it('returns zeroes rather than throwing on a degenerate route', () => {
+    expect(backtrackReport([[5, 51], [5, 51]])).toEqual({ totalMeters: 0, longestMeters: 0 });
   });
 });
 

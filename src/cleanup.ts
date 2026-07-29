@@ -6,11 +6,17 @@
 // route-wide quality gates (a 300 m spur is ~0.5% of a 60 km loop), so
 // instead of rejecting the candidate they are spliced out of the geometry.
 
-import { projectToMeters } from './loops';
+import { backtrackReport, projectToMeters } from './loops';
 import { fetchRoute, type RouteResult } from './routing';
 
 /** Max length of an out-and-back excursion that gets removed (meters). */
 const SPUR_MAX_M = 2200;
+/**
+ * Minimum vertex count of a spur. A retrace along a straight road has almost
+ * no vertices (out on one segment, back on the next), so this only has to be
+ * high enough to exclude a two-segment kink.
+ */
+const SPUR_MIN_POINTS = 3;
 /** The spur's entry and exit points must be this close together. */
 const SPUR_JUNCTION_M = 35;
 /** Outbound and return paths of a spur must stay within this distance. */
@@ -38,8 +44,11 @@ export function cleanLoopGeometry(
   let codes = segCodes;
   let removed = 0;
 
-  // Each pass removes at most one artifact; repeat until stable.
-  for (let pass = 0; pass < 12; pass++) {
+  // Each pass removes at most one artifact; repeat until stable. The budget has
+  // to be generous, because the passes are tried in a fixed order and a pass
+  // spent on a 20 m kink is a pass the backtrack test never gets. Running out
+  // silently leaves the worst artifact in place, which is exactly backwards.
+  for (let pass = 0; pass < 60; pass++) {
     const spur = removeOneSpur(current, codes);
     if (spur) {
       removed += spur.removedMeters;
@@ -52,6 +61,13 @@ export function cleanLoopGeometry(
       removed += curl.removedMeters;
       current = curl.coords;
       codes = curl.segCodes;
+      continue;
+    }
+    const back = removeOneBacktrack(current, codes);
+    if (back) {
+      removed += back.removedMeters;
+      current = back.coords;
+      codes = back.segCodes;
       continue;
     }
     break;
@@ -100,7 +116,7 @@ function removeOneSpur(
       for (let b = a + 1; b < indices.length; b++) {
         const i = indices[a];
         const j = indices[b];
-        if (j - i < 6) continue;
+        if (j - i < SPUR_MIN_POINTS) continue;
         const pathLen = cum[j] - cum[i];
         if (pathLen > SPUR_MAX_M || pathLen > total - 500) continue;
         if (Math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]) > SPUR_JUNCTION_M) continue;
@@ -237,6 +253,143 @@ function removeOneCurl(
   return null;
 }
 
+// --- Corridor backtracks ----------------------------------------------------
+// The artifact neither of the two passes above catches: the route leaves a
+// junction, runs a few hundred meters, turns round and comes back over the
+// ground beside the ground it just covered — the parallel carriageway, the
+// cycleway next to the road, or the other side of a dual roundabout exit. It
+// never retraces the same polyline, so the spur test's palindrome check fails,
+// and the two halves enclose a thin sliver, which the curl test deliberately
+// spares because that is also what a hairpin bend looks like.
+//
+// A hairpin, though, is 50-150 m of path. A backtrack is hundreds of meters of
+// riding beside yourself, and that is what gets measured here: the share of the
+// excursion that runs within a road's width of a part of itself far enough away
+// along the route to count as separate riding.
+
+/** Shortest excursion treated as a backtrack rather than a bend (meters). */
+const BACKTRACK_MIN_M = 150;
+const BACKTRACK_MAX_M = 6000;
+/** ...and never more than this share of the whole loop. */
+const BACKTRACK_MAX_FRACTION = 0.25;
+/**
+ * The excursion must return this close to its start. Splicing it out joins the
+ * two ends with a straight line, so this is also the worst off-road line the
+ * pass can introduce; at junction scale, two points this close on the same road
+ * are a couple of meters off the tarmac at most.
+ */
+const BACKTRACK_JUNCTION_M = 50;
+/** Two passes within this distance count as the same ground. */
+const BACKTRACK_CORRIDOR_M = 32;
+/**
+ * ...provided they are this far apart measured along the excursion. Lower than
+ * the route-wide figure in loops.ts on purpose: here the sub-path is already
+ * known to start and end at the same junction, so there is no risk of reading
+ * an honest bend as a backtrack, and a low value keeps the share meaningful for
+ * a short U-turn (an excursion of 2L meters flags 2(L - separation/2) of them,
+ * which vanishes for short L if the separation is large).
+ */
+const BACKTRACK_SEPARATION_M = 100;
+/** Share of the excursion that must ride beside itself. */
+const BACKTRACK_MIN_SHARE = 0.5;
+
+/**
+ * Share of the sub-path i..j that runs within BACKTRACK_CORRIDOR_M of another
+ * part of the same sub-path at least BACKTRACK_SEPARATION_M away along it.
+ * Sampled at a fixed spacing so the answer does not depend on how densely the
+ * router happened to place vertices.
+ */
+function corridorShare(pts: [number, number][], cum: number[], i: number, j: number): number {
+  const SPACING = 15;
+  const samples: [number, number, number][] = [];
+  let along = cum[i];
+  for (let k = i + 1; k <= j; k++) {
+    const span = cum[k] - cum[k - 1];
+    while (along <= cum[k]) {
+      const t = span > 0 ? (along - cum[k - 1]) / span : 0;
+      samples.push([
+        pts[k - 1][0] + (pts[k][0] - pts[k - 1][0]) * t,
+        pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * t,
+        along,
+      ]);
+      along += SPACING;
+    }
+  }
+  if (samples.length < 4) return 0;
+
+  let beside = 0;
+  for (const [x, y, s] of samples) {
+    for (const [ox, oy, os] of samples) {
+      if (Math.abs(os - s) < BACKTRACK_SEPARATION_M) continue;
+      if (Math.hypot(ox - x, oy - y) <= BACKTRACK_CORRIDOR_M) {
+        beside++;
+        break;
+      }
+    }
+  }
+  return beside / samples.length;
+}
+
+/**
+ * Finds the longest corridor backtrack and splices it out. The excursion's
+ * endpoints are within BACKTRACK_JUNCTION_M of each other, so joining them
+ * leaves at most a junction's width of straight line, the same trade the spur
+ * pass already makes.
+ */
+function removeOneBacktrack(
+  coords: Coord[],
+  segCodes: (number | null)[] | null,
+): CleanResult | null {
+  const pts = projectToMeters(coords) as [number, number][];
+  const cum = planarCumulative(pts);
+  const total = cum[cum.length - 1];
+  const maxLen = Math.min(BACKTRACK_MAX_M, total * BACKTRACK_MAX_FRACTION);
+  if (maxLen < BACKTRACK_MIN_M) return null;
+
+  // Hash on the junction distance so a 3x3 neighbourhood covers every pair
+  // that could possibly be close enough.
+  const grid = new Map<string, number[]>();
+  const key = (x: number, y: number): string =>
+    `${Math.round(x / BACKTRACK_JUNCTION_M)},${Math.round(y / BACKTRACK_JUNCTION_M)}`;
+  for (let k = 0; k < pts.length; k++) {
+    const cellId = key(pts[k][0], pts[k][1]);
+    let list = grid.get(cellId);
+    if (!list) grid.set(cellId, (list = []));
+    list.push(k);
+  }
+
+  // Longest first: a nested backtrack is dealt with by a later pass.
+  let best: { i: number; j: number; len: number } | null = null;
+  for (let i = 0; i < pts.length; i++) {
+    const cx = Math.round(pts[i][0] / BACKTRACK_JUNCTION_M);
+    const cy = Math.round(pts[i][1] / BACKTRACK_JUNCTION_M);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (const j of grid.get(`${cx + dx},${cy + dy}`) ?? []) {
+          if (j - i < 3) continue;
+          const len = cum[j] - cum[i];
+          if (len < BACKTRACK_MIN_M || len > maxLen) continue;
+          if (best && len <= best.len) continue;
+          if (Math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]) > BACKTRACK_JUNCTION_M) {
+            continue;
+          }
+          if (corridorShare(pts, cum, i, j) < BACKTRACK_MIN_SHARE) continue;
+          best = { i, j, len };
+        }
+      }
+    }
+  }
+  if (!best) return null;
+
+  const { i, j, len } = best;
+  const coordsOut = coords.slice(0, i + 1).concat(coords.slice(j));
+  let codesOut: (number | null)[] | null = null;
+  if (segCodes) {
+    codesOut = segCodes.slice(0, i).concat([segCodes[i]], segCodes.slice(j));
+  }
+  return { coords: coordsOut, segCodes: codesOut, removedMeters: len };
+}
+
 // --- Detour wiggles ---------------------------------------------------------
 // The third artifact: the route dives into a residential block and zigzags
 // through it purely to pad distance, leaving from and returning to nearly
@@ -248,18 +401,27 @@ function removeOneCurl(
 // real through-road exists. When no shortcut exists (an honestly winding
 // road), the geometry is left alone.
 
-/** Max length of a wiggle sub-path (meters). */
-const WIGGLE_MAX_M = 2500;
-const WIGGLE_MIN_M = 350;
+/**
+ * Max length of a wiggle sub-path (meters). Generous, because the excursions
+ * that need a re-route are exactly the ones too long to splice blind: measured
+ * on real ORS loops they run to 4.5 km.
+ */
+const WIGGLE_MAX_M = 5000;
+/**
+ * Shortest sub-path treated as a detour. A 150 m out-and-back at a roundabout
+ * is as unwelcome as a 1 km one, so this sits just above the scale of an honest
+ * bend rather than at the scale of an obvious detour.
+ */
+const WIGGLE_MIN_M = 200;
 /** Endpoints must be this close for the sub-path to count as a detour. */
 const WIGGLE_ENDPOINT_M = 400;
 /** Path length over endpoint distance must exceed this. */
 const WIGGLE_RATIO = 2.8;
 /** A heal must save at least this many meters (and be relatively shorter). */
-const HEAL_MIN_SAVING_M = 300;
+const HEAL_MIN_SAVING_M = 150;
 const HEAL_MAX_SHARE = 0.9;
 /** Max wiggles healed per candidate. */
-const MAX_HEALS = 3;
+const MAX_HEALS = 5;
 /** Point offsets to widen the excision window per attempt: the wiggle's own
  *  endpoints often sit inside the neighborhood; a wider window puts them on
  *  the through-road before and after it. */
@@ -406,17 +568,29 @@ export async function healWiggles(
   // array as in the original. Widening by HEAL_OFFSETS can make two plans
   // overlap even though their wiggles did not; the later one is then dropped.
   let limit = maxIndex;
+  let backtrack = backtrackReport(outCoords).totalMeters;
 
   for (const plan of plans) {
     if (!plan || plan.j >= limit) continue;
     const { i, j, shortcut } = plan;
-    outCoords = outCoords.slice(0, i).concat(shortcut, outCoords.slice(j + 1));
+    const nextCoords = outCoords.slice(0, i).concat(shortcut, outCoords.slice(j + 1));
+
+    // A shortcut is only an improvement if it does not itself start riding
+    // alongside the loop. BRouter is asked for the shortest way between two
+    // points and neither knows nor cares where the other 60 km go, so it will
+    // happily route the shortcut down the road the loop comes home on. Trading
+    // a detour for a stretch of doubling back is not a trade worth making.
+    const nextBacktrack = backtrackReport(nextCoords).totalMeters;
+    if (nextBacktrack > backtrack) continue;
+
+    outCoords = nextCoords;
     if (outCodes) {
       outCodes = outCodes
         .slice(0, i - 1)
         .concat(new Array(shortcut.length + 1).fill(null), outCodes.slice(j + 1));
     }
     healed += plan.saving;
+    backtrack = nextBacktrack;
     limit = i - 1;
   }
   return { coords: outCoords, segCodes: outCodes, healedMeters: healed };

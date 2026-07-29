@@ -11,6 +11,8 @@ export function rejectionText(option: LoopOption): string {
   switch (option.rejection) {
     case 'overlap':
       return `${Math.round(option.overlap * 100)}% of it doubles back on itself`;
+    case 'backtrack':
+      return `it rides back beside itself for about ${formatMeters(option.backtrackMeters)}`;
     case 'shape':
       return 'it is awkwardly shaped';
     case 'surface':
@@ -20,4 +22,8 @@ export function rejectionText(option: LoopOption): string {
     default:
       return '';
   }
+}
+
+function formatMeters(meters: number): string {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters / 50) * 50} m`;
 }

@@ -13,7 +13,14 @@
 import type { FeatureCollection, Feature, LineString } from 'geojson';
 import type { LngLat, RouteResult } from './routing';
 import { cumulativeDistances } from './geo';
-import { overlapRatio, loopRoundness, initialBearing, edgeSet, routeSimilarity } from './loops';
+import {
+  overlapRatio,
+  loopRoundness,
+  initialBearing,
+  edgeSet,
+  routeSimilarity,
+  backtrackReport,
+} from './loops';
 import { fetchNetworkGrid, networkCoverage } from './network';
 import { fetchWind, windBonus, windNote, type WindInfo } from './wind';
 import {
@@ -57,6 +64,25 @@ const CANDIDATES = 8;
 const MAX_OPTIONS = 3;
 /** Reject candidates that re-ride more than this share of their distance. */
 const MAX_OVERLAP = 0.1;
+/**
+ * Reject a candidate over any single stretch of riding back alongside itself,
+ * and over this much of it in total.
+ *
+ * These are absolute meters, not a share, and they are the gate that actually
+ * bites. Measured over real ORS loops, overlapRatio never rises above 0.006, so
+ * MAX_OVERLAP above has never once rejected anything: it only sees an exact
+ * retrace of the same polyline, and the loops that visibly double back do it on
+ * the road beside the road, which lands in different grid cells. See
+ * backtrackReport for what is measured instead.
+ *
+ * The measure ignores stretches under 75 m, so these tolerate one brief brush
+ * alongside itself and nothing more. Loosening them is the knob to turn if a
+ * flat, sparse road network starts failing to produce any loop at all: measured
+ * over 18 real loops, 10 come out with no backtracking whatever, 2 more inside
+ * these limits, and the remaining 6 run from 315 m to 1065 m.
+ */
+const MAX_BACKTRACK_RUN_M = 120;
+const MAX_BACKTRACK_TOTAL_M = 200;
 /** Minimum unpaved share (of known surface) per bike type. */
 const MIN_UNPAVED: Record<string, number> = { gravel: 0.22, mtb: 0.3 };
 /** Two candidates sharing more than this are considered the same loop. */
@@ -68,6 +94,8 @@ export interface LoopOption {
   route: RouteResult;
   /** Share of distance ridden over ground already ridden (0..1). */
   overlap: number;
+  /** Meters spent riding back alongside ground the loop already covers. */
+  backtrackMeters: number;
   roundness: number;
   /** Unpaved share of known surface, or null when surface is mostly unknown. */
   unpaved: number | null;
@@ -175,6 +203,7 @@ function evaluateCandidate(
 ): LoopOption {
   const coords = route.coordinates;
   const overlap = overlapRatio(coords);
+  const backtrack = backtrackReport(coords);
   const roundness = loopRoundness(coords, route.distanceMeters);
   const unpaved = unpavedFraction(route.surface ?? null);
   const network = grid ? networkCoverage(grid, coords) : null;
@@ -186,6 +215,11 @@ function evaluateCandidate(
     rejection = 'distance';
   } else if (overlap > MAX_OVERLAP) {
     rejection = 'overlap';
+  } else if (
+    backtrack.longestMeters > MAX_BACKTRACK_RUN_M ||
+    backtrack.totalMeters > MAX_BACKTRACK_TOTAL_M
+  ) {
+    rejection = 'backtrack';
   } else if (roundness < (hills === 'prefer' ? 0.15 : 0.22)) {
     rejection = 'shape';
   } else if (MIN_UNPAVED[bike] !== undefined && unpaved !== null && unpaved < MIN_UNPAVED[bike]) {
@@ -197,7 +231,10 @@ function evaluateCandidate(
   const overshoot =
     Math.max(0, minMeters - route.distanceMeters, route.distanceMeters - maxMeters) /
     ((minMeters + maxMeters) / 2);
-  let score = roundness - overshoot * 8 - overlap * 6;
+  // Backtracking in kilometers, weighted to outrank roundness: when nothing
+  // passes, the loop offered as a fallback should be the one that doubles back
+  // least, not the roundest one that happens to contain a U-turn.
+  let score = roundness - overshoot * 8 - overlap * 6 - (backtrack.totalMeters / 1000) * 0.6;
   if (network !== null) score += network * 1.2;
   score += windBonus(wind, bearing);
   if (unpaved !== null && MIN_UNPAVED[bike] !== undefined) score += unpaved * 0.8;
@@ -210,6 +247,7 @@ function evaluateCandidate(
   return {
     route,
     overlap,
+    backtrackMeters: backtrack.totalMeters,
     roundness,
     unpaved,
     network,
@@ -245,6 +283,7 @@ function dedupe(options: LoopOption[]): LoopOption[] {
 
 const REASON_TEXT: Record<string, string> = {
   overlap: 'every loop found here doubles back on itself too much',
+  backtrack: 'every loop found here turns round and rides back beside itself somewhere',
   shape: 'only awkwardly shaped loops were found here',
   surface: 'not enough unpaved roads were found for a loop of this length',
   distance: 'no loop within the distance range was found',
@@ -398,11 +437,15 @@ function estimateAscent(coordinates: [number, number, number][]): number {
 }
 
 function humanizeOrsError(status: number, body: string): string {
+  // A spent daily quota comes back as 403 "Access to this API has been
+  // disallowed", not 429, so status alone cannot tell an exhausted quota from a
+  // bad key. Sending someone to check a key that is perfectly fine is the more
+  // expensive mistake of the two.
+  if (status === 429 || /disallowed/i.test(body)) {
+    return 'The OpenRouteService daily quota has been reached. Try again tomorrow.';
+  }
   if (status === 401 || status === 403) {
     return 'The OpenRouteService key was rejected. Check the key or its domain restriction.';
-  }
-  if (status === 429) {
-    return 'The OpenRouteService daily quota has been reached. Try again tomorrow.';
   }
   if (/2004/.test(body)) {
     return 'The requested distance is too long for a round trip (100 km maximum).';
