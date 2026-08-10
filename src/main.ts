@@ -3,7 +3,6 @@ import type { FeatureCollection } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
 import { fetchRoute, RouteCancelledError, type LngLat } from './routing';
-import { buildAvoidZonesGeoJson } from './avoidZones';
 import { downloadGpx } from './gpx';
 import { downloadTcx } from './tcx';
 import { parseTcx } from './tcximport';
@@ -37,8 +36,8 @@ import { buildShareUrl, parseShareUrl } from './share';
 import { parseGpx, isClosedTrack } from './gpximport';
 import {
   DEFAULT_SIGNIN_HINT, accountCode, accountEmail, accountName, accountSignedIn, accountSignedOut,
-  authorField, authorNameInput, avoidZoneRadiusButtons, bikeButtons, bottomTabButtons,
-  btnAvoidZone, btnCafes, btnClear, btnClearAvoidZones, btnExport, btnExportTcx, btnImportGpx,
+  authorField, authorNameInput, bikeButtons, bottomTabButtons,
+  btnCafes, btnClear, btnExport, btnExportTcx, btnImportGpx,
   btnLocate, btnPublish, btnReverse, btnRoundtrip, btnSave, btnShare, btnSignin, btnSigninBack,
   btnSignout, btnUndo, btnVerify, btnWater, cafeKmInput, cafesEl, cafesList, chartCanvas,
   chartWrap, climbsEl, climbsList, codeRow, communityBikeButtons, communityDistMax,
@@ -364,47 +363,6 @@ map.on('load', () => {
     map.getCanvas().style.cursor = '';
   });
 
-  // Circular "avoid this area" zones for manual routes.
-  map.addSource('avoid-zones', {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [] },
-  });
-  map.addLayer({
-    id: 'avoid-zones-fill',
-    type: 'fill',
-    source: 'avoid-zones',
-    paint: {
-      'fill-color': '#d63e3e',
-      'fill-opacity': 0.2,
-    },
-  });
-  map.addLayer({
-    id: 'avoid-zones-line',
-    type: 'line',
-    source: 'avoid-zones',
-    layout: { 'line-join': 'round' },
-    paint: {
-      'line-color': '#d63e3e',
-      'line-width': 2,
-      'line-dasharray': [2, 2],
-    },
-  });
-  map.on('click', 'avoid-zones-fill', (event) => {
-    const feature = event.features?.[0];
-    if (!feature) return;
-    const index = (feature.properties as { zoneIndex: number }).zoneIndex;
-    state.avoidZones.splice(index, 1);
-    updateAvoidZonesSource();
-    syncAvoidZoneUi();
-    void recalculateRoute();
-  });
-  map.on('mouseenter', 'avoid-zones-fill', () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
-  map.on('mouseleave', 'avoid-zones-fill', () => {
-    map.getCanvas().style.cursor = '';
-  });
-
   // Community heatmap: density of published routes, below the route overlays.
   // Hidden until toggled on; populated on first activation (see initHeatmap).
   map.addSource('heatmap', {
@@ -503,23 +461,10 @@ map.on('load', () => {
 });
 
 map.on('click', (event) => {
-  // Clicks on a café/water marker or an existing avoid-zone are handled by
-  // their own layer-click listeners above, not by the branches below.
-  const poiLayers = ['cafe-dots', 'water-dots', 'avoid-zones-fill'].filter((id) => map.getLayer(id));
+  // Clicks on a café/water marker are handled by their own layer-click
+  // listeners above, not by the branches below.
+  const poiLayers = ['cafe-dots', 'water-dots'].filter((id) => map.getLayer(id));
   if (poiLayers.length > 0 && map.queryRenderedFeatures(event.point, { layers: poiLayers }).length > 0) {
-    return;
-  }
-  // Avoid-area mode is one-shot: this click places a zone and reverts to
-  // normal mode, overriding the route-editing clicks below entirely.
-  if (state.mode === 'avoid') {
-    state.avoidZones.push({
-      lngLat: [event.lngLat.lng, event.lngLat.lat],
-      radiusM: state.avoidZoneRadius,
-    });
-    state.mode = 'normal';
-    updateAvoidZonesSource();
-    syncAvoidZoneUi();
-    void recalculateRoute();
     return;
   }
   // Clicking near point 1 closes an open route into a loop.
@@ -574,54 +519,9 @@ btnUndo.addEventListener('click', () => {
 btnClear.addEventListener('click', () => {
   state.waypoints = [];
   state.closed = false;
-  state.avoidZones = [];
-  state.mode = 'normal';
-  updateAvoidZonesSource();
-  syncAvoidZoneUi();
   rebuildMarkers();
   void recalculateRoute();
 });
-
-btnAvoidZone.addEventListener('click', () => {
-  state.mode = state.mode === 'avoid' ? 'normal' : 'avoid';
-  syncAvoidZoneUi();
-});
-
-avoidZoneRadiusButtons.forEach((button) =>
-  button.addEventListener('click', () => {
-    state.avoidZoneRadius = Number(button.dataset.radius);
-    setActiveInGroup(avoidZoneRadiusButtons, button);
-  }),
-);
-
-btnClearAvoidZones.addEventListener('click', () => {
-  state.avoidZones = [];
-  updateAvoidZonesSource();
-  syncAvoidZoneUi();
-  void recalculateRoute();
-});
-
-function updateAvoidZonesSource(): void {
-  const source = map.getSource('avoid-zones') as maplibregl.GeoJSONSource | undefined;
-  source?.setData(buildAvoidZonesGeoJson(state.avoidZones));
-}
-
-/**
- * Round trips (ORS) don't support avoid zones yet (BRouter's nogos and ORS's
- * avoid_polygons are incompatible shapes), so the toggle is disabled whenever
- * a round trip is active.
- */
-function syncAvoidZoneUi(): void {
-  btnAvoidZone.disabled = state.closed;
-  btnAvoidZone.title = state.closed
-    ? 'Not available for round trips yet'
-    : 'Click the map to mark a circular area to avoid';
-  btnAvoidZone.classList.toggle('active', state.mode === 'avoid');
-  btnAvoidZone.setAttribute('aria-pressed', String(state.mode === 'avoid'));
-  btnAvoidZone.textContent = state.mode === 'avoid' ? 'Click the map…' : 'Mark area';
-  avoidZoneRadiusButtons.forEach((button) => (button.disabled = state.closed));
-  btnClearAvoidZones.hidden = state.avoidZones.length === 0;
-}
 
 btnReverse.addEventListener('click', () => {
   if (!state.route) return;
@@ -1476,12 +1376,7 @@ async function recalculateRoute(): Promise<void> {
   setStatus('Calculating route…');
   setBusy(true);
   try {
-    const route = await fetchRoute(
-      routingWaypoints,
-      currentProfile(),
-      state.avoidZones,
-      abort.signal,
-    );
+    const route = await fetchRoute(routingWaypoints, currentProfile(), abort.signal);
     if (requestId !== state.requestId) return; // a newer request superseded this one
     state.route = route;
     setRouteData(route.geojson);
@@ -1871,7 +1766,6 @@ function updateControls(): void {
   btnExportTcx.disabled = !state.route;
   btnSave.disabled = !state.route || state.waypoints.length < 2;
   btnShare.disabled = !state.route || state.waypoints.length < 2;
-  syncAvoidZoneUi();
   updatePublishButton();
 }
 

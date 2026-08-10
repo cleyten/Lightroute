@@ -2018,28 +2018,6 @@ button.primary:active:not(:disabled),
   }
 }
 
-/* --- Avoid-zone row ------------------------------------------------------- */
-/* The "Mark area" toggle plus the radius presets share one line, so the
-   presets' own .segmented margin is zeroed and it grows to fill the rest. */
-#avoid-zone-row {
-  align-items: stretch;
-}
-
-#avoid-zone-row #btn-avoid-zone {
-  flex: 0 0 auto;
-}
-
-#avoid-zone-row #btn-avoid-zone.active {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: #fff;
-}
-
-#avoid-zone-row .segmented {
-  flex: 1;
-  margin: 0;
-}
-
 /* --- Floating status bar -------------------------------------------------- */
 /* Progress used to be reported into the last element of the scrolling panel,
    where no mobile snap point could show it next to the button that started the

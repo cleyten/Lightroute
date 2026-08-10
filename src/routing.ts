@@ -38,17 +38,10 @@ export class RouteCancelledError extends Error {
 export async function fetchRoute(
   waypoints: LngLat[],
   profile: string = 'fastbike-lowtraffic',
-  avoidZones: { lngLat: LngLat; radiusM: number }[] = [],
   signal?: AbortSignal,
 ): Promise<RouteResult> {
   const lonlats = waypoints.map(([lng, lat]) => `${lng.toFixed(6)},${lat.toFixed(6)}`).join('|');
-  let url = `${BROUTER_URL}?lonlats=${lonlats}&profile=${profile}&alternativeidx=0&format=geojson`;
-  if (avoidZones.length > 0) {
-    const nogos = avoidZones
-      .map(({ lngLat: [lng, lat], radiusM }) => `${lng.toFixed(6)},${lat.toFixed(6)},${radiusM.toFixed(0)}`)
-      .join('|');
-    url += `&nogos=${nogos}`;
-  }
+  const url = `${BROUTER_URL}?lonlats=${lonlats}&profile=${profile}&alternativeidx=0&format=geojson`;
 
   // Two reasons to give up: the caller superseded this request, or the server
   // never answered. Both abort the same fetch, so they are told apart after the

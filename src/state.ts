@@ -12,7 +12,6 @@ import type { LoopOption } from './ors';
 import type { Climb } from './climbs';
 import type { Cafe } from './cafes';
 import type { WaterPoint } from './water';
-import type { AvoidZone } from './avoidZones';
 
 export const state = {
   waypoints: [] as LngLat[],
@@ -35,14 +34,6 @@ export const state = {
   // reroute (see recalculateRoute).
   importedFileText: null as string | null,
   importedFileFormat: null as 'gpx' | 'tcx' | null,
-  // Circular "avoid this area" zones for manual routes (BRouter nogos).
-  // Round trips (ORS) don't support these yet; see syncAvoidZoneUi().
-  avoidZones: [] as AvoidZone[],
-  // Radius used for the NEXT zone placed, in meters.
-  avoidZoneRadius: 60,
-  // 'avoid' is a one-shot mode: the next map click places a zone, then this
-  // reverts to 'normal' automatically.
-  mode: 'normal' as 'normal' | 'avoid',
   // Last GPS fix, shared between the planner's locate button and the community
   // "Near me" sort / distance-away labels. Null until location is granted.
   lastKnownLocation: null as [number, number] | null,

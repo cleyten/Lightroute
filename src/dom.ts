@@ -52,10 +52,6 @@ export const btnRoundtrip = el<HTMLButtonElement>('#btn-roundtrip');
 export const loopOptionsEl = el<HTMLElement>('#loop-options');
 export const windChipEl = el<HTMLElement>('#wind-chip');
 
-// Avoid zones
-export const btnAvoidZone = el<HTMLButtonElement>('#btn-avoid-zone');
-export const avoidZoneRadiusButtons = all<HTMLButtonElement>('#avoid-zone-radius button');
-export const btnClearAvoidZones = el<HTMLButtonElement>('#btn-clear-avoid-zones');
 
 // Search, location and import
 export const searchInput = el<HTMLInputElement>('#search-input');
