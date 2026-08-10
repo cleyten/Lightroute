@@ -372,17 +372,22 @@ async function fetchOneRoundTrip(
       }),
     });
   } catch {
-    // OpenRouteService sends its 401/403/429 responses without the CORS header
-    // a browser needs, so the browser refuses to hand the response over and the
+    // OpenRouteService sends its error responses without the CORS header a
+    // browser needs, so the browser refuses to hand the response over and the
     // fetch rejects outright. The status never reaches humanizeOrsError below,
     // and the raw "Failed to fetch" used to travel all the way to the status
-    // bar. On the direct-key build there is no way to tell a blocked error
-    // response from a genuinely offline browser, so say both; through the proxy
-    // the response is same-origin, so a rejection there really is the network.
+    // bar.
+    //
+    // The cause cannot be read from here, so the message must not guess at one.
+    // Observed in practice: ORS takes individual routing profiles down for hours
+    // at a time (status.openrouteservice.org showed cycling-road at 11% uptime
+    // for a day while cycling-regular and cycling-mountain sat at 99%), which
+    // presents exactly like a dead key while the other ride types keep working.
+    // So the message points at the one check the rider can actually run.
     throw new Error(
       USE_PROXY
-        ? 'Could not reach the routing server. Check your connection.'
-        : 'Could not reach OpenRouteService. Usually that means a spent daily quota or a rejected key, which the browser cannot tell apart from being offline.',
+        ? 'The routing server did not answer for this ride type. Try another ride type, or check your connection.'
+        : 'OpenRouteService did not answer for this ride type. It often takes one routing profile offline for a while, so try another ride type first; otherwise check your connection.',
     );
   }
 
@@ -453,12 +458,16 @@ function estimateAscent(coordinates: [number, number, number][]): number {
 }
 
 function humanizeOrsError(status: number, body: string): string {
-  // A spent daily quota comes back as 403 "Access to this API has been
-  // disallowed", not 429, so status alone cannot tell an exhausted quota from a
-  // bad key. Sending someone to check a key that is perfectly fine is the more
-  // expensive mistake of the two.
-  if (status === 429 || /disallowed/i.test(body)) {
-    return 'The OpenRouteService daily quota has been reached. Try again tomorrow.';
+  if (status === 429) {
+    return 'Too many round trips requested at once. Wait a minute and try again.';
+  }
+  // 403 "Access to this API has been disallowed" is NOT a quota message and not
+  // a key message: measured against the live API, it comes back for any
+  // server-side client, with a valid key, an invalid key and every profile
+  // alike, while the very same key works from a browser. So it means the caller
+  // was refused for being a server, which on this build is the Worker proxy.
+  if (/disallowed/i.test(body)) {
+    return 'OpenRouteService refused the request from this server. Round trips need to be requested from the browser.';
   }
   if (status === 401 || status === 403) {
     return 'The OpenRouteService key was rejected. Check the key or its domain restriction.';
