@@ -15,6 +15,24 @@ export default defineConfig(({ command }) => ({
       : command === 'build'
         ? '/Lightroute/'
         : '/'),
+  build: {
+    // maplibre-gl is ~1.1 MB on its own and is essentially the whole initial
+    // payload; it cannot be lazy-loaded because the map paints on first render.
+    // Splitting it into its own vendor chunk does not shrink the total, but it
+    // rarely changes, so a returning visitor re-downloads only the small app
+    // chunk after a deploy while maplibre stays served from cache.
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/maplibre-gl')) return 'maplibre';
+          return undefined;
+        },
+      },
+    },
+    // The maplibre vendor chunk is legitimately large; raise the warning above
+    // it so a real regression in the (much smaller) app chunk still shows up.
+    chunkSizeWarningLimit: 1200,
+  },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
