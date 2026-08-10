@@ -52,6 +52,15 @@ export type CommunitySort = 'newest' | 'top';
 /** Grace period a deleted route (row + GPX file) is kept before it is purged. */
 export const GRACE_DAYS = 14;
 
+/**
+ * How many routes one browse fetches at most. The bike/hills/distance filters
+ * and the "near me" sort all run client-side over this fetched page, so it is
+ * a page size, not a hard total: big enough that the filters have plenty to
+ * work with, bounded so a growing library never turns one open of the Community
+ * tab into an unbounded download (and an unbounded burst of reverse-geocodes).
+ */
+export const COMMUNITY_PAGE_SIZE = 200;
+
 // Shape of a row from the `routes_with_rating` view (snake_case, as stored).
 interface RouteRow {
   id: string;
@@ -151,8 +160,11 @@ export async function fetchRouteGeometries(): Promise<LngLat[][]> {
     .filter((geometry) => geometry.length > 1);
 }
 
-export async function fetchCommunityRoutes(sort: CommunitySort): Promise<CommunityRoute[]> {
-  const base = client().from('routes_with_rating').select('*');
+export async function fetchCommunityRoutes(
+  sort: CommunitySort,
+  limit: number = COMMUNITY_PAGE_SIZE,
+): Promise<CommunityRoute[]> {
+  const base = client().from('routes_with_rating').select('*').limit(limit);
   const { data, error } =
     sort === 'top'
       ? await base
