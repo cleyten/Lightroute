@@ -351,24 +351,40 @@ async function fetchOneRoundTrip(
   // The proxy adds the Authorization header itself; only send it when calling
   // OpenRouteService directly.
   if (!USE_PROXY) headers.Authorization = ORS_KEY;
-  const response = await fetch(`${ORS_BASE}/${profile}/geojson`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      coordinates: [start],
-      elevation: true,
-      instructions: false,
-      extra_info: ['surface'],
-      options: {
-        round_trip: {
-          length: lengthMeters,
-          points: 5,
-          // A random seed gives a different loop on every attempt.
-          seed: Math.floor(Math.random() * 1_000_000),
+  let response: Response;
+  try {
+    response = await fetch(`${ORS_BASE}/${profile}/geojson`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        coordinates: [start],
+        elevation: true,
+        instructions: false,
+        extra_info: ['surface'],
+        options: {
+          round_trip: {
+            length: lengthMeters,
+            points: 5,
+            // A random seed gives a different loop on every attempt.
+            seed: Math.floor(Math.random() * 1_000_000),
+          },
         },
-      },
-    }),
-  });
+      }),
+    });
+  } catch {
+    // OpenRouteService sends its 401/403/429 responses without the CORS header
+    // a browser needs, so the browser refuses to hand the response over and the
+    // fetch rejects outright. The status never reaches humanizeOrsError below,
+    // and the raw "Failed to fetch" used to travel all the way to the status
+    // bar. On the direct-key build there is no way to tell a blocked error
+    // response from a genuinely offline browser, so say both; through the proxy
+    // the response is same-origin, so a rejection there really is the network.
+    throw new Error(
+      USE_PROXY
+        ? 'Could not reach the routing server. Check your connection.'
+        : 'Could not reach OpenRouteService. Usually that means a spent daily quota or a rejected key, which the browser cannot tell apart from being offline.',
+    );
+  }
 
   if (!response.ok) {
     const body = await response.text();
@@ -446,6 +462,11 @@ function humanizeOrsError(status: number, body: string): string {
   }
   if (status === 401 || status === 403) {
     return 'The OpenRouteService key was rejected. Check the key or its domain restriction.';
+  }
+  // The Worker proxy's own answer when its ORS_KEY secret is missing. Passing
+  // that through as "error 503" hides a one-line fix behind a server error.
+  if (status === 503 && /not configured/i.test(body)) {
+    return 'Round trips are not configured on this deployment: the server is missing its OpenRouteService key.';
   }
   if (/2004/.test(body)) {
     return 'The requested distance is too long for a round trip (100 km maximum).';
