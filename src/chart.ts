@@ -72,7 +72,14 @@ export function renderElevationChart(
           type: 'linear',
           min: 0,
           max: totalKm,
-          ticks: { maxTicksLimit: 6, callback: (v) => `${v} km`, color: tickColor },
+          ticks: {
+            maxTicksLimit: 6,
+            // Fixing max: totalKm (below) means the last tick is the route's
+            // exact end distance, not a Chart.js-chosen round number, so it
+            // needs rounding too (matches the mockup: "0  10  20  30  42.6 km").
+            callback: (v) => `${Number(Number(v).toFixed(1))} km`,
+            color: tickColor,
+          },
           grid: { display: false },
           border: { color: gridColor },
         },

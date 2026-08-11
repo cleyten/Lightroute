@@ -13,18 +13,11 @@ const all = <T extends Element>(selector: string): T[] => [
   ...document.querySelectorAll<T>(selector),
 ];
 
-// Route stats and detail panels
-export const statDistance = el<HTMLElement>('#stat-distance');
-export const statAscend = el<HTMLElement>('#stat-ascend');
-export const statsSection = el<HTMLElement>('#stats');
-export const routeEmpty = el<HTMLElement>('#route-empty');
-export const routePills = el<HTMLElement>('#route-pills');
-export const gradeLegendEl = el<HTMLElement>('#grade-legend');
-export const chartWrap = el<HTMLElement>('#chart-wrap');
-export const chartCanvas = el<HTMLCanvasElement>('#elevation-chart');
-export const surfaceEl = el<HTMLElement>('#surface');
-export const climbsEl = el<HTMLElement>('#climbs');
-export const climbsList = el<HTMLUListElement>('#climbs-list');
+// Route detail: a full-screen mobile view and a floating desktop panel, both
+// built entirely by routeDetailView.ts (see its file comment) rather than
+// exposing a fixed sub-element schema here.
+export const routeDetailMobile = el<HTMLElement>('#route-detail-mobile');
+export const routeDetailPanel = el<HTMLElement>('#route-detail-panel');
 
 // Route controls
 export const btnUndo = el<HTMLButtonElement>('#btn-undo');

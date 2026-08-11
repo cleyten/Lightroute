@@ -23,8 +23,6 @@ import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
 // ./chart pulls in chart.js/auto and is only needed once a route exists, so it
 // is dynamically imported (see loadChartModule) and never statically. Type-only
 // imports are erased at build time and do not affect that.
-// Kept out of chart.ts so the static grade swatches do not depend on Chart.js.
-import { renderGradeLegend, gradeColor } from './gradelegend';
 import { escapeHtml, initDisclosure, setActiveInGroup, setBusy, setStatus } from './ui';
 import { initDualRange } from './dualRange';
 import { initBottomSheet } from './bottomSheet';
@@ -34,7 +32,7 @@ import {
 } from './settings';
 import { state } from './state';
 import { sanitizeWaypoints } from './waypoints';
-import { surfaceBreakdown, renderSurfaceBar, surfaceRuns, type SurfaceClass } from './surface';
+import { surfaceBreakdown, surfaceRuns, type SurfaceClass } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
 import type { LoopOption } from './ors';
 import { rejectionText } from './loopText';
@@ -45,21 +43,24 @@ import { searchPlaces, reverseCity, type GeocodeResult } from './geocode';
 import { buildRoutePreviewSvg } from './preview';
 import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
+import { estimateMovingTimeHours } from './rideTime';
+import {
+  renderRouteDetailFullscreen, renderRouteDetailPanel, clearRouteDetail,
+  type RouteDetailData, type RouteDetailCallbacks,
+} from './routeDetailView';
 import { buildShareUrl, parseShareUrl } from './share';
 import { parseGpx, isClosedTrack } from './gpximport';
 import {
   DEFAULT_SIGNIN_HINT, accountCode, accountEmail, accountName, accountSignedIn, accountSignedOut,
   authorField, authorNameInput, bikeButtons, bottomTabButtons,
-  btnCafes, btnClear, btnExport, btnExportTcx, btnImportGpx,
+  btnClear, btnExport, btnExportTcx, btnImportGpx,
   btnLocate, btnPublish, btnReverse, btnRoundtrip, btnSave, btnShare, btnSignin, btnSigninBack,
-  btnSignout, btnUndo, btnVerify, btnWater, cafeKmInput, cafesEl, cafesList, chartCanvas,
-  chartWrap, climbsEl, climbsList, codeRow, communityBikeButtons, communityDistMax,
+  btnSignout, btnUndo, btnVerify, codeRow, communityBikeButtons, communityDistMax,
   communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons, communityList,
-  communityPanel, communitySortButtons, emailRow, gpxFileInput, gradeLegendEl, hillsButtons,
+  communityPanel, communitySortButtons, emailRow, gpxFileInput, hillsButtons,
   loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, rangeTrack, rangeValue, roundtripMax,
-  roundtripMin, routeEmpty, routeNameInput, routePills, savedList, searchInput, searchResults,
-  signinHint, statAscend, statDistance, statsSection, surfaceEl, trafficSelect,
-  waterEl, waterList, windChipEl,
+  roundtripMin, routeDetailMobile, routeDetailPanel, routeNameInput, savedList, searchInput,
+  searchResults, signinHint, trafficSelect, windChipEl,
 } from './dom';
 // ./auth and ./community both pull in @supabase/supabase-js. They are loaded on
 // demand via loadBackend() so the client stays out of the initial bundle; the
@@ -1033,68 +1034,31 @@ initDualRange({
   format: (min, max) => `${min} – ${max}`,
 });
 
-// --- Cafés along the route ---------------------------------------------------
+// --- Points of interest along the route (cafés, drinking water) -------------
+// Fetched automatically whenever a route appears rather than button-gated:
+// the route detail view's Stops tab is the only place these are listed, and
+// its hero pills need real counts as soon as they can have them. Both are a
+// nice-to-have, so a failure here is silent rather than an error banner.
 
-btnCafes.addEventListener('click', async () => {
-  if (!state.route) return;
-  btnCafes.disabled = true;
-  setStatus('Searching cafés along the route…');
-  setBusy(true);
-  // Overpass can take 20s. Pin the geometry the results belong to: if the
-  // route changed meanwhile, their km marks and off-route distances describe a
-  // route that no longer exists.
+/** Route a POI fetch is in flight (or done) for, so a route doesn't get fetched twice. */
+let poisFetchedForRoute: typeof state.route = null;
+
+function fetchPoisIfNeeded(): void {
+  if (!state.route || poisFetchedForRoute === state.route) return;
   const searchedRoute = state.route;
-  try {
-    const cafes = await fetchCafes(searchedRoute.coordinates);
-    if (state.route !== searchedRoute) return;
-    state.cafes = cafes;
-    renderCafes();
-    setStatus(state.cafes.length === 0 ? 'No cafés found along this route.' : '');
-  } catch (error) {
-    if (state.route !== searchedRoute) return;
-    setStatus(error instanceof Error ? error.message : 'Café search failed.', true);
-  } finally {
-    setBusy(false);
-    btnCafes.disabled = false;
-  }
-});
-
-cafeKmInput.addEventListener('input', () => {
-  if (state.cafes.length > 0) renderCafes();
-});
-
-/** Renders the café list (optionally filtered around a km mark) and the map dots. */
-function renderCafes(): void {
-  const aroundKm = Number(cafeKmInput.value);
-  const filtered =
-    cafeKmInput.value !== '' && !Number.isNaN(aroundKm)
-      ? state.cafes.filter((cafe) => Math.abs(cafe.atKm - aroundKm) <= 5)
-      : state.cafes;
-
-  cafesList.innerHTML = '';
-  if (state.cafes.length > 0 && filtered.length === 0) {
-    const note = document.createElement('li');
-    note.className = 'cafe-empty';
-    note.textContent = `No cafés within 5 km of km ${aroundKm}.`;
-    cafesList.append(note);
-  }
-  for (const cafe of filtered.slice(0, 25)) {
-    const item = document.createElement('li');
-    const button = document.createElement('button');
-    button.className = 'cafe-item';
-    button.innerHTML =
-      `<span class="cafe-where">km ${cafe.atKm.toFixed(1)}</span>` +
-      `<span class="cafe-name">${escapeHtml(cafe.name)}</span>` +
-      `<span class="cafe-detour">${Math.round(cafe.offRouteM)} m</span>`;
-    if (cafe.openingHours) button.title = `Opening hours: ${cafe.openingHours}`;
-    button.addEventListener('click', () => {
-      map.flyTo({ center: cafe.lngLat, zoom: 15 });
+  poisFetchedForRoute = searchedRoute;
+  void Promise.all([fetchCafes(searchedRoute.coordinates), fetchWater(searchedRoute.coordinates)])
+    .then(([cafes, water]) => {
+      if (state.route !== searchedRoute) return;
+      state.cafes = cafes;
+      state.water = water;
+      setCafeData(cafes);
+      setWaterData(water);
+      renderRouteDetails();
+    })
+    .catch(() => {
+      // Leave state.cafes/water empty; the hero pills and Stops tab just stay empty too.
     });
-    item.append(button);
-    cafesList.append(item);
-  }
-  setCafeData(filtered);
-  renderRoutePills();
 }
 
 function setCafeData(cafes: Cafe[]): void {
@@ -1116,54 +1080,7 @@ function setCafeData(cafes: Cafe[]): void {
 
 function clearCafes(): void {
   state.cafes = [];
-  cafesList.innerHTML = '';
-  cafeKmInput.value = '';
   setCafeData([]);
-}
-
-// --- Drinking water along the route ------------------------------------------
-
-btnWater.addEventListener('click', async () => {
-  if (!state.route) return;
-  btnWater.disabled = true;
-  setStatus('Searching drinking water along the route…');
-  setBusy(true);
-  // Same staleness guard as the café search above.
-  const searchedRoute = state.route;
-  try {
-    const water = await fetchWater(searchedRoute.coordinates);
-    if (state.route !== searchedRoute) return;
-    state.water = water;
-    renderWater();
-    setStatus(state.water.length === 0 ? 'No drinking water found along this route.' : '');
-  } catch (error) {
-    if (state.route !== searchedRoute) return;
-    setStatus(error instanceof Error ? error.message : 'Water search failed.', true);
-  } finally {
-    setBusy(false);
-    btnWater.disabled = false;
-  }
-});
-
-/** Renders the drinking-water list and the map dots. */
-function renderWater(): void {
-  waterList.innerHTML = '';
-  for (const point of state.water.slice(0, 25)) {
-    const item = document.createElement('li');
-    const button = document.createElement('button');
-    button.className = 'cafe-item water-item';
-    button.innerHTML =
-      `<span class="cafe-where">km ${point.atKm.toFixed(1)}</span>` +
-      `<span class="cafe-name">${escapeHtml(point.name)}</span>` +
-      `<span class="water-detour">${Math.round(point.offRouteM)} m</span>`;
-    button.addEventListener('click', () => {
-      map.flyTo({ center: point.lngLat, zoom: 15 });
-    });
-    item.append(button);
-    waterList.append(item);
-  }
-  setWaterData(state.water);
-  renderRoutePills();
 }
 
 function setWaterData(points: WaterPoint[]): void {
@@ -1183,7 +1100,6 @@ function setWaterData(points: WaterPoint[]): void {
 
 function clearWater(): void {
   state.water = [];
-  waterList.innerHTML = '';
   setWaterData([]);
 }
 
@@ -1260,12 +1176,14 @@ trafficSelect.addEventListener('change', () => {
   void recalculateRoute();
 });
 
-chartCanvas.addEventListener('mouseleave', () => {
-  if (hoverMarkerVisible) {
-    hoverMarker.remove();
-    hoverMarkerVisible = false;
-  }
-});
+function hideHoverMarkerOnLeave(canvas: HTMLCanvasElement): void {
+  canvas.addEventListener('mouseleave', () => {
+    if (hoverMarkerVisible) {
+      hoverMarker.remove();
+      hoverMarkerVisible = false;
+    }
+  });
+}
 
 /** Recreates all markers from state.waypoints, keeping numbering correct. */
 function rebuildMarkers(): void {
@@ -1505,69 +1423,30 @@ function loadChartModule(): Promise<ChartModule> {
   return chartModulePromise;
 }
 
+/**
+ * Renders the route detail view (mobile full-screen + desktop panel) for the
+ * current route, or clears both when there is none. `poisFetchedForRoute`
+ * doubles as "have we already handled a route change for this exact route
+ * object": this function runs again once cafés/water arrive (to show their
+ * counts) and must NOT re-detect climbs or re-clear POIs on that second pass,
+ * only on a genuine route change.
+ */
 function renderRouteDetails(): void {
-  // Any route change invalidates café results found for the previous route.
-  clearCafes();
-  clearWater();
-  cafesEl.hidden = !state.route;
-  waterEl.hidden = !state.route;
-  const statsWereHidden = statsSection.hidden;
-  statsSection.hidden = !state.route;
-  routeEmpty.hidden = !!state.route;
+  const isNewRoute = state.route !== poisFetchedForRoute;
+  if (isNewRoute) {
+    clearCafes();
+    clearWater();
+  }
   setSurfaceLine();
 
-  if (state.route) {
-    const km = state.route.distanceMeters / 1000;
-    const ascend = Math.round(state.route.ascendMeters);
-    // Count the numbers up the first time a route appears; snap on later
-    // re-routes (e.g. while dragging) so it doesn't flicker.
-    if (statsWereHidden) {
-      animateStat(statDistance, km, 'km', 1);
-      animateStat(statAscend, ascend, 'm', 0);
-    } else {
-      setStatValue(statDistance, km, 'km', 1);
-      setStatValue(statAscend, ascend, 'm', 0);
-    }
-
-    state.climbs = detectClimbs(state.route.coordinates);
-    state.selectedClimb = -1;
-    setClimbHighlight(null);
-    renderClimbsList();
-
-    chartWrap.hidden = false;
-    gradeLegendEl.hidden = false;
-    void loadChartModule().then(({ renderElevationChart }) => {
-      // The route may have changed again while the chart module was loading,
-      // so read state.route fresh here rather than capturing it earlier.
-      if (!state.route) return;
-      renderElevationChart(chartCanvas, state.route.coordinates, (index) => {
-        const coord = state.route?.coordinates[index];
-        if (!coord) return; // chart still holds indices from a previous route
-        hoverMarker.setLngLat([coord[0], coord[1]]);
-        if (!hoverMarkerVisible) {
-          hoverMarker.addTo(map);
-          hoverMarkerVisible = true;
-        }
-      });
-    });
-
-    const totals = state.route.surface ?? surfaceBreakdown(state.route.messages);
-    if (totals) {
-      surfaceEl.hidden = false;
-      renderSurfaceBar(surfaceEl, totals);
-    } else {
-      surfaceEl.hidden = true;
-    }
-  } else {
-    statDistance.textContent = '–';
-    statAscend.textContent = '–';
-    chartWrap.hidden = true;
-    gradeLegendEl.hidden = true;
-    surfaceEl.hidden = true;
-    climbsEl.hidden = true;
+  if (!state.route) {
+    clearRouteDetail(routeDetailMobile, routeDetailPanel);
+    routeDetailMobile.hidden = true;
+    routeDetailPanel.hidden = true;
     state.climbs = [];
     state.selectedClimb = -1;
     setClimbHighlight(null);
+    poisFetchedForRoute = null;
     // Nothing to clear if the chart module was never loaded (no route yet).
     if (chartModulePromise) {
       void chartModulePromise.then(({ clearElevationChart }) => clearElevationChart());
@@ -1576,102 +1455,82 @@ function renderRouteDetails(): void {
       hoverMarker.remove();
       hoverMarkerVisible = false;
     }
-  }
-  renderRoutePills();
-}
-
-/** Consistent outline icons for the at-a-glance summary pills. */
-const PILL_ICONS = {
-  climb:
-    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18L13.5 6l-3.5 6-2-3z"/></svg>',
-  cafe:
-    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h11v5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z"/><path d="M16 9h2a2 2 0 0 1 0 4h-2"/><path d="M6 3v2M10 3v2"/></svg>',
-  water:
-    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6.2 6 10.2A6 6 0 0 1 6 13.2C6 9.2 12 3 12 3z"/></svg>',
-};
-
-/** Compact at-a-glance pills summarizing climbs and coffee stops. */
-function renderRoutePills(): void {
-  const pills: string[] = [];
-  if (state.climbs.length > 0) {
-    const n = state.climbs.length;
-    const gain = Math.round(state.climbs.reduce((sum, c) => sum + c.gainM, 0));
-    pills.push(
-      `<span class="pill climb">${PILL_ICONS.climb} ${n} climb${n > 1 ? 's' : ''} · +${gain} m</span>`,
-    );
-  }
-  if (state.cafes.length > 0) {
-    const n = state.cafes.length;
-    pills.push(
-      `<span class="pill cafe">${PILL_ICONS.cafe} ${n} coffee stop${n > 1 ? 's' : ''}</span>`,
-    );
-  }
-  if (state.water.length > 0) {
-    const n = state.water.length;
-    pills.push(`<span class="pill water">${PILL_ICONS.water} ${n} water</span>`);
-  }
-  routePills.innerHTML = pills.join('');
-  routePills.hidden = pills.length === 0;
-}
-
-/** Lists detected climbs; clicking one highlights it on the map and zooms to it. */
-/** Writes a stat value with its small unit label. */
-function setStatValue(el: HTMLElement, value: number, unit: string, decimals: number): void {
-  el.innerHTML = `${value.toFixed(decimals)}<span class="unit">${unit}</span>`;
-}
-
-/** Counts a stat up from zero (easeOutCubic); snaps instantly under reduced motion. */
-function animateStat(el: HTMLElement, target: number, unit: string, decimals: number): void {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    setStatValue(el, target, unit, decimals);
     return;
   }
-  const duration = 550;
-  const start = performance.now();
-  const step = (now: number): void => {
-    const t = Math.min(1, (now - start) / duration);
-    const eased = 1 - Math.pow(1 - t, 3);
-    setStatValue(el, target * eased, unit, decimals);
-    if (t < 1) requestAnimationFrame(step);
-    else setStatValue(el, target, unit, decimals);
+
+  if (isNewRoute) {
+    state.climbs = detectClimbs(state.route.coordinates);
+    state.selectedClimb = -1;
+    setClimbHighlight(null);
+  }
+
+  // TODO(task 6, planner screens): #route-detail-mobile's visibility should
+  // come from plannerScreen === 'detail', not "a route exists". Until that
+  // state machine lands, showing it whenever there is a route is the agreed
+  // interim behaviour (see the redesign plan).
+  routeDetailMobile.hidden = false;
+  routeDetailPanel.hidden = false;
+
+  const km = state.route.distanceMeters / 1000;
+  const ascend = Math.round(state.route.ascendMeters);
+  const data: RouteDetailData = {
+    title: routeNameInput.value.trim() || 'Your route',
+    distanceKm: km,
+    ascendM: ascend,
+    timeHours: estimateMovingTimeHours(km, ascend, settings.bike),
+    closed: state.closed,
+    coordinates: state.route.coordinates,
+    climbs: state.climbs,
+    selectedClimb: state.selectedClimb,
+    surfaceTotals: state.route.surface ?? surfaceBreakdown(state.route.messages),
+    cafes: state.cafes,
+    water: state.water,
   };
-  requestAnimationFrame(step);
+  const callbacks: RouteDetailCallbacks = {
+    onBack: () => {
+      routeDetailMobile.hidden = true;
+    },
+    onShare: () => btnShare.click(),
+    onSave: () => btnSave.click(),
+    onExportGpx: () => btnExport.click(),
+    onClimbClick: selectClimb,
+    onPoiClick: (lngLat) => map.flyTo({ center: lngLat, zoom: 15 }),
+  };
+  const mobileCanvas = renderRouteDetailFullscreen(routeDetailMobile, data, callbacks);
+  const panelCanvas = renderRouteDetailPanel(routeDetailPanel, data, callbacks);
+  hideHoverMarkerOnLeave(mobileCanvas);
+  hideHoverMarkerOnLeave(panelCanvas);
+
+  void loadChartModule().then(({ renderElevationChart }) => {
+    // The route may have changed again while the chart module was loading,
+    // so read state.route fresh here rather than capturing it earlier.
+    if (!state.route) return;
+    const onHover = (index: number): void => {
+      const coord = state.route?.coordinates[index];
+      if (!coord) return; // chart still holds indices from a previous route
+      hoverMarker.setLngLat([coord[0], coord[1]]);
+      if (!hoverMarkerVisible) {
+        hoverMarker.addTo(map);
+        hoverMarkerVisible = true;
+      }
+    };
+    renderElevationChart(mobileCanvas, state.route.coordinates, onHover);
+    renderElevationChart(panelCanvas, state.route.coordinates, onHover);
+  });
+
+  fetchPoisIfNeeded();
 }
 
-function renderClimbsList(): void {
-  climbsEl.hidden = state.climbs.length === 0;
-  climbsList.innerHTML = '';
-  state.climbs.forEach((climb, index) => {
-    const item = document.createElement('li');
-    const button = document.createElement('button');
-    button.className = 'climb-item';
-    button.innerHTML =
-      `<span class="climb-grade" style="background:${gradeColor(climb.avgPct)}">${climb.avgPct.toFixed(1)}%</span>` +
-      `<span class="climb-info"><span class="climb-where">km ${climb.startKm.toFixed(1)}</span>` +
-      `<span class="climb-len">${(climb.lengthM / 1000).toFixed(1)} km climb</span></span>` +
-      `<span class="climb-gain">+${Math.round(climb.gainM)} m</span>`;
-    button.title = `Average ${climb.avgPct.toFixed(1)}%, steepest 100 m ${climb.maxPct.toFixed(0)}%`;
-    button.addEventListener('click', () => {
-      if (state.selectedClimb === index) {
-        state.selectedClimb = -1;
-        setClimbHighlight(null);
-      } else {
-        state.selectedClimb = index;
-        setClimbHighlight(climb);
-        const coords = state.route!.coordinates.slice(climb.startIndex, climb.endIndex + 1);
-        const bounds = coords.reduce(
-          (acc, c) => acc.extend([c[0], c[1]]),
-          new maplibregl.LngLatBounds([coords[0][0], coords[0][1]], [coords[0][0], coords[0][1]]),
-        );
-        map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
-      }
-      [...climbsList.querySelectorAll('.climb-item')].forEach((el, i) =>
-        el.classList.toggle('active', i === state.selectedClimb),
-      );
-    });
-    item.append(button);
-    climbsList.append(item);
-  });
+/** Highlights a climb's stretch on the live map and zooms to it; called from routeDetailView.ts. */
+function selectClimb(climb: Climb, index: number): void {
+  state.selectedClimb = index;
+  setClimbHighlight(climb);
+  const coords = state.route!.coordinates.slice(climb.startIndex, climb.endIndex + 1);
+  const bounds = coords.reduce(
+    (acc, c) => acc.extend([c[0], c[1]]),
+    new maplibregl.LngLatBounds([coords[0][0], coords[0][1]], [coords[0][0], coords[0][1]]),
+  );
+  map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
 }
 
 function setClimbHighlight(climb: Climb | null): void {
@@ -1796,7 +1655,6 @@ async function applySharedRoute(): Promise<void> {
 
 syncProfileUi();
 void refreshSavedList();
-renderGradeLegend(gradeLegendEl);
 
 // --- Community library (Supabase) ------------------------------------------
 // Publishing/rating needs sign-in; browsing is public. The whole section only

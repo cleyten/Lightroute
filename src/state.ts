@@ -37,4 +37,8 @@ export const state = {
   // Last GPS fix, shared between the planner's locate button and the community
   // "Near me" sort / distance-away labels. Null until location is granted.
   lastKnownLocation: null as [number, number] | null,
+  // Which tab is open in the route detail view (routeDetailView.ts). Kept here
+  // rather than module-local so a re-render (e.g. after a reroute) shows the
+  // same tab the user had open instead of resetting to Climbs.
+  routeDetailTab: 'climbs' as 'climbs' | 'surface' | 'stops',
 };

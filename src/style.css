@@ -9,6 +9,7 @@
      6. Map overlays    markers, floating controls
      7. Community
      8. Mobile          bottom sheet (<= 700px)
+     9. Route detail    full-screen mobile view + floating desktop panel
    ============================================================================ */
 
 /* =============================================================================
@@ -2133,4 +2134,319 @@ button.primary:active:not(:disabled),
   .statusbar {
     max-width: calc(100% - 7.5rem);
   }
+}
+
+/* =============================================================================
+   9. ROUTE DETAIL
+   Full-screen mobile view + floating desktop panel, both built from JS by
+   routeDetailView.ts. Shown whenever state.route exists (see main.ts).
+   ============================================================================ */
+
+.route-detail-mobile {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.route-detail-panel {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 400px;
+  max-width: calc(100% - 40px);
+  border-radius: var(--radius-panel);
+  background: var(--panel-grad);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  box-shadow: var(--shadow-panel);
+  z-index: 4;
+  overflow: hidden;
+}
+
+@media (max-width: 700px) {
+  .route-detail-panel {
+    display: none;
+  }
+}
+
+@media (min-width: 701px) {
+  .route-detail-mobile {
+    display: none;
+  }
+}
+
+/* --- Header, hero, footer (mobile) --------------------------------------- */
+.detail-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 58px;
+  padding: 0 8px;
+  background: var(--color-panel);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-btn-bare {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.icon-btn-bare:hover {
+  background: var(--color-hover);
+}
+
+.icon-btn-square {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--grad-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-tile), var(--edge-hi);
+  cursor: pointer;
+}
+
+.icon-btn-square:hover {
+  background: var(--color-hover);
+}
+
+.detail-hero {
+  flex: 0 0 auto;
+  position: relative;
+  height: 168px;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.hero-shape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.detail-hero-pills {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--color-panel);
+  box-shadow: var(--shadow-float);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.detail-body {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--color-panel);
+}
+
+.detail-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 76px;
+  padding: 0 20px;
+  background: var(--color-panel);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--color-border);
+}
+
+.detail-export {
+  flex: 1;
+  height: 52px;
+}
+
+/* --- Stats, chart, tabs (shared between the mobile body and the panel) --- */
+.detail-stats {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 15px 0 15px 20px;
+  border-left: 1px solid var(--color-border);
+}
+
+.detail-stat:first-child {
+  border-left: none;
+}
+
+.detail-stat-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+}
+
+.detail-stat-value {
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-stat-value .unit {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin-left: 3px;
+  font-weight: 500;
+}
+
+.detail-chart-wrap {
+  padding: 16px 20px 0;
+  height: 120px;
+}
+
+.detail-chart-wrap canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.detail-tabs {
+  display: flex;
+  gap: 22px;
+  padding: 18px 20px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-tab {
+  padding-bottom: 12px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.detail-tab.active {
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom-color: var(--color-text);
+}
+
+.detail-tab-body {
+  padding: 6px 20px 20px;
+}
+
+.detail-empty {
+  padding: 20px 0;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--color-muted);
+}
+
+.detail-climbs,
+.detail-stops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.detail-climbs .climb-item,
+.detail-stops .cafe-item {
+  width: 100%;
+}
+
+.stop-ico {
+  flex: 0 0 auto;
+  display: flex;
+}
+
+/* --- Desktop panel -------------------------------------------------------- */
+.detail-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+}
+
+.detail-panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--grad-raised);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pill-btn:hover {
+  background: var(--color-hover);
+}
+
+.pill-btn.primary {
+  border: none;
+}
+
+.route-detail-panel .detail-stats {
+  border-bottom: none;
 }
