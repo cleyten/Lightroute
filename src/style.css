@@ -1952,6 +1952,12 @@ button.primary:active:not(:disabled),
     bottom: calc(56px + env(safe-area-inset-bottom));
     height: calc(92vh - 56px - env(safe-area-inset-bottom));
     max-height: calc(92vh - 56px - env(safe-area-inset-bottom));
+    /* dvh tracks the viewport as browser chrome comes and goes. iOS Safari's vh
+       is the LARGE viewport (URL bar hidden), so with the bar showing the sheet
+       was taller than the visible area and its bottom fell off the screen,
+       which is what forced scrolling. vh stays first as the fallback. */
+    height: calc(92dvh - 56px - env(safe-area-inset-bottom));
+    max-height: calc(92dvh - 56px - env(safe-area-inset-bottom));
   }
 
   #sidebar {
@@ -1962,6 +1968,8 @@ button.primary:active:not(:disabled),
     width: 100%;
     height: 92vh;
     max-height: 92vh;
+    height: 92dvh;
+    max-height: 92dvh;
     padding: 0;
     border: none;
     border-radius: var(--radius-panel) var(--radius-panel) 0 0;
@@ -1970,6 +1978,7 @@ button.primary:active:not(:disabled),
     display: flex;
     flex-direction: column;
     transform: translateY(64vh);
+    transform: translateY(64dvh);
     transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
     z-index: 3;
   }
@@ -2635,6 +2644,7 @@ button.primary:active:not(:disabled),
   bottom: 0;
   z-index: 21;
   max-height: 85vh;
+  max-height: 85dvh;
   overflow-y: auto;
   padding: 0 20px 28px;
   border-radius: 20px 20px 0 0;
@@ -2952,5 +2962,20 @@ button.primary:active:not(:disabled),
      same height it would sit right on top of the wordmark. */
   .statusbar {
     top: calc(68px + env(safe-area-inset-top));
+  }
+}
+
+/* --- Keep the community switcher in place while its list scrolls ---------- */
+/* A route list is unbounded, so it has to scroll - but the whole sheet used to
+   scroll with it, carrying the Discover / Your library switcher off-screen. */
+@media (max-width: 700px) {
+  .community-segment {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-panel);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    padding-top: var(--space-2);
   }
 }
