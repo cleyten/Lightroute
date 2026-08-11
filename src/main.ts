@@ -44,6 +44,7 @@ import { buildRoutePreviewSvg } from './preview';
 import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
 import { estimateMovingTimeHours } from './rideTime';
+import { renderCandidateCards, type CandidateCardData } from './candidateCards';
 import {
   renderRouteDetailFullscreen, renderRouteDetailPanel, clearRouteDetail,
   type RouteDetailData, type RouteDetailCallbacks,
@@ -710,39 +711,39 @@ btnRoundtrip.addEventListener('click', async () => {
   updateControls();
 });
 
-/** Renders the quality-passed loops as selectable options. */
-function renderLoopOptions(): void {
-  loopOptionsEl.innerHTML = '';
-  loopOptionsEl.hidden = state.loopOptions.length === 0;
-  state.loopOptions.forEach((option, index) => {
-    const button = document.createElement('button');
-    button.className = 'loop-option';
-    button.classList.toggle('active', index === state.selectedLoop);
+/** Downsamples a coordinate list for the cards' mini route-shape icon (preview.ts). */
+function iconWaypoints(coordinates: [number, number, number][]): [number, number][] {
+  const stride = Math.max(1, Math.ceil(coordinates.length / 150));
+  const out: [number, number][] = [];
+  for (let i = 0; i < coordinates.length; i += stride) out.push([coordinates[i][0], coordinates[i][1]]);
+  return out;
+}
 
-    const parts = [
-      `${(option.route.distanceMeters / 1000).toFixed(1)} km`,
-      `${Math.round(option.route.ascendMeters)} m up`,
-    ];
-    if (option.unpaved !== null) parts.push(`${Math.round(option.unpaved * 100)}% unpaved`);
-    if (option.network !== null && option.network > 0.15) {
-      parts.push(`${Math.round(option.network * 100)}% on cycle routes`);
-    }
-    const title = document.createElement('span');
-    title.className = 'loop-title';
-    title.textContent = `Loop ${index + 1}`;
-    const detail = document.createElement('span');
-    detail.className = 'loop-detail';
-    detail.textContent = parts.join(' · ');
-    button.append(title, detail);
-    if (option.windNote) {
-      const wind = document.createElement('span');
-      wind.className = 'loop-wind';
-      wind.textContent = option.windNote;
-      button.append(wind);
-    }
-    button.addEventListener('click', () => selectLoop(index));
-    loopOptionsEl.append(button);
-  });
+function loopOptionToCardData(option: LoopOption): CandidateCardData {
+  const km = option.route.distanceMeters / 1000;
+  const ascend = option.route.ascendMeters;
+  return {
+    title: `Loop ${state.loopOptions.indexOf(option) + 1}`,
+    distanceKm: km,
+    ascendM: ascend,
+    timeHours: estimateMovingTimeHours(km, ascend, settings.bike),
+    closed: true,
+    waypoints: iconWaypoints(option.route.coordinates),
+    coordinates: option.route.coordinates,
+    surfaceTotals: option.route.surface ?? surfaceBreakdown(option.route.messages),
+    climbCount: detectClimbs(option.route.coordinates).length,
+  };
+}
+
+/** Renders the quality-passed loops as selectable candidate cards. */
+function renderLoopOptions(): void {
+  loopOptionsEl.hidden = state.loopOptions.length === 0;
+  renderCandidateCards(
+    loopOptionsEl,
+    state.loopOptions.map(loopOptionToCardData),
+    state.selectedLoop,
+    selectLoop,
+  );
 }
 
 function selectLoop(index: number): void {
@@ -763,9 +764,10 @@ function selectLoop(index: number): void {
   setRouteData(option.route.geojson);
   renderRouteDetails();
   updateControls();
-  [...loopOptionsEl.children].forEach((el, i) =>
-    el.classList.toggle('active', i === index),
-  );
+  // Rebuilds the cards so the newly-selected one expands with its elevation
+  // bars, surface bar and caption (not just a class toggle: a compact card's
+  // DOM genuinely differs from its expanded form).
+  renderLoopOptions();
 
   const bounds = coords.reduce(
     (acc, c) => acc.extend([c[0], c[1]]),

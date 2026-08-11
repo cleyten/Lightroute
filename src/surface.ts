@@ -182,7 +182,13 @@ const LEGEND: { key: keyof Omit<SurfaceTotals, 'totalMeters'>; label: string; co
   { key: 'unknown', label: 'Unknown', color: 'var(--surface-unknown)' },
 ];
 
-export function renderSurfaceBar(container: HTMLElement, totals: SurfaceTotals): void {
+/** `showLegend: false` for compact contexts (candidate cards) that show their own caption instead. */
+export function renderSurfaceBar(
+  container: HTMLElement,
+  totals: SurfaceTotals,
+  options: { showLegend?: boolean } = {},
+): void {
+  const { showLegend = true } = options;
   container.innerHTML = '';
 
   const track = document.createElement('div');
@@ -205,5 +211,6 @@ export function renderSurfaceBar(container: HTMLElement, totals: SurfaceTotals):
     legend.append(item);
   }
 
-  container.append(track, legend);
+  container.append(track);
+  if (showLegend) container.append(legend);
 }
