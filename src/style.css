@@ -2794,7 +2794,8 @@ button.primary:active:not(:disabled),
 }
 /* --- Plan screen: the mockup's compact row list -------------------------- */
 .plan-title {
-  padding: 0 var(--space-5) var(--space-3);
+  /* Top padding matters on desktop, where the tab row sits directly above. */
+  padding: var(--space-3) var(--space-5);
   font-size: 1.25rem;
   font-weight: 750;
   letter-spacing: -0.02em;
@@ -2904,5 +2905,52 @@ button.primary:active:not(:disabled),
   #loop-options {
     padding-left: var(--space-5);
     padding-right: var(--space-5);
+  }
+}
+
+/* --- Wordmark as a floating pill over the map (phones) -------------------- */
+/* brandPlacement.ts moves #brand out of the sheet at this breakpoint, which is
+   what frees the ~70px of sheet height it used to occupy on every screen. */
+@media (max-width: 700px) {
+  #brand {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    left: 12px;
+    z-index: 4;
+    width: max-content;
+    gap: 0.5rem;
+    padding: 0 0.6rem 0 0.5rem;
+    height: 44px;
+    border-radius: 999px;
+    background: var(--color-panel);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border: 0.5px solid var(--color-border);
+    box-shadow: var(--shadow-float);
+  }
+
+  /* Sized down to pill proportions; the desktop sidebar keeps the large mark. */
+  #brand .brand-mark {
+    width: 24px;
+    height: 24px;
+  }
+
+  #brand h1 {
+    font-size: 1.05rem;
+  }
+
+  #brand .theme-toggle {
+    width: 30px;
+    height: 30px;
+    min-height: 30px;
+    border: none;
+    background: none;
+    box-shadow: none;
+  }
+
+  /* Clears the pill: the toast is centred with 4rem side margins, so at the
+     same height it would sit right on top of the wordmark. */
+  .statusbar {
+    top: calc(68px + env(safe-area-inset-top));
   }
 }

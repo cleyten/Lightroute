@@ -26,6 +26,7 @@ import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
 import { escapeHtml, setActiveInGroup, setBusy, setStatus } from './ui';
 import { initDualRange } from './dualRange';
 import { initBottomSheet } from './bottomSheet';
+import { initBrandPlacement } from './brandPlacement';
 import {
   currentProfile, persistSettings, settings, syncProfileUi,
   type BikeType, type HillPreference,
@@ -2461,6 +2462,11 @@ async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
 
 // --- Mobile bottom sheet ---
 const bottomSheet = initBottomSheet();
+
+// The wordmark floats over the map on phones and sits in the sidebar on
+// desktop, which means moving it between parents; re-measure the sheet after,
+// since its middle snap is sized from its contents.
+initBrandPlacement(() => bottomSheet?.refresh());
 
 // --- Mobile planner screens (plan / generating / candidates / detail / build) ---
 initPlannerScreens(
