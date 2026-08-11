@@ -51,6 +51,9 @@ import { initDialogSheet } from './dialogSheet';
 import { setApplyButtonCount, resetFilterControls } from './sortFilterSheet';
 import { wireAltFormatButton, openSaveExportSheet } from './saveExportSheet';
 import {
+  initPlanRows, renderPlanRows, showPlanSettingPane, type PlanRowState,
+} from './planRows';
+import {
   renderRouteDetailFullscreen, renderRouteDetailPanel, clearRouteDetail,
   type RouteDetailData, type RouteDetailCallbacks,
 } from './routeDetailView';
@@ -62,15 +65,18 @@ import {
   btnApplyFilters, btnBookmarkLoop, btnBuildDone, btnCancelGenerate, btnCandidatesBack, btnClear,
   btnCloseLoop, btnExport,
   btnExportTcx, btnImportGpx,
-  btnLocate, btnOpenFilters, btnOpenSaveExport, btnPublish, btnResetFilters, btnReverse, btnRoundtrip,
+  btnLocate, btnOpenFilters, btnOpenSaveExport, btnPlanSettingDone, btnPublish, btnResetFilters,
+  btnReverse, btnRoundtrip,
   btnSave, btnShare, btnSignin, btnSigninBack,
   btnSignout, btnUndo, btnUseLoop, btnVerify, buildAscend, buildDistance,
-  buildPoints, btnChangeCandidates, candidateDotsEl, candidatesHeadingEl, candidatesHeadingText,
+  buildActionsEl, buildPoints, btnChangeCandidates, candidateDotsEl, candidatesHeadingEl,
+  candidatesHeadingText, controlsEl,
   codeRow, communityBikeButtons, communityDiscoverEl, communityDistMax,
   communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons, communityLibraryEl,
   communityList, communityPanel, communitySegmentEl, communitySortButtons, emailRow, gpxFileInput,
   hillsButtons, libraryTabButtons,
   loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, publishedList, rangeTrack, rangeValue,
+  planSettingBackdrop, planSettingSheetEl,
   roundtripMax, roundtripMin, routeDetailMobile, routeDetailPanel, routeNameInput, saveExportBackdrop,
   saveExportSheetEl, savedList,
   screenBuild, screenCandidates, screenGenerating, screenPlan, searchInput,
@@ -268,6 +274,12 @@ const hoverDotEl = document.createElement('div');
 hoverDotEl.className = 'hover-dot';
 const hoverMarker = new maplibregl.Marker({ element: hoverDotEl });
 let hoverMarkerVisible = false;
+
+/** Place name for waypoint 1, plus the point it describes so a moved start
+ *  invalidates it. Declared up here rather than beside syncPlanRows() so the
+ *  early map-load path can refresh the rows without hitting a TDZ error. */
+let startPlaceLabel: string | null = null;
+let startPlaceFor: string | null = null;
 
 map.on('load', () => {
   // Empty GeoJSON source; its data is replaced whenever a route is calculated.
@@ -1070,6 +1082,9 @@ function renderSearchResults(results: GeocodeResult[]): void {
       searchInput.value = '';
       renderSearchResults([]);
       addWaypoint([...result.lngLat] as LngLat, result.label);
+      // Picking a place is the whole point of the Start pane, so get out of the
+      // way and let the map show where it landed.
+      planSettingDialog.close();
     });
     item.append(button);
     searchResults.append(item);
@@ -1137,6 +1152,8 @@ initDualRange({
   label: rangeValue,
   track: rangeTrack,
   format: (min, max) => `${min} – ${max}`,
+  // Keeps the Plan screen's Distance row in step while the sheet is open.
+  onInput: () => syncPlanRows(),
 });
 
 // --- Points of interest along the route (cafés, drinking water) -------------
@@ -1224,6 +1241,51 @@ btnResetFilters.addEventListener('click', () => {
   );
 });
 
+const planSettingDialog = initDialogSheet(planSettingSheetEl, planSettingBackdrop);
+initPlanRows((pane) => {
+  showPlanSettingPane(pane);
+  planSettingDialog.open();
+  if (pane === 'start') searchInput.focus();
+});
+btnPlanSettingDone.addEventListener('click', () => {
+  planSettingDialog.close();
+  syncPlanRows();
+});
+
+function planRowState(): PlanRowState {
+  return {
+    startPlace: startPlaceLabel,
+    hasStart: state.waypoints.length > 0,
+    distanceMinKm: Number(roundtripMin.value),
+    distanceMaxKm: Number(roundtripMax.value),
+    bike: settings.bike,
+    hills: settings.hills,
+    traffic: settings.traffic,
+  };
+}
+
+/** Refreshes the Plan row summaries, resolving the start's place name if it moved. */
+function syncPlanRows(): void {
+  const start = state.waypoints[0];
+  const key = start ? `${start[0].toFixed(4)},${start[1].toFixed(4)}` : null;
+  if (key !== startPlaceFor) {
+    startPlaceFor = key;
+    startPlaceLabel = null;
+    if (start) {
+      void reverseCity(start)
+        .then((place) => {
+          if (startPlaceFor !== key) return; // start moved while this was in flight
+          startPlaceLabel = place;
+          renderPlanRows(planRowState());
+        })
+        .catch(() => {
+          // No place name is fine; the row falls back to "On the map".
+        });
+    }
+  }
+  renderPlanRows(planRowState());
+}
+
 const saveExportDialog = initDialogSheet(saveExportSheetEl, saveExportBackdrop);
 wireAltFormatButton(btnExportTcx);
 btnOpenSaveExport.addEventListener('click', () => openSaveExportSheet(saveExportDialog, routeNameInput));
@@ -1295,6 +1357,7 @@ bikeButtons.forEach((button) =>
     settings.bike = button.dataset.bike as BikeType;
     persistSettings();
     syncProfileUi();
+    syncPlanRows();
     void recalculateRoute();
   }),
 );
@@ -1305,12 +1368,14 @@ hillsButtons.forEach((button) =>
     settings.hills = button.dataset.hills as HillPreference;
     persistSettings();
     syncProfileUi();
+    syncPlanRows();
   }),
 );
 
 trafficSelect.addEventListener('change', () => {
   settings.traffic = Number(trafficSelect.value);
   persistSettings();
+  syncPlanRows();
   void recalculateRoute();
 });
 
@@ -1750,6 +1815,28 @@ function updateControls(): void {
   btnBuildDone.disabled = !state.route;
   updatePublishButton();
   renderBuildReadout();
+  syncEditToolbar();
+  syncPlanRows();
+}
+
+/**
+ * Shows the Undo/Clear/Reverse toolbar whenever there is actually something to
+ * edit, on whichever screen the user is on.
+ *
+ * Deliberately keyed off state rather than off the planner screen: waypoints
+ * arrive from more places than the Build screen. Loading a saved route, opening
+ * a shared link, importing a GPX and picking a generated loop all leave
+ * editable points on screen without ever passing through 'build', and hiding
+ * the toolbar there left no way to undo or clear them.
+ */
+function syncEditToolbar(): void {
+  const screen = getPlannerScreen();
+  const somethingToEdit = state.waypoints.length > 0 || state.closed;
+  // Generating/Candidates hand the sheet over to the candidate cards, and the
+  // route detail is a full-screen overlay carrying its own actions.
+  const screenHasRoomForIt = screen === 'plan' || screen === 'build';
+  controlsEl.hidden = !somethingToEdit || !screenHasRoomForIt;
+  buildActionsEl.hidden = screen !== 'build';
 }
 
 /** The Build screen's big distance/gain/point-count readout (mobile only). */
@@ -1893,6 +1980,9 @@ function setActiveTab(name: 'planner' | 'community'): void {
   plannerPanel.hidden = name !== 'planner';
   communityPanel.hidden = name !== 'community';
   if (name === 'community') void refreshCommunity();
+  // The two tabs are very different heights, and the middle snap is measured
+  // from whichever is showing.
+  bottomSheet?.refresh();
 }
 
 if (isSupabaseConfigured) {
@@ -2372,9 +2462,17 @@ initPlannerScreens(
     // own visibility check on every screen change, not just when its data
     // changes.
     renderLoopOptions();
+    syncEditToolbar();
     if (screen === 'generating' || screen === 'candidates') bottomSheet?.raiseToHalf();
+    // The middle snap is measured from the sheet's contents, so a screen swap
+    // has to re-measure or the sheet keeps the previous screen's height.
+    bottomSheet?.refresh();
   },
 );
+
+// Reflect the initial state (a shared link may already have loaded a route).
+syncEditToolbar();
+syncPlanRows();
 
 // Dev-only handle for verification in the browser console; stripped from
 // the production build by the `import.meta.env.DEV` guard.

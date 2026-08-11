@@ -1974,13 +1974,22 @@ button.primary:active:not(:disabled),
     z-index: 3;
   }
 
+  /* 44px, not the 28px this used to be: it is the sheet's main drag target and
+     a thin strip sits directly against the map, so a slightly high grab panned
+     the map instead of lowering the sheet. The visible pill stays small. */
   #sheet-handle {
     display: block;
     flex: 0 0 auto;
-    height: 28px;
+    height: 44px;
     position: relative;
     cursor: grab;
     touch-action: none;
+  }
+
+  /* Keeps a swipe that reaches the end of the content from scrolling the page
+     behind the sheet (and, in standalone PWA mode, from rubber-banding). */
+  #sheet-body {
+    overscroll-behavior: contain;
   }
 
   #sheet-handle::before {
@@ -2115,10 +2124,13 @@ button.primary:active:not(:disabled),
    routeDetailView.ts. Shown whenever state.route exists (see main.ts).
    ============================================================================ */
 
+/* z-index 6, above the bottom nav's 5: this is a full-screen view carrying its
+   own back button and footer actions, and at an equal z-index the nav (later in
+   the DOM) painted over the Export GPX button. */
 .route-detail-mobile {
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: 6;
   display: flex;
   flex-direction: column;
   background: var(--color-bg);
@@ -2576,12 +2588,9 @@ button.primary:active:not(:disabled),
 
 /* --- Shared-element visibility on mobile, keyed off plannerScreen.ts's
    attribute. Desktop overrides below win regardless of this. ------------- */
-@media (max-width: 700px) {
-  #tab-planner:not([data-planner-screen='build']) #controls,
-  #tab-planner:not([data-planner-screen='build']) .build-actions {
-    display: none;
-  }
-}
+/* #controls and .build-actions visibility is decided in JS by
+   syncEditToolbar() (main.ts), which keys off whether there is anything to
+   edit rather than off which screen is showing. */
 
 /* --- Desktop: no screens, no new chrome — the pre-redesign single column. */
 @media (min-width: 701px) {
@@ -2614,6 +2623,9 @@ button.primary:active:not(:disabled),
   inset: 0;
   z-index: 20;
   background: rgba(0, 0, 0, 0.42);
+  /* Not decoration: iOS Safari only treats an element as tappable (and so only
+     dispatches the events dialogSheet.ts listens for) when it looks clickable. */
+  cursor: pointer;
 }
 
 .dialog-sheet {
@@ -2779,4 +2791,89 @@ button.primary:active:not(:disabled),
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* --- Plan screen: the mockup's compact row list -------------------------- */
+.plan-title {
+  padding: 0 var(--space-5) var(--space-3);
+  font-size: 1.25rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.plan-rows {
+  border-top: 1px solid var(--color-border);
+}
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  /* 15px block padding gives a ~54px row: comfortably over the 44px minimum
+     touch target, and four of them plus the button still clear the fold. */
+  padding: 15px var(--space-5);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-row:hover {
+  background: var(--color-hover);
+}
+
+.plan-row > svg:first-child {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+}
+
+.plan-row-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.plan-row-value {
+  flex: 1;
+  text-align: right;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-row-value.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-row-chevron {
+  flex: 0 0 auto;
+  color: var(--color-faint);
+}
+
+/* The generate button and its hint, now that they sit directly on the screen
+   rather than inside a .group/.field wrapper. */
+#screen-plan > .generate {
+  width: calc(100% - 2 * var(--space-5));
+  margin: var(--space-4) var(--space-5) 0;
+}
+
+.plan-tap-hint {
+  text-align: center;
+  margin-top: var(--space-2);
+}
+
+/* Panes inside the plan-setting dialog. */
+.plan-setting-pane .field {
+  margin-top: 0;
+}
+
+.plan-setting-pane #search-results {
+  margin-top: var(--space-2);
 }

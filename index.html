@@ -48,61 +48,44 @@
         <!-- Mobile-only screen state (plannerScreen.ts): exactly one of these
              four is visible at a time under 700px; all four are forced visible
              together above it, matching today's single-column desktop form. -->
+        <!-- The mockup's compact row list. Each row summarises a setting and
+             opens #plan-setting-sheet on the matching pane, where the real
+             controls live (unchanged ids, so every existing handler still
+             applies). Kept short on purpose: the old inline form was 594px
+             tall, which pushed "Find loops" 150px below the fold and forced
+             the sheet to full height, hiding the map. -->
         <div id="screen-plan" class="planner-screen">
-          <p class="hint">Click the map to set your start and add waypoints.</p>
+          <div class="plan-title">Plan a ride</div>
+          <div class="plan-rows">
+            <button type="button" class="plan-row" data-plan-setting="start">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
+              <span class="plan-row-label">Start</span>
+              <span class="plan-row-value" id="row-value-start">Tap the map</span>
+              <svg class="plan-row-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            </button>
+            <button type="button" class="plan-row" data-plan-setting="distance">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h6a4 4 0 0 0 0-8H10a4 4 0 0 1 0-8h6"/></svg>
+              <span class="plan-row-label">Distance</span>
+              <span class="plan-row-value mono" id="row-value-distance">30 – 50 km</span>
+              <svg class="plan-row-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            </button>
+            <button type="button" class="plan-row" data-plan-setting="bike">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="3.2"/><circle cx="18" cy="17" r="3.2"/><path d="M6 17l4-9h4l3.6 9"/><path d="M9 8h5"/></svg>
+              <span class="plan-row-label">Bike</span>
+              <span class="plan-row-value" id="row-value-bike">Race</span>
+              <svg class="plan-row-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            </button>
+            <button type="button" class="plan-row" data-plan-setting="hills">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18L13.5 6l-3.5 6-2-3z"/></svg>
+              <span class="plan-row-label">Hills &amp; roads</span>
+              <span class="plan-row-value" id="row-value-hills">Mixed</span>
+              <svg class="plan-row-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            </button>
+          </div>
 
-          <section class="group">
-            <div id="search-box">
-              <span class="save-row">
-                <input id="search-input" type="text" placeholder="Search address or place" autocomplete="off" aria-label="Search address or place" />
-                <button id="btn-locate" type="button" title="Use my GPS location" aria-label="Use my GPS location">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
-                </button>
-              </span>
-              <ul id="search-results" hidden></ul>
-            </div>
-          </section>
-
-          <section class="group">
-            <span class="group-label">Route preferences</span>
-            <div id="planner-options-body" class="pref-grid">
-              <span class="field">Ride type</span>
-              <div class="segmented" id="bike-type">
-                <button type="button" data-bike="race" aria-pressed="false">Race</button>
-                <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
-                <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
-              </div>
-              <span class="field">Elevation</span>
-              <div class="segmented" id="hills-type">
-                <button type="button" data-hills="avoid" aria-pressed="false">Avoid</button>
-                <button type="button" data-hills="mix" aria-pressed="true">Mix</button>
-                <button type="button" data-hills="prefer" aria-pressed="false">Prefer</button>
-              </div>
-              <label class="field" id="traffic-label">
-                Road preference
-                <select id="traffic-select">
-                  <option value="0">No (fastest route)</option>
-                  <option value="1">Quiet roads</option>
-                  <option value="2">Very quiet roads</option>
-                </select>
-              </label>
-            </div>
-          </section>
-
-          <section class="group">
-            <div class="field" id="roundtrip-field">
-              Round trip from point 1
-              <span class="range-label"><span id="range-value">30 – 50</span> km</span>
-              <div class="dual-range">
-                <div class="range-track" id="range-track"></div>
-                <input id="roundtrip-min" type="range" min="5" max="100" step="5" value="30" aria-label="Minimum round trip distance in km" />
-                <input id="roundtrip-max" type="range" min="5" max="100" step="5" value="50" aria-label="Maximum round trip distance in km" />
-              </div>
-              <button id="btn-roundtrip" class="primary generate"><svg class="btn-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h6a4 4 0 0 0 0-8H10a4 4 0 0 1 0-8h6"/></svg>Find loops</button>
-              <p class="hint plan-tap-hint">Or tap the map to build a route yourself.</p>
-              <div id="wind-chip" hidden></div>
-            </div>
-          </section>
+          <button id="btn-roundtrip" class="primary generate"><svg class="btn-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h6a4 4 0 0 0 0-8H10a4 4 0 0 1 0-8h6"/></svg>Find loops</button>
+          <p class="hint plan-tap-hint">Or tap the map to build a route yourself.</p>
+          <div id="wind-chip" hidden></div>
         </div>
 
         <div id="screen-generating" class="planner-screen" hidden>
@@ -288,6 +271,71 @@
            there is a route; see renderRouteDetails() in main.ts. -->
       <div id="route-detail-mobile" class="route-detail-mobile" hidden></div>
       <div id="route-detail-panel" class="route-detail-panel" hidden></div>
+
+      <!-- Plan settings (planRows.ts + dialogSheet.ts). Holds the actual
+           controls the Plan rows summarise. Every id here is the original one
+           from the old inline form, so the handlers in main.ts and
+           settings.ts bind to exactly the same elements as before. -->
+      <div id="plan-setting-backdrop" class="dialog-backdrop" hidden></div>
+      <div id="plan-setting-sheet" class="dialog-sheet" role="dialog" aria-label="Route setting" hidden>
+        <div class="dialog-handle"></div>
+        <div class="dialog-head">
+          <span class="dialog-title" id="plan-setting-title">Start</span>
+        </div>
+
+        <div class="plan-setting-pane" data-pane="start">
+          <div id="search-box">
+            <span class="save-row">
+              <input id="search-input" type="text" placeholder="Search address or place" autocomplete="off" aria-label="Search address or place" />
+              <button id="btn-locate" type="button" title="Use my GPS location" aria-label="Use my GPS location">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+              </button>
+            </span>
+            <ul id="search-results" hidden></ul>
+          </div>
+          <p class="hint">Search for a place, use your location, or close this and tap the map.</p>
+        </div>
+
+        <div class="plan-setting-pane" data-pane="distance" hidden>
+          <div class="field" id="roundtrip-field">
+            Round trip from point 1
+            <span class="range-label"><span id="range-value">30 – 50</span> km</span>
+            <div class="dual-range">
+              <div class="range-track" id="range-track"></div>
+              <input id="roundtrip-min" type="range" min="5" max="100" step="5" value="30" aria-label="Minimum round trip distance in km" />
+              <input id="roundtrip-max" type="range" min="5" max="100" step="5" value="50" aria-label="Maximum round trip distance in km" />
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-setting-pane" data-pane="bike" hidden>
+          <span class="field">Ride type</span>
+          <div class="segmented" id="bike-type">
+            <button type="button" data-bike="race" aria-pressed="false">Race</button>
+            <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
+            <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
+          </div>
+        </div>
+
+        <div class="plan-setting-pane" data-pane="hills" hidden>
+          <span class="field">Elevation</span>
+          <div class="segmented" id="hills-type">
+            <button type="button" data-hills="avoid" aria-pressed="false">Avoid</button>
+            <button type="button" data-hills="mix" aria-pressed="true">Mix</button>
+            <button type="button" data-hills="prefer" aria-pressed="false">Prefer</button>
+          </div>
+          <label class="field" id="traffic-label">
+            Road preference
+            <select id="traffic-select">
+              <option value="0">No (fastest route)</option>
+              <option value="1">Quiet roads</option>
+              <option value="2">Very quiet roads</option>
+            </select>
+          </label>
+        </div>
+
+        <button type="button" id="btn-plan-setting-done" class="primary dialog-apply">Done</button>
+      </div>
 
       <!-- Save/Export (saveExportSheet.ts + dialogSheet.ts): a top-level
            sibling, not nested in either tab, since it opens from bookmark

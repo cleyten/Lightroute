@@ -24,7 +24,13 @@ export function initDialogSheet(dialogEl: HTMLElement, backdropEl: HTMLElement):
     dialogEl.hidden = true;
   }
 
-  backdropEl.addEventListener('click', doClose);
+  // pointerdown, not click: iOS Safari does not reliably fire click on a bare
+  // non-interactive <div>, so tap-to-dismiss silently did nothing on iPhone.
+  // pointerdown also feels more immediate than waiting for a full tap.
+  backdropEl.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    doClose();
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && openState) doClose();
   });

@@ -35,6 +35,8 @@ export const btnUseLoop = el<HTMLButtonElement>('#btn-use-loop');
 export const buildDistance = el<HTMLElement>('#build-distance');
 export const buildAscend = el<HTMLElement>('#build-ascend');
 export const buildPoints = el<HTMLElement>('#build-points');
+export const controlsEl = el<HTMLElement>('#controls');
+export const buildActionsEl = el<HTMLElement>('#build-actions');
 export const btnCloseLoop = el<HTMLButtonElement>('#btn-close-loop');
 export const btnBuildDone = el<HTMLButtonElement>('#btn-build-done');
 
@@ -127,6 +129,11 @@ export const sortFilterBackdrop = el<HTMLElement>('#sort-filter-backdrop');
 export const sortFilterSheetEl = el<HTMLElement>('#sort-filter-sheet');
 export const btnResetFilters = el<HTMLButtonElement>('#btn-reset-filters');
 export const btnApplyFilters = el<HTMLButtonElement>('#btn-apply-filters');
+
+// Plan setting dialog (planRows.ts / dialogSheet.ts)
+export const planSettingBackdrop = el<HTMLElement>('#plan-setting-backdrop');
+export const planSettingSheetEl = el<HTMLElement>('#plan-setting-sheet');
+export const btnPlanSettingDone = el<HTMLButtonElement>('#btn-plan-setting-done');
 
 // Save/Export dialog (saveExportSheet.ts / dialogSheet.ts)
 export const btnOpenSaveExport = el<HTMLButtonElement>('#btn-open-save-export');
