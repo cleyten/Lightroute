@@ -3,14 +3,18 @@
 // Everything here is inert on desktop, where the panel is a floating sidebar
 // and the inline transform must never leak onto it.
 
-export function initBottomSheet(): void {
+export interface BottomSheetHandle {
+  /** Raises the sheet from peek to half, if it's currently at peek. No-op on desktop. */
+  raiseToHalf(): void;
+}
+
+export function initBottomSheet(): BottomSheetHandle | null {
   const sheetEl = document.querySelector<HTMLElement>('#sidebar');
   const handleEl = document.querySelector<HTMLElement>('#sheet-handle');
-  if (!sheetEl || !handleEl) return;
+  if (!sheetEl || !handleEl) return null;
 
   const fab = document.querySelector<HTMLElement>('#gps-fab');
   const locateEl = document.querySelector<HTMLButtonElement>('#btn-locate');
-  const distEl = document.querySelector<HTMLElement>('#stat-distance');
 
   const isMobile = (): boolean => window.matchMedia('(max-width: 700px)').matches;
 
@@ -124,15 +128,6 @@ export function initBottomSheet(): void {
     }
   });
 
-  // Raise to half the first time a route appears so the stats come into view.
-  if (distEl) {
-    const observer = new MutationObserver(() => {
-      const text = distEl.textContent ?? '';
-      if (isMobile() && snap === 0 && text && text !== '–') apply(1);
-    });
-    observer.observe(distEl, { childList: true, characterData: true, subtree: true });
-  }
-
   if (fab && locateEl) {
     fab.addEventListener('click', () => locateEl.click());
   }
@@ -154,4 +149,10 @@ export function initBottomSheet(): void {
   window.addEventListener('pageshow', restore);
 
   reset();
+
+  return {
+    raiseToHalf() {
+      if (isMobile() && snap === 0) apply(1);
+    },
+  };
 }

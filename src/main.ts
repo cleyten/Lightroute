@@ -36,7 +36,8 @@ import { surfaceBreakdown, surfaceRuns, type SurfaceClass } from './surface';
 import { saveRoute, listRoutes, deleteRoute, type SavedRoute } from './storage';
 import type { LoopOption } from './ors';
 import { rejectionText } from './loopText';
-import { generateRoundTripsAsync } from './roundtripClient';
+import { generateRoundTripsAsync, RoundTripCancelledError } from './roundtripClient';
+import { initPlannerScreens, setPlannerScreen, getPlannerScreen } from './plannerScreen';
 import { detectClimbs, type Climb } from './climbs';
 import { compassLabel, type WindInfo } from './wind';
 import { searchPlaces, reverseCity, type GeocodeResult } from './geocode';
@@ -44,7 +45,7 @@ import { buildRoutePreviewSvg } from './preview';
 import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
 import { estimateMovingTimeHours } from './rideTime';
-import { renderCandidateCards, type CandidateCardData } from './candidateCards';
+import { renderCandidateCards, renderCandidateDots, type CandidateCardData } from './candidateCards';
 import {
   renderRouteDetailFullscreen, renderRouteDetailPanel, clearRouteDetail,
   type RouteDetailData, type RouteDetailCallbacks,
@@ -54,13 +55,16 @@ import { parseGpx, isClosedTrack } from './gpximport';
 import {
   DEFAULT_SIGNIN_HINT, accountCode, accountEmail, accountName, accountSignedIn, accountSignedOut,
   authorField, authorNameInput, bikeButtons, bottomTabButtons,
-  btnClear, btnExport, btnExportTcx, btnImportGpx,
+  btnBookmarkLoop, btnBuildDone, btnCancelGenerate, btnCandidatesBack, btnClear, btnCloseLoop, btnExport,
+  btnExportTcx, btnImportGpx,
   btnLocate, btnPublish, btnReverse, btnRoundtrip, btnSave, btnShare, btnSignin, btnSigninBack,
-  btnSignout, btnUndo, btnVerify, codeRow, communityBikeButtons, communityDistMax,
+  btnSignout, btnUndo, btnUseLoop, btnVerify, buildAscend, buildDistance,
+  buildPoints, candidateDotsEl, codeRow, communityBikeButtons, communityDistMax,
   communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons, communityList,
   communityPanel, communitySortButtons, emailRow, gpxFileInput, hillsButtons,
   loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, rangeTrack, rangeValue, roundtripMax,
-  roundtripMin, routeDetailMobile, routeDetailPanel, routeNameInput, savedList, searchInput,
+  roundtripMin, routeDetailMobile, routeDetailPanel, routeNameInput, savedList, screenBuild,
+  screenCandidates, screenGenerating, screenPlan, searchInput,
   searchResults, signinHint, trafficSelect, windChipEl,
 } from './dom';
 // ./auth and ./community both pull in @supabase/supabase-js. They are loaded on
@@ -499,6 +503,12 @@ map.on('click', (event) => {
       return;
     }
   }
+  // Starting to place points by hand from the Plan screen enters the
+  // dedicated Build screen (mobile only; harmless no-op on desktop, which
+  // ignores plannerScreen and always shows #controls).
+  if (getPlannerScreen() === 'plan' && state.waypoints.length === 0) {
+    setPlannerScreen('build');
+  }
   state.waypoints.push([event.lngLat.lng, event.lngLat.lat]);
   rebuildMarkers();
   void recalculateRoute();
@@ -562,6 +572,28 @@ btnReverse.addEventListener('click', () => {
   renderRouteDetails();
   setStatus('Direction reversed. Export GPX now follows the route the other way round.');
 });
+
+btnCloseLoop.addEventListener('click', () => {
+  void closeLoop();
+});
+
+btnBuildDone.addEventListener('click', () => {
+  if (!state.route) return;
+  setPlannerScreen('detail');
+});
+
+btnCandidatesBack.addEventListener('click', () => {
+  setPlannerScreen('plan');
+});
+
+btnUseLoop.addEventListener('click', () => {
+  if (state.selectedLoop < 0) return;
+  setPlannerScreen('detail');
+});
+
+// Bridges to the existing Save flow until saveExportSheet.ts (a later step in
+// this redesign) replaces it with the mockup's actual "Save this route" sheet.
+btnBookmarkLoop.addEventListener('click', () => btnSave.click());
 
 /** Wraps a coordinate list in the FeatureCollection the map source expects. */
 function lineFeatureCollection(coordinates: [number, number, number][]): FeatureCollection {
@@ -637,6 +669,13 @@ btnSave.addEventListener('click', async () => {
   setStatus(`Route "${name}" saved.`);
 });
 
+/** Aborts the in-flight round-trip generation; null once it settles. */
+let generateAbort: AbortController | null = null;
+
+btnCancelGenerate.addEventListener('click', () => {
+  generateAbort?.abort();
+});
+
 btnRoundtrip.addEventListener('click', async () => {
   if (state.waypoints.length === 0) {
     setStatus('First click a start point on the map.', true);
@@ -659,6 +698,9 @@ btnRoundtrip.addEventListener('click', async () => {
   btnRoundtrip.disabled = true;
   btnRoundtrip.classList.add('is-loading');
   setBusy(true);
+  setPlannerScreen('generating');
+  const abort = new AbortController();
+  generateAbort = abort;
   try {
     const result = await generateRoundTripsAsync({
       start: state.waypoints[0],
@@ -666,9 +708,11 @@ btnRoundtrip.addEventListener('click', async () => {
       maxMeters: maxKm * 1000,
       bike: settings.bike,
       hills: settings.hills,
+      signal: abort.signal,
       onProgress: (done, total, phase) => {
         // A superseded run must not narrate over the current one.
         if (requestId !== state.requestId) return;
+        setGeneratingProgress(done, total);
         setStatus(done > 0 && done < total ? `${phase}… ${done} of ${total}` : `${phase}…`);
       },
     });
@@ -677,12 +721,13 @@ btnRoundtrip.addEventListener('click', async () => {
     renderWindChip(result.wind);
     if (result.options.length > 0) {
       state.loopOptions = result.options;
-      renderLoopOptions();
+      state.selectedLoop = -1;
       selectLoop(0);
+      setPlannerScreen('candidates');
       setStatus(
         result.options.length > 1
-          ? 'Pick a loop below, or Generate again for new ones.'
-          : 'One good loop found. Generate again for new ones.',
+          ? 'Pick a loop below, or Find loops again for new ones.'
+          : 'One good loop found. Find loops again for new ones.',
       );
     } else {
       state.loopOptions = [];
@@ -690,6 +735,7 @@ btnRoundtrip.addEventListener('click', async () => {
       setRouteData({ type: 'FeatureCollection', features: [] });
       renderRouteDetails();
       renderNoLoopFound(result.failReason, result.fallback);
+      setPlannerScreen('plan');
     }
   } catch (error) {
     if (requestId !== state.requestId) return;
@@ -698,7 +744,10 @@ btnRoundtrip.addEventListener('click', async () => {
     state.route = null;
     setRouteData({ type: 'FeatureCollection', features: [] });
     renderRouteDetails();
-    setStatus(error instanceof Error ? error.message : 'Something went wrong.', true);
+    setPlannerScreen('plan');
+    if (!(error instanceof RoundTripCancelledError)) {
+      setStatus(error instanceof Error ? error.message : 'Something went wrong.', true);
+    }
   } finally {
     // Unconditionally: state.requestId is shared with recalculateRoute(), so
     // any map interaction during generation would bump it and leave the button
@@ -707,6 +756,7 @@ btnRoundtrip.addEventListener('click', async () => {
     btnRoundtrip.disabled = false;
     btnRoundtrip.classList.remove('is-loading');
     setBusy(false);
+    generateAbort = null;
   }
   updateControls();
 });
@@ -735,15 +785,37 @@ function loopOptionToCardData(option: LoopOption): CandidateCardData {
   };
 }
 
-/** Renders the quality-passed loops as selectable candidate cards. */
+/** How many still-generating slots to show as skeleton cards (see setGeneratingProgress). */
+let generatingSkeletonCount = 0;
+
+/** Sizes the Generating screen's skeleton row from the real progress total. */
+function setGeneratingProgress(_done: number, total: number): void {
+  generatingSkeletonCount = Math.max(0, total);
+  renderLoopOptions();
+}
+
+/**
+ * Renders #loop-options: shared by the Generating screen (skeletons only, no
+ * real cards yet — results arrive as one batch, staggered in visually, not
+ * streamed one by one; see the redesign plan) and the Candidates screen
+ * (real cards). Hidden outside both screens; always shown on desktop
+ * whenever there are options, exactly like before this redesign.
+ */
 function renderLoopOptions(): void {
-  loopOptionsEl.hidden = state.loopOptions.length === 0;
-  renderCandidateCards(
-    loopOptionsEl,
-    state.loopOptions.map(loopOptionToCardData),
-    state.selectedLoop,
-    selectLoop,
-  );
+  const screen = getPlannerScreen();
+  const showing = screen === 'generating' || screen === 'candidates';
+  loopOptionsEl.hidden = !showing || (screen === 'candidates' && state.loopOptions.length === 0);
+  if (screen === 'generating') {
+    renderCandidateCards(loopOptionsEl, [], -1, () => {}, generatingSkeletonCount);
+  } else {
+    renderCandidateCards(
+      loopOptionsEl,
+      state.loopOptions.map(loopOptionToCardData),
+      state.selectedLoop,
+      selectLoop,
+    );
+  }
+  renderCandidateDots(candidateDotsEl, state.loopOptions.length, state.selectedLoop);
 }
 
 function selectLoop(index: number): void {
@@ -1443,7 +1515,6 @@ function renderRouteDetails(): void {
 
   if (!state.route) {
     clearRouteDetail(routeDetailMobile, routeDetailPanel);
-    routeDetailMobile.hidden = true;
     routeDetailPanel.hidden = true;
     state.climbs = [];
     state.selectedClimb = -1;
@@ -1466,11 +1537,9 @@ function renderRouteDetails(): void {
     setClimbHighlight(null);
   }
 
-  // TODO(task 6, planner screens): #route-detail-mobile's visibility should
-  // come from plannerScreen === 'detail', not "a route exists". Until that
-  // state machine lands, showing it whenever there is a route is the agreed
-  // interim behaviour (see the redesign plan).
-  routeDetailMobile.hidden = false;
+  // #route-detail-mobile's own visibility comes from plannerScreen === 'detail'
+  // (see initPlannerScreens below), not from route existence: candidates can
+  // preview a route on the map without jumping straight to its full detail.
   routeDetailPanel.hidden = false;
 
   const km = state.route.distanceMeters / 1000;
@@ -1489,9 +1558,7 @@ function renderRouteDetails(): void {
     water: state.water,
   };
   const callbacks: RouteDetailCallbacks = {
-    onBack: () => {
-      routeDetailMobile.hidden = true;
-    },
+    onBack: () => setPlannerScreen(state.loopOptions.length > 0 ? 'candidates' : 'plan'),
     onShare: () => btnShare.click(),
     onSave: () => btnSave.click(),
     onExportGpx: () => btnExport.click(),
@@ -1632,7 +1699,19 @@ function updateControls(): void {
   btnExportTcx.disabled = !state.route;
   btnSave.disabled = !state.route || state.waypoints.length < 2;
   btnShare.disabled = !state.route || state.waypoints.length < 2;
+  btnCloseLoop.disabled = state.closed || state.waypoints.length < 3;
+  btnBuildDone.disabled = !state.route;
   updatePublishButton();
+  renderBuildReadout();
+}
+
+/** The Build screen's big distance/gain/point-count readout (mobile only). */
+function renderBuildReadout(): void {
+  const km = state.route ? state.route.distanceMeters / 1000 : 0;
+  const ascend = state.route ? Math.round(state.route.ascendMeters) : 0;
+  buildDistance.innerHTML = `${km.toFixed(1)}<span class="unit">km</span>`;
+  buildAscend.innerHTML = `+${ascend}<span class="unit">m</span>`;
+  buildPoints.textContent = `${state.waypoints.length} point${state.waypoints.length === 1 ? '' : 's'}`;
 }
 
 /** Loads a route shared via URL (see share.ts), if the link carries one. */
@@ -2212,7 +2291,26 @@ async function deleteCommunityRoute(route: CommunityRoute): Promise<void> {
 }
 
 // --- Mobile bottom sheet ---
-initBottomSheet();
+const bottomSheet = initBottomSheet();
+
+// --- Mobile planner screens (plan / generating / candidates / detail / build) ---
+initPlannerScreens(
+  {
+    plan: screenPlan,
+    generating: screenGenerating,
+    candidates: screenCandidates,
+    detail: routeDetailMobile,
+    build: screenBuild,
+  },
+  (screen) => {
+    // #loop-options is shared across the Generating and Candidates screens
+    // rather than duplicated (see index.html's comments), so it needs its
+    // own visibility check on every screen change, not just when its data
+    // changes.
+    renderLoopOptions();
+    if (screen === 'generating' || screen === 'candidates') bottomSheet?.raiseToHalf();
+  },
+);
 
 // Dev-only handle for verification in the browser console; stripped from
 // the production build by the `import.meta.env.DEV` guard.

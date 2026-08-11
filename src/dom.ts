@@ -19,6 +19,22 @@ const all = <T extends Element>(selector: string): T[] => [
 export const routeDetailMobile = el<HTMLElement>('#route-detail-mobile');
 export const routeDetailPanel = el<HTMLElement>('#route-detail-panel');
 
+// Mobile planner screens (plannerScreen.ts): plan / generating / candidates / build.
+export const screenPlan = el<HTMLElement>('#screen-plan');
+export const screenGenerating = el<HTMLElement>('#screen-generating');
+export const screenCandidates = el<HTMLElement>('#screen-candidates');
+export const screenBuild = el<HTMLElement>('#screen-build');
+export const btnCancelGenerate = el<HTMLButtonElement>('#btn-cancel-generate');
+export const candidateDotsEl = el<HTMLElement>('#candidate-dots');
+export const btnCandidatesBack = el<HTMLButtonElement>('#btn-candidates-back');
+export const btnBookmarkLoop = el<HTMLButtonElement>('#btn-bookmark-loop');
+export const btnUseLoop = el<HTMLButtonElement>('#btn-use-loop');
+export const buildDistance = el<HTMLElement>('#build-distance');
+export const buildAscend = el<HTMLElement>('#build-ascend');
+export const buildPoints = el<HTMLElement>('#build-points');
+export const btnCloseLoop = el<HTMLButtonElement>('#btn-close-loop');
+export const btnBuildDone = el<HTMLButtonElement>('#btn-build-done');
+
 // Route controls
 export const btnUndo = el<HTMLButtonElement>('#btn-undo');
 export const btnClear = el<HTMLButtonElement>('#btn-clear');
