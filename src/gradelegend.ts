@@ -19,3 +19,15 @@ export function renderGradeLegend(container: HTMLElement): void {
     ({ color, label }) => `<span><i style="background:${color}"></i>${label}</span>`,
   ).join('');
 }
+
+/**
+ * Grade (percent) to a `GRADE_STOPS` color. The one place this mapping is
+ * made, so the elevation chart, the mini elevation bars, and climb badges
+ * can't drift out of sync with each other or with the legend above.
+ */
+export function gradeColor(pct: number): string {
+  for (const stop of GRADE_STOPS) {
+    if (pct <= stop.max) return stop.color;
+  }
+  return GRADE_STOPS[GRADE_STOPS.length - 1].color;
+}

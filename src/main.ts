@@ -24,7 +24,7 @@ import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
 // is dynamically imported (see loadChartModule) and never statically. Type-only
 // imports are erased at build time and do not affect that.
 // Kept out of chart.ts so the static grade swatches do not depend on Chart.js.
-import { renderGradeLegend } from './gradelegend';
+import { renderGradeLegend, gradeColor } from './gradelegend';
 import { escapeHtml, initDisclosure, setActiveInGroup, setBusy, setStatus } from './ui';
 import { initDualRange } from './dualRange';
 import { initBottomSheet } from './bottomSheet';
@@ -1638,14 +1638,6 @@ function animateStat(el: HTMLElement, target: number, unit: string, decimals: nu
   requestAnimationFrame(step);
 }
 
-/** Steepness → chip colour, mild green through to hard red (Strava-like). */
-function climbGradeColor(pct: number): string {
-  if (pct >= 10) return '#c0392b';
-  if (pct >= 7) return '#e0621a';
-  if (pct >= 4.5) return '#d98a1e';
-  return '#4a9e5b';
-}
-
 function renderClimbsList(): void {
   climbsEl.hidden = state.climbs.length === 0;
   climbsList.innerHTML = '';
@@ -1654,7 +1646,7 @@ function renderClimbsList(): void {
     const button = document.createElement('button');
     button.className = 'climb-item';
     button.innerHTML =
-      `<span class="climb-grade" style="background:${climbGradeColor(climb.avgPct)}">${climb.avgPct.toFixed(1)}%</span>` +
+      `<span class="climb-grade" style="background:${gradeColor(climb.avgPct)}">${climb.avgPct.toFixed(1)}%</span>` +
       `<span class="climb-info"><span class="climb-where">km ${climb.startKm.toFixed(1)}</span>` +
       `<span class="climb-len">${(climb.lengthM / 1000).toFixed(1)} km climb</span></span>` +
       `<span class="climb-gain">+${Math.round(climb.gainM)} m</span>`;
