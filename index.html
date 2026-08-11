@@ -177,42 +177,57 @@
 
         <div id="community-discover">
           <section class="group" id="community-section">
-            <button type="button" class="disclosure-toggle" id="community-filters-toggle" aria-expanded="false" aria-controls="community-filters-body">
-              <span class="group-label">Sort &amp; filter</span>
-              <span class="disclosure-chevron" aria-hidden="true"></span>
-            </button>
-            <div class="community-controls" id="community-filters-body" hidden>
-              <span class="field">Sort</span>
-              <div class="segmented" id="community-sort">
-                <button type="button" data-sort="newest" class="active" aria-pressed="true">Newest</button>
-                <button type="button" data-sort="top" aria-pressed="false">Top rated</button>
-                <button type="button" data-sort="near" aria-pressed="false">Near me</button>
-              </div>
-              <span class="field">Bike</span>
-              <div class="segmented" id="community-bike">
-                <button type="button" data-bike="all" class="active" aria-pressed="true">All</button>
-                <button type="button" data-bike="race" aria-pressed="false">Race</button>
-                <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
-                <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
-              </div>
-              <span class="field">Hills</span>
-              <div class="segmented" id="community-hills">
-                <button type="button" data-hills="all" class="active" aria-pressed="true">All</button>
-                <button type="button" data-hills="flat" aria-pressed="false">Flat</button>
-                <button type="button" data-hills="hilly" aria-pressed="false">Hilly</button>
-              </div>
-              <span class="field" id="community-dist-field">
-                Distance
-                <span class="range-label"><span id="community-dist-value">Any length</span></span>
-              </span>
-              <div class="dual-range">
-                <div class="range-track" id="community-dist-track"></div>
-                <input id="community-dist-min" type="range" min="0" max="200" step="5" value="0" aria-label="Minimum route distance in km" />
-                <input id="community-dist-max" type="range" min="0" max="200" step="5" value="200" aria-label="Maximum route distance in km" />
-              </div>
+            <div class="discover-head">
+              <span class="group-label">Community</span>
+              <button type="button" id="btn-open-filters" class="icon-btn-square" aria-haspopup="dialog" aria-controls="sort-filter-sheet">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+              </button>
             </div>
             <ul id="community-list"></ul>
           </section>
+        </div>
+
+        <!-- Sort & Filter (dialogSheet.ts): a dimmed backdrop + bottom sheet
+             over the Discover list, not an inline disclosure. Same underlying
+             sort/bike/hills/distance controls and filter state as before. -->
+        <div id="sort-filter-backdrop" class="dialog-backdrop" hidden></div>
+        <div id="sort-filter-sheet" class="dialog-sheet" role="dialog" aria-label="Sort and filter" hidden>
+          <div class="dialog-handle"></div>
+          <div class="dialog-head">
+            <span class="dialog-title">Sort &amp; filter</span>
+            <button type="button" id="btn-reset-filters" class="linklike">Reset</button>
+          </div>
+          <div class="community-controls">
+            <span class="field">Sort</span>
+            <div class="segmented" id="community-sort">
+              <button type="button" data-sort="newest" class="active" aria-pressed="true">Newest</button>
+              <button type="button" data-sort="top" aria-pressed="false">Top rated</button>
+              <button type="button" data-sort="near" aria-pressed="false">Near me</button>
+            </div>
+            <span class="field">Bike</span>
+            <div class="segmented" id="community-bike">
+              <button type="button" data-bike="all" class="active" aria-pressed="true">All</button>
+              <button type="button" data-bike="race" aria-pressed="false">Race</button>
+              <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
+              <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
+            </div>
+            <span class="field">Hills</span>
+            <div class="segmented" id="community-hills">
+              <button type="button" data-hills="all" class="active" aria-pressed="true">All</button>
+              <button type="button" data-hills="flat" aria-pressed="false">Flat</button>
+              <button type="button" data-hills="hilly" aria-pressed="false">Hilly</button>
+            </div>
+            <span class="field" id="community-dist-field">
+              Distance
+              <span class="range-label"><span id="community-dist-value">Any length</span></span>
+            </span>
+            <div class="dual-range">
+              <div class="range-track" id="community-dist-track"></div>
+              <input id="community-dist-min" type="range" min="0" max="200" step="5" value="0" aria-label="Minimum route distance in km" />
+              <input id="community-dist-max" type="range" min="0" max="200" step="5" value="200" aria-label="Maximum route distance in km" />
+            </div>
+          </div>
+          <button type="button" id="btn-apply-filters" class="primary dialog-apply">Show routes</button>
         </div>
 
         <div id="community-library" hidden>

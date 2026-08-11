@@ -11,6 +11,7 @@
      8. Mobile          bottom sheet (<= 700px)
      9. Route detail    full-screen mobile view + floating desktop panel
     10. Planner screens  mobile plan/generating/candidates/build state machine
+    11. Dialog sheets    Sort & Filter, Save/Export (dialogSheet.ts)
    ============================================================================ */
 
 /* =============================================================================
@@ -2841,4 +2842,86 @@ button.primary:active:not(:disabled),
   .build-actions {
     display: none !important;
   }
+}
+
+/* =============================================================================
+   11. DIALOG SHEETS
+   Shared look for the two mockup dialogs that sit over a dimmed backdrop
+   (Sort & Filter, Save/Export) rather than being another planner screen.
+   dialogSheet.ts owns showing/hiding both halves together.
+   ============================================================================ */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.dialog-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 21;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 0 20px 28px;
+  border-radius: 20px 20px 0 0;
+  background: var(--color-panel);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.24);
+}
+
+@media (min-width: 701px) {
+  .dialog-sheet {
+    left: 50%;
+    right: auto;
+    bottom: 50%;
+    transform: translate(-50%, 50%);
+    width: 420px;
+    max-width: calc(100% - 40px);
+    border-radius: var(--radius-panel);
+  }
+}
+
+.dialog-handle {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .dialog-handle {
+    display: block;
+    width: 38px;
+    height: 5px;
+    margin: 10px auto 8px;
+    border-radius: 3px;
+    background: var(--color-border-strong);
+  }
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 16px;
+}
+
+.dialog-title {
+  font-size: 1.25rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.dialog-apply {
+  width: 100%;
+  height: 54px;
+  margin-top: 22px;
+}
+
+.discover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
 }

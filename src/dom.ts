@@ -121,3 +121,10 @@ export const communityDistMax = el<HTMLInputElement>('#community-dist-max');
 export const communityDistValue = el<HTMLElement>('#community-dist-value');
 export const communityDistTrack = el<HTMLElement>('#community-dist-track');
 export const communityList = el<HTMLUListElement>('#community-list');
+
+// Sort & Filter dialog (sortFilterSheet.ts / dialogSheet.ts)
+export const btnOpenFilters = el<HTMLButtonElement>('#btn-open-filters');
+export const sortFilterBackdrop = el<HTMLElement>('#sort-filter-backdrop');
+export const sortFilterSheetEl = el<HTMLElement>('#sort-filter-sheet');
+export const btnResetFilters = el<HTMLButtonElement>('#btn-reset-filters');
+export const btnApplyFilters = el<HTMLButtonElement>('#btn-apply-filters');

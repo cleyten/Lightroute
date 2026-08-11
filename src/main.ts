@@ -23,7 +23,7 @@ import { haversineMeters, cumulativeDistances, elevationGain } from './geo';
 // ./chart pulls in chart.js/auto and is only needed once a route exists, so it
 // is dynamically imported (see loadChartModule) and never statically. Type-only
 // imports are erased at build time and do not affect that.
-import { escapeHtml, initDisclosure, setActiveInGroup, setBusy, setStatus } from './ui';
+import { escapeHtml, setActiveInGroup, setBusy, setStatus } from './ui';
 import { initDualRange } from './dualRange';
 import { initBottomSheet } from './bottomSheet';
 import {
@@ -47,6 +47,8 @@ import { fetchWater, type WaterPoint } from './water';
 import { estimateMovingTimeHours } from './rideTime';
 import { renderCandidateCards, renderCandidateDots, type CandidateCardData } from './candidateCards';
 import { initLibrarySegment, renderSavedList } from './librarySheet';
+import { initDialogSheet } from './dialogSheet';
+import { setApplyButtonCount, resetFilterControls } from './sortFilterSheet';
 import {
   renderRouteDetailFullscreen, renderRouteDetailPanel, clearRouteDetail,
   type RouteDetailData, type RouteDetailCallbacks,
@@ -56,9 +58,11 @@ import { parseGpx, isClosedTrack } from './gpximport';
 import {
   DEFAULT_SIGNIN_HINT, accountAvatar, accountCode, accountEmail, accountName, accountSignedIn,
   accountSignedOut, authorField, authorNameInput, bikeButtons, bottomTabButtons,
-  btnBookmarkLoop, btnBuildDone, btnCancelGenerate, btnCandidatesBack, btnClear, btnCloseLoop, btnExport,
+  btnApplyFilters, btnBookmarkLoop, btnBuildDone, btnCancelGenerate, btnCandidatesBack, btnClear,
+  btnCloseLoop, btnExport,
   btnExportTcx, btnImportGpx,
-  btnLocate, btnPublish, btnReverse, btnRoundtrip, btnSave, btnShare, btnSignin, btnSigninBack,
+  btnLocate, btnOpenFilters, btnPublish, btnResetFilters, btnReverse, btnRoundtrip, btnSave, btnShare,
+  btnSignin, btnSigninBack,
   btnSignout, btnUndo, btnUseLoop, btnVerify, buildAscend, buildDistance,
   buildPoints, candidateDotsEl, codeRow, communityBikeButtons, communityDiscoverEl, communityDistMax,
   communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons, communityLibraryEl,
@@ -67,7 +71,7 @@ import {
   loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, publishedList, rangeTrack, rangeValue,
   roundtripMax, roundtripMin, routeDetailMobile, routeDetailPanel, routeNameInput, savedList,
   screenBuild, screenCandidates, screenGenerating, screenPlan, searchInput,
-  searchResults, signinHint, trafficSelect, windChipEl,
+  searchResults, signinHint, sortFilterBackdrop, sortFilterSheetEl, trafficSelect, windChipEl,
 } from './dom';
 // ./auth and ./community both pull in @supabase/supabase-js. They are loaded on
 // demand via loadBackend() so the client stays out of the initial bundle; the
@@ -1179,7 +1183,21 @@ function clearWater(): void {
   setWaterData([]);
 }
 
-initDisclosure('#community-filters-toggle', '#community-filters-body');
+const sortFilterDialog = initDialogSheet(sortFilterSheetEl, sortFilterBackdrop);
+btnOpenFilters.addEventListener('click', () => {
+  setApplyButtonCount(btnApplyFilters, filteredCommunityRoutes().length);
+  sortFilterDialog.open();
+});
+btnApplyFilters.addEventListener('click', () => sortFilterDialog.close());
+btnResetFilters.addEventListener('click', () => {
+  resetFilterControls(
+    communitySortButtons[0],
+    communityBikeButtons[0],
+    communityHillsButtons[0],
+    communityDistMin,
+    communityDistMax,
+  );
+});
 
 initLibrarySegment(communitySegmentEl, (segment) => {
   communityDiscoverEl.hidden = segment !== 'discover';
@@ -2103,6 +2121,7 @@ function renderCommunityList(
   myRatings: Map<string, number>,
   container: HTMLUListElement = communityList,
 ): void {
+  if (container === communityList) setApplyButtonCount(btnApplyFilters, routes.length);
   container.innerHTML = '';
   if (routes.length === 0) {
     const empty = document.createElement('li');
