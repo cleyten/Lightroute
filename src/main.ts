@@ -49,6 +49,7 @@ import { renderCandidateCards, renderCandidateDots, type CandidateCardData } fro
 import { initLibrarySegment, renderSavedList } from './librarySheet';
 import { initDialogSheet } from './dialogSheet';
 import { setApplyButtonCount, resetFilterControls } from './sortFilterSheet';
+import { wireAltFormatButton, openSaveExportSheet } from './saveExportSheet';
 import {
   renderRouteDetailFullscreen, renderRouteDetailPanel, clearRouteDetail,
   type RouteDetailData, type RouteDetailCallbacks,
@@ -61,15 +62,16 @@ import {
   btnApplyFilters, btnBookmarkLoop, btnBuildDone, btnCancelGenerate, btnCandidatesBack, btnClear,
   btnCloseLoop, btnExport,
   btnExportTcx, btnImportGpx,
-  btnLocate, btnOpenFilters, btnPublish, btnResetFilters, btnReverse, btnRoundtrip, btnSave, btnShare,
-  btnSignin, btnSigninBack,
+  btnLocate, btnOpenFilters, btnOpenSaveExport, btnPublish, btnResetFilters, btnReverse, btnRoundtrip,
+  btnSave, btnShare, btnSignin, btnSigninBack,
   btnSignout, btnUndo, btnUseLoop, btnVerify, buildAscend, buildDistance,
   buildPoints, candidateDotsEl, codeRow, communityBikeButtons, communityDiscoverEl, communityDistMax,
   communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons, communityLibraryEl,
   communityList, communityPanel, communitySegmentEl, communitySortButtons, emailRow, gpxFileInput,
   hillsButtons, libraryTabButtons,
   loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, publishedList, rangeTrack, rangeValue,
-  roundtripMax, roundtripMin, routeDetailMobile, routeDetailPanel, routeNameInput, savedList,
+  roundtripMax, roundtripMin, routeDetailMobile, routeDetailPanel, routeNameInput, saveExportBackdrop,
+  saveExportSheetEl, savedList,
   screenBuild, screenCandidates, screenGenerating, screenPlan, searchInput,
   searchResults, signinHint, sortFilterBackdrop, sortFilterSheetEl, trafficSelect, windChipEl,
 } from './dom';
@@ -597,9 +599,7 @@ btnUseLoop.addEventListener('click', () => {
   setPlannerScreen('detail');
 });
 
-// Bridges to the existing Save flow until saveExportSheet.ts (a later step in
-// this redesign) replaces it with the mockup's actual "Save this route" sheet.
-btnBookmarkLoop.addEventListener('click', () => btnSave.click());
+btnBookmarkLoop.addEventListener('click', () => openSaveExportSheet(saveExportDialog, routeNameInput));
 
 /** Wraps a coordinate list in the FeatureCollection the map source expects. */
 function lineFeatureCollection(coordinates: [number, number, number][]): FeatureCollection {
@@ -673,6 +673,7 @@ btnSave.addEventListener('click', async () => {
   routeNameInput.value = '';
   await refreshSavedList();
   setStatus(`Route "${name}" saved.`);
+  saveExportDialog.close();
 });
 
 /** Aborts the in-flight round-trip generation; null once it settles. */
@@ -1199,6 +1200,10 @@ btnResetFilters.addEventListener('click', () => {
   );
 });
 
+const saveExportDialog = initDialogSheet(saveExportSheetEl, saveExportBackdrop);
+wireAltFormatButton(btnExportTcx);
+btnOpenSaveExport.addEventListener('click', () => openSaveExportSheet(saveExportDialog, routeNameInput));
+
 initLibrarySegment(communitySegmentEl, (segment) => {
   communityDiscoverEl.hidden = segment !== 'discover';
   communityLibraryEl.hidden = segment !== 'library';
@@ -1592,16 +1597,22 @@ function renderRouteDetails(): void {
     cafes: state.cafes,
     water: state.water,
   };
-  const callbacks: RouteDetailCallbacks = {
+  // The mobile bookmark opens the Save/Export dialog (matching Candidates'
+  // bookmark and the mockup); the desktop panel's Save/Export GPX stay
+  // direct one-tap actions, as decided when the panel was first built.
+  const mobileCallbacks: RouteDetailCallbacks = {
     onBack: () => setPlannerScreen(state.loopOptions.length > 0 ? 'candidates' : 'plan'),
     onShare: () => btnShare.click(),
-    onSave: () => btnSave.click(),
+    onSave: () => openSaveExportSheet(saveExportDialog, routeNameInput),
     onExportGpx: () => btnExport.click(),
     onClimbClick: selectClimb,
     onPoiClick: (lngLat) => map.flyTo({ center: lngLat, zoom: 15 }),
   };
-  const mobileCanvas = renderRouteDetailFullscreen(routeDetailMobile, data, callbacks);
-  const panelCanvas = renderRouteDetailPanel(routeDetailPanel, data, callbacks);
+  const mobileCanvas = renderRouteDetailFullscreen(routeDetailMobile, data, mobileCallbacks);
+  const panelCanvas = renderRouteDetailPanel(routeDetailPanel, data, {
+    onSave: () => btnSave.click(),
+    onExportGpx: () => btnExport.click(),
+  });
   hideHoverMarkerOnLeave(mobileCanvas);
   hideHoverMarkerOnLeave(panelCanvas);
 

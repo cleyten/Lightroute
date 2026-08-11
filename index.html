@@ -242,19 +242,8 @@
             <input id="gpx-file-input" type="file" accept=".gpx,.tcx" hidden aria-hidden="true" />
           </section>
 
-          <section class="group" id="save-section">
-            <span class="group-label">Save and export</span>
-            <button id="btn-publish" class="find-btn" type="button" hidden disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m8 7 4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Publish this route</button>
-            <label class="field">
-              Route name
-              <input id="route-name" type="text" placeholder="Name" />
-            </label>
-            <div class="save-actions">
-              <button id="btn-save" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12a1 1 0 0 1 1 1v16l-7-4-7 4V5a1 1 0 0 1 1-1Z"/></svg>Save</button>
-              <button id="btn-share" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>Share</button>
-              <button id="btn-export" class="primary" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>Export GPX</button>
-              <button id="btn-export-tcx" class="primary" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>Export TCX</button>
-            </div>
+          <section class="group">
+            <button type="button" id="btn-open-save-export" class="find-btn" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12a1 1 0 0 1 1 1v16l-7-4-7 4V5a1 1 0 0 1 1-1Z"/></svg>Save, share &amp; export current route</button>
           </section>
 
           <section class="group">
@@ -291,6 +280,42 @@
            there is a route; see renderRouteDetails() in main.ts. -->
       <div id="route-detail-mobile" class="route-detail-mobile" hidden></div>
       <div id="route-detail-panel" class="route-detail-panel" hidden></div>
+
+      <!-- Save/Export (saveExportSheet.ts + dialogSheet.ts): a top-level
+           sibling, not nested in either tab, since it opens from bookmark
+           icons in the planner (Candidates/Build) as well as from the
+           Community tab's library. -->
+      <div id="save-export-backdrop" class="dialog-backdrop" hidden></div>
+      <div id="save-export-sheet" class="dialog-sheet" role="dialog" aria-label="Save this route" hidden>
+        <div class="dialog-handle"></div>
+        <div class="dialog-head">
+          <span class="dialog-title">Save this route</span>
+        </div>
+        <label class="field">
+          Route name
+          <input id="route-name" type="text" placeholder="Name" />
+        </label>
+        <div class="save-export-rows">
+          <button type="button" id="btn-share" class="save-export-row">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>
+            <span class="save-export-label">Share a link</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="save-export-chevron"><path d="m9 6 6 6-6 6"/></svg>
+          </button>
+          <button type="button" id="btn-export" class="save-export-row">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>
+            <span class="save-export-label">Export</span>
+            <span class="save-export-trailing">GPX</span>
+            <button type="button" id="btn-export-tcx" class="save-export-alt-format">TCX</button>
+          </button>
+          <button type="button" id="btn-publish" class="save-export-row" hidden disabled>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m8 7 4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
+            <span class="save-export-textblock"><span class="save-export-label">Publish to community</span><span class="save-export-sublabel">Others can load and rate it</span></span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="save-export-chevron"><path d="m9 6 6 6-6 6"/></svg>
+          </button>
+        </div>
+        <button type="button" id="btn-save" class="primary dialog-apply" disabled>Save</button>
+      </div>
+
       <!-- Floats over the map rather than living at the bottom of the scrolling
            panel, so progress is visible whatever the panel is scrolled to and
            whichever snap point the mobile sheet is at. -->

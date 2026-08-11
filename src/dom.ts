@@ -128,3 +128,8 @@ export const sortFilterBackdrop = el<HTMLElement>('#sort-filter-backdrop');
 export const sortFilterSheetEl = el<HTMLElement>('#sort-filter-sheet');
 export const btnResetFilters = el<HTMLButtonElement>('#btn-reset-filters');
 export const btnApplyFilters = el<HTMLButtonElement>('#btn-apply-filters');
+
+// Save/Export dialog (saveExportSheet.ts / dialogSheet.ts)
+export const btnOpenSaveExport = el<HTMLButtonElement>('#btn-open-save-export');
+export const saveExportBackdrop = el<HTMLElement>('#save-export-backdrop');
+export const saveExportSheetEl = el<HTMLElement>('#save-export-sheet');
