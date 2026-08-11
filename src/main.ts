@@ -65,7 +65,8 @@ import {
   btnLocate, btnOpenFilters, btnOpenSaveExport, btnPublish, btnResetFilters, btnReverse, btnRoundtrip,
   btnSave, btnShare, btnSignin, btnSigninBack,
   btnSignout, btnUndo, btnUseLoop, btnVerify, buildAscend, buildDistance,
-  buildPoints, candidateDotsEl, codeRow, communityBikeButtons, communityDiscoverEl, communityDistMax,
+  buildPoints, btnChangeCandidates, candidateDotsEl, candidatesHeadingEl, candidatesHeadingText,
+  codeRow, communityBikeButtons, communityDiscoverEl, communityDistMax,
   communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons, communityLibraryEl,
   communityList, communityPanel, communitySegmentEl, communitySortButtons, emailRow, gpxFileInput,
   hillsButtons, libraryTabButtons,
@@ -594,6 +595,10 @@ btnCandidatesBack.addEventListener('click', () => {
   setPlannerScreen('plan');
 });
 
+btnChangeCandidates.addEventListener('click', () => {
+  setPlannerScreen('plan');
+});
+
 btnUseLoop.addEventListener('click', () => {
   if (state.selectedLoop < 0) return;
   setPlannerScreen('detail');
@@ -729,8 +734,15 @@ btnRoundtrip.addEventListener('click', async () => {
     if (result.options.length > 0) {
       state.loopOptions = result.options;
       state.selectedLoop = -1;
+      candidatesHeadingPlace = null;
       selectLoop(0);
       setPlannerScreen('candidates');
+      const startedFrom = state.waypoints[0];
+      void reverseCity(startedFrom).then((place) => {
+        if (state.waypoints[0] !== startedFrom || !place) return;
+        candidatesHeadingPlace = place;
+        renderCandidatesHeadingText();
+      });
       setStatus(
         result.options.length > 1
           ? 'Pick a loop below, or Find loops again for new ones.'
@@ -823,6 +835,18 @@ function renderLoopOptions(): void {
     );
   }
   renderCandidateDots(candidateDotsEl, state.loopOptions.length, state.selectedLoop);
+  candidatesHeadingEl.hidden = screen !== 'candidates' || state.loopOptions.length === 0;
+  if (!candidatesHeadingEl.hidden) renderCandidatesHeadingText();
+}
+
+/** "N loops from <place>": place resolves async and is cached per generation. */
+let candidatesHeadingPlace: string | null = null;
+function renderCandidatesHeadingText(): void {
+  const n = state.loopOptions.length;
+  const base = `${n} loop${n === 1 ? '' : 's'}`;
+  candidatesHeadingText.textContent = candidatesHeadingPlace
+    ? `${base} from ${candidatesHeadingPlace}`
+    : base;
 }
 
 function selectLoop(index: number): void {

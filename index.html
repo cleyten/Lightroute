@@ -113,6 +113,14 @@
           <button type="button" id="btn-cancel-generate" class="secondary-btn generating-cancel">Cancel</button>
         </div>
 
+        <!-- "N loops from <place>" + Change: shown above the candidate cards
+             whenever there are any, on desktop (the mockup's sidebar header)
+             and on mobile's Candidates screen alike. -->
+        <div id="candidates-heading" class="candidates-heading" hidden>
+          <span id="candidates-heading-text"></span>
+          <button type="button" id="btn-change-candidates" class="pill-btn">Change</button>
+        </div>
+
         <!-- Shared by Generating (fills in with skeletons) and Candidates
              (final cards): one element, not duplicated. Visibility is driven
              by renderLoopOptions() checking the current planner screen. -->
