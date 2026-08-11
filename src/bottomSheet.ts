@@ -7,6 +7,13 @@ export interface BottomSheetHandle {
   /** Raises the sheet from peek to half, if it's currently at peek. No-op on desktop. */
   raiseToHalf(): void;
   /**
+   * True during a sheet drag and briefly after it. The map has to consult this
+   * before acting on a click: dragging the sheet down slides it out from under
+   * the finger, so the lift happens over the map, and iOS then synthesises a
+   * tap there - which was silently dropping a waypoint on the route.
+   */
+  recentlyDragged(): boolean;
+  /**
    * Re-applies the current snap point. Needed whenever the sheet's contents
    * change height, because the middle snap is measured from that content: without
    * it, switching screens leaves the sheet at the offset computed for the
@@ -104,6 +111,8 @@ export function initBottomSheet(): BottomSheetHandle | null {
   const bodyEl = document.querySelector<HTMLElement>('#sheet-body');
 
   let dragging = false;
+  /** When the last drag finished, for recentlyDragged() below. */
+  let lastDragEndAt = -Infinity;
   /** A touch started on the content while it was scrolled to the top: it
    *  becomes a sheet drag only once the finger actually moves down, so an
    *  upward swipe still scrolls the content normally. */
@@ -140,22 +149,31 @@ export function initBottomSheet(): BottomSheetHandle | null {
   // On window, not on the handle: pointer capture is unreliable on some iOS
   // versions, and without it a drag used to die the moment the finger left the
   // 28px handle.
-  window.addEventListener('pointermove', (e) => {
-    if (armedFromBody && !dragging) {
-      const dy = e.clientY - startY;
-      // Only a downward swipe takes over; upward still scrolls the content.
-      if (dy > PROMOTE_THRESHOLD) beginDrag(startY);
-      else if (dy < -PROMOTE_THRESHOLD) armedFromBody = false;
-    }
-    if (!dragging) return;
-    const h = sheetEl.offsetHeight;
-    translateTo(Math.min(Math.max(0, startOffset + (e.clientY - startY)), h - 80));
-  });
+  // passive: false so preventDefault() below actually takes effect. Once we own
+  // the gesture we must suppress the browser's default handling, or iOS both
+  // scrolls underneath and synthesises a tap at the lift point afterwards.
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      if (armedFromBody && !dragging) {
+        const dy = e.clientY - startY;
+        // Only a downward swipe takes over; upward still scrolls the content.
+        if (dy > PROMOTE_THRESHOLD) beginDrag(startY);
+        else if (dy < -PROMOTE_THRESHOLD) armedFromBody = false;
+      }
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const h = sheetEl.offsetHeight;
+      translateTo(Math.min(Math.max(0, startOffset + (e.clientY - startY)), h - 80));
+    },
+    { passive: false },
+  );
 
   const endDrag = (fromHandle: boolean) => (): void => {
     armedFromBody = false;
     if (!dragging) return;
     dragging = false;
+    lastDragEndAt = performance.now();
     sheetEl.style.transition = '';
     const y = currentY();
     if (Math.abs(y - startOffset) < 6) {
@@ -222,6 +240,9 @@ export function initBottomSheet(): BottomSheetHandle | null {
   return {
     raiseToHalf() {
       if (isMobile() && snap === 0) apply(1);
+    },
+    recentlyDragged() {
+      return dragging || performance.now() - lastDragEndAt < 400;
     },
     refresh() {
       if (!isMobile()) return;

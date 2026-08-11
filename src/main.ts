@@ -502,6 +502,10 @@ map.on('load', () => {
 });
 
 map.on('click', (event) => {
+  // Dragging the sheet down slides it out from under the finger, so the lift
+  // lands on the map and iOS synthesises a tap there. That was dropping a
+  // waypoint on the route every time the sheet was lowered by swiping.
+  if (bottomSheet?.recentlyDragged()) return;
   // Clicks on a café/water marker are handled by their own layer-click
   // listeners above, not by the branches below.
   const poiLayers = ['cafe-dots', 'water-dots'].filter((id) => map.getLayer(id));
