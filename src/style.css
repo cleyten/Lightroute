@@ -204,7 +204,7 @@
 }
 
 /* The `hidden` attribute must win over element display rules
-   (e.g. #stats and #wind-chip set display: flex). */
+   (e.g. #wind-chip sets display: flex). */
 [hidden] {
   display: none !important;
 }
@@ -255,23 +255,17 @@ select {
 }
 
 /* Thin, quiet scrollbars — a small but load-bearing polish detail. */
-#sidebar,
-#cafes-list,
-#water-list {
+#sidebar {
   scrollbar-width: thin;
   scrollbar-color: var(--color-track) transparent;
 }
 
-#sidebar::-webkit-scrollbar,
-#cafes-list::-webkit-scrollbar,
-#water-list::-webkit-scrollbar {
+#sidebar::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
-#sidebar::-webkit-scrollbar-thumb,
-#cafes-list::-webkit-scrollbar-thumb,
-#water-list::-webkit-scrollbar-thumb {
+#sidebar::-webkit-scrollbar-thumb {
   background: var(--color-track);
   border: 3px solid transparent;
   background-clip: padding-box;
@@ -343,44 +337,6 @@ select {
   letter-spacing: -0.01em;
   text-transform: none;
   color: var(--color-text);
-}
-
-/* Collapsible headers ("Route preferences", "Sort & filter"). */
-.disclosure-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-height: 28px;
-  margin: 0;
-  padding: 0;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-.disclosure-toggle .group-label {
-  margin: 0;
-}
-
-.disclosure-toggle:hover .group-label {
-  color: var(--color-accent-fg);
-}
-
-.disclosure-chevron {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  margin-left: 0.5rem;
-  border-right: 2px solid var(--color-faint);
-  border-bottom: 2px solid var(--color-faint);
-  transform: rotate(45deg);
-  transition: transform 0.22s ease;
-}
-
-.disclosure-toggle[aria-expanded='true'] .disclosure-chevron {
-  transform: rotate(225deg);
 }
 
 /* --- Brand ---------------------------------------------------------------- */
@@ -526,7 +482,6 @@ select {
 }
 
 /* --- Secondary buttons (default surface) --------------------------------- */
-.save-actions button,
 .save-row button,
 .find-btn,
 #btn-locate,
@@ -548,7 +503,6 @@ select {
   cursor: pointer;
 }
 
-.save-actions button:hover:not(:disabled),
 .save-row button:hover:not(:disabled),
 .find-btn:hover:not(:disabled),
 #btn-locate:hover:not(:disabled),
@@ -558,7 +512,6 @@ select {
   border-color: var(--color-border-strong);
 }
 
-.save-actions button:disabled,
 .save-row button:disabled,
 .find-btn:disabled {
   opacity: 0.4;
@@ -861,113 +814,9 @@ button.generate.is-loading::before {
   accent-color: var(--color-accent);
 }
 
-/* --- Button rows ---------------------------------------------------------- */
-.save-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.7rem;
-}
-
-.save-actions button {
-  flex: 1 1 calc(50% - 0.25rem);
-}
-
 .find-btn {
   width: 100%;
   margin-top: 0.6rem;
-}
-
-/* --- Route summary: metric tiles ----------------------------------------- */
-#stats {
-  display: flex;
-  gap: 0.6rem;
-  margin: 0.9rem 0 0.75rem;
-}
-
-.stat {
-  flex: 1;
-  padding: 0.85rem 0.95rem;
-  background: var(--grad-raised);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-tile), var(--edge-hi);
-}
-
-.stat-label {
-  display: block;
-  margin-bottom: 0.35rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0.01em;
-  color: var(--color-muted);
-}
-
-.stat-value {
-  display: flex;
-  align-items: baseline;
-  gap: 0.15rem;
-  font-size: 1.9rem;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-}
-
-.stat-value .unit {
-  font-size: 0.85rem;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--color-muted);
-}
-
-/* --- Summary pills (quiet chips, colored icon only) ---------------------- */
-.pill-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0.5rem 0 0.2rem;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.8125rem;
-  font-weight: 550;
-  padding: 0.38rem 0.7rem;
-  border-radius: 999px;
-  background: var(--grad-surface);
-  color: var(--color-text);
-  box-shadow: var(--edge-hi);
-}
-
-.pill svg {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-}
-
-.pill.climb svg {
-  color: var(--color-climb);
-}
-
-.pill.cafe svg {
-  color: var(--color-cafe);
-}
-
-.pill.water svg {
-  color: var(--color-water);
-}
-
-/* --- Elevation chart + legends ------------------------------------------- */
-#chart-wrap {
-  height: 150px;
-  margin: 0.7rem 0 0.75rem;
-}
-
-#surface {
-  margin: 1rem 0 0.75rem;
 }
 
 .surface-track {
@@ -1025,36 +874,6 @@ button.generate.is-loading::before {
   flex: 0 0 auto;
 }
 
-/* --- Section labels (with leading icon) ---------------------------------- */
-.section-label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--color-text);
-}
-
-.sec-ico {
-  flex: 0 0 auto;
-  color: var(--color-muted);
-}
-
-#climbs .sec-ico {
-  color: var(--color-climb);
-}
-
-#cafes .sec-ico {
-  color: var(--color-cafe);
-}
-
-#water .sec-ico {
-  color: var(--color-water);
-}
-
 /* --- Reusable list-row --------------------------------------------------- */
 /* Climbs, cafés, water and loop options share one row language. */
 .climb-item,
@@ -1072,27 +891,6 @@ button.generate.is-loading::before {
   box-shadow: var(--edge-hi);
   text-align: left;
   cursor: pointer;
-}
-
-#climbs {
-  margin: 0 0 0.75rem;
-}
-
-#climbs-list,
-#cafes-list,
-#water-list {
-  list-style: none;
-  margin: 0.5rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-#cafes-list,
-#water-list {
-  max-height: 220px;
-  overflow-y: auto;
 }
 
 .climb-item {
@@ -1147,11 +945,6 @@ button.generate.is-loading::before {
   font-weight: 650;
   color: var(--color-climb);
   font-variant-numeric: tabular-nums;
-}
-
-#cafes,
-#water {
-  margin: 0 0 0.75rem;
 }
 
 .cafe-item {
@@ -1388,13 +1181,6 @@ button.generate.is-loading::before {
   font-size: 0.8125rem;
 }
 
-.loop-wind {
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
-  font-size: 0.78rem;
-  color: var(--color-accent-fg);
-}
 
 /* --- Round-trip range ----------------------------------------------------- */
 .range-label {
@@ -1524,29 +1310,6 @@ button.generate.is-loading::before {
   margin: 0.15rem 0 0.25rem;
 }
 
-/* Friendly empty state for the route summary before a route exists. */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 0.6rem;
-  padding: 1.1rem 1rem 0.6rem;
-}
-
-.empty-state .empty-ico {
-  color: var(--color-accent-fg);
-  opacity: 0.85;
-}
-
-.empty-state p {
-  margin: 0;
-  max-width: 26ch;
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  color: var(--color-muted);
-}
-
 #status {
   margin: 0 1.25rem;
   font-size: 0.8125rem;
@@ -1571,10 +1334,6 @@ button.generate.is-loading::before {
 }
 
 /* --- Saved routes --------------------------------------------------------- */
-#save-section {
-  margin-top: 0;
-}
-
 #saved-list,
 #published-list {
   list-style: none;
@@ -1717,7 +1476,6 @@ button.generate.is-loading::before {
    ============================================================================ */
 button.generate:active:not(:disabled),
 button.primary:active:not(:disabled),
-.save-actions button:active:not(:disabled),
 .save-row button:active:not(:disabled),
 .find-btn:active:not(:disabled),
 .icon-btn:active:not(:disabled),

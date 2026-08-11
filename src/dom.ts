@@ -80,14 +80,10 @@ export const btnLocate = el<HTMLButtonElement>('#btn-locate');
 export const btnImportGpx = el<HTMLButtonElement>('#btn-import-gpx');
 export const gpxFileInput = el<HTMLInputElement>('#gpx-file-input');
 
-// Points of interest along the route
-export const cafesEl = el<HTMLElement>('#cafes');
-export const cafeKmInput = el<HTMLInputElement>('#cafe-km');
-export const btnCafes = el<HTMLButtonElement>('#btn-cafes');
-export const cafesList = el<HTMLUListElement>('#cafes-list');
-export const waterEl = el<HTMLElement>('#water');
-export const btnWater = el<HTMLButtonElement>('#btn-water');
-export const waterList = el<HTMLUListElement>('#water-list');
+// Cafés/water are fetched automatically now (see fetchPoisIfNeeded in
+// main.ts) and shown only in routeDetailView.ts's Stops tab, which builds
+// its own DOM — there is no #cafes/#water find-along-route UI left to
+// resolve handles for.
 
 // Tabs. The mobile bottom bar mirrors the top tabs; both drive setActiveTab.
 export const mainTabs = el<HTMLElement>('#main-tabs');
