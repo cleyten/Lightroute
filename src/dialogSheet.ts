@@ -22,6 +22,14 @@ export function initDialogSheet(dialogEl: HTMLElement, backdropEl: HTMLElement):
     openState = false;
     backdropEl.hidden = true;
     dialogEl.hidden = true;
+    // These sheets carry text inputs (route name, place search). iOS shifts the
+    // visual viewport up to clear the on-screen keyboard and does not always
+    // shift it back, which leaves the whole page scrolled and its top edge
+    // clipped. Dropping focus dismisses the keyboard, and the scroll reset
+    // undoes the shift if it stuck. Same defence as bottomSheet.ts's restore().
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
   }
 
   // pointerdown, not click: iOS Safari does not reliably fire click on a bare

@@ -1252,7 +1252,10 @@ const planSettingDialog = initDialogSheet(planSettingSheetEl, planSettingBackdro
 initPlanRows((pane) => {
   showPlanSettingPane(pane);
   planSettingDialog.open();
-  if (pane === 'start') searchInput.focus();
+  // Deliberately does NOT focus the search field. Auto-focusing raised the iOS
+  // keyboard the instant the sheet opened, and iOS shifts the visual viewport
+  // to make room for it and can leave it shifted afterwards, which clips the
+  // top of the page. Opening a sheet should not commandeer the keyboard.
 });
 btnPlanSettingDone.addEventListener('click', () => {
   planSettingDialog.close();
