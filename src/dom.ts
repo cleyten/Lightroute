@@ -37,6 +37,7 @@ export const buildAscend = el<HTMLElement>('#build-ascend');
 export const buildPoints = el<HTMLElement>('#build-points');
 export const controlsEl = el<HTMLElement>('#controls');
 export const buildActionsEl = el<HTMLElement>('#build-actions');
+export const btnBuildBack = el<HTMLButtonElement>('#btn-build-back');
 export const btnCloseLoop = el<HTMLButtonElement>('#btn-close-loop');
 export const btnBuildDone = el<HTMLButtonElement>('#btn-build-done');
 

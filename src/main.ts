@@ -62,7 +62,7 @@ import { parseGpx, isClosedTrack } from './gpximport';
 import {
   DEFAULT_SIGNIN_HINT, accountAvatar, accountCode, accountEmail, accountName, accountSignedIn,
   accountSignedOut, authorField, authorNameInput, bikeButtons, bottomTabButtons,
-  btnApplyFilters, btnBookmarkLoop, btnBuildDone, btnCancelGenerate, btnCandidatesBack, btnClear,
+  btnApplyFilters, btnBookmarkLoop, btnBuildBack, btnBuildDone, btnCancelGenerate, btnCandidatesBack, btnClear,
   btnCloseLoop, btnExport,
   btnExportTcx, btnImportGpx,
   btnLocate, btnOpenFilters, btnOpenSaveExport, btnPlanSettingDone, btnPublish, btnResetFilters,
@@ -527,10 +527,11 @@ map.on('click', (event) => {
   // Starting to place points by hand from the Plan screen enters the
   // dedicated Build screen (mobile only; harmless no-op on desktop, which
   // ignores plannerScreen and always shows #controls).
-  if (getPlannerScreen() === 'plan' && state.waypoints.length === 0) {
-    setPlannerScreen('build');
-  }
+  const enteringBuild = getPlannerScreen() === 'plan' && state.waypoints.length === 0;
+  // Point first, screen second: the auto-return below bounces out of Build the
+  // moment there is nothing to build, so switching first would undo itself.
   state.waypoints.push([event.lngLat.lng, event.lngLat.lat]);
+  if (enteringBuild) setPlannerScreen('build');
   rebuildMarkers();
   void recalculateRoute();
 });
@@ -604,6 +605,12 @@ btnBuildDone.addEventListener('click', () => {
 });
 
 btnCandidatesBack.addEventListener('click', () => {
+  setPlannerScreen('plan');
+});
+
+// Leaves the placed points alone: going back to Plan keeps them, so the start
+// you just tapped can be fed straight into "Find loops".
+btnBuildBack.addEventListener('click', () => {
   setPlannerScreen('plan');
 });
 
@@ -1817,6 +1824,11 @@ function updateControls(): void {
   renderBuildReadout();
   syncEditToolbar();
   syncPlanRows();
+  // Clearing or undoing every point used to strand the user on the Build
+  // screen, which has no route to press Done on and (until now) no way back.
+  if (getPlannerScreen() === 'build' && state.waypoints.length === 0 && !state.closed) {
+    setPlannerScreen('plan');
+  }
 }
 
 /**

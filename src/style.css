@@ -2516,7 +2516,7 @@ button.primary:active:not(:disabled),
 }
 
 /* --- Candidates screen ----------------------------------------------------- */
-.candidates-back {
+.screen-back {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -2876,4 +2876,33 @@ button.primary:active:not(:disabled),
 
 .plan-setting-pane #search-results {
   margin-top: var(--space-2);
+}
+
+/* --- Gutters for the planner screens ------------------------------------- */
+/* #controls, #build-actions and the screen sections used to sit inside a
+   <section class="group"> and inherited its 1.25rem side padding. They are
+   direct children of #tab-planner now, so they need their own, or their
+   buttons run flush into the right edge of the screen. #screen-plan is
+   excluded on purpose: its rows are full-bleed and carry their own padding. */
+#screen-generating,
+#screen-candidates,
+#screen-build,
+#controls,
+#build-actions,
+.candidates-heading {
+  padding-left: var(--space-5);
+  padding-right: var(--space-5);
+}
+
+/* The card row stays full-bleed so the next candidate peeks in from the edge
+   (the mockup's look), but the first card still needs the same gutter. */
+#loop-options {
+  scroll-padding-left: var(--space-5);
+}
+
+@media (max-width: 700px) {
+  #loop-options {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+  }
 }
