@@ -46,6 +46,7 @@ import { fetchCafes, type Cafe } from './cafes';
 import { fetchWater, type WaterPoint } from './water';
 import { estimateMovingTimeHours } from './rideTime';
 import { renderCandidateCards, renderCandidateDots, type CandidateCardData } from './candidateCards';
+import { initLibrarySegment, renderSavedList } from './librarySheet';
 import {
   renderRouteDetailFullscreen, renderRouteDetailPanel, clearRouteDetail,
   type RouteDetailData, type RouteDetailCallbacks,
@@ -53,18 +54,19 @@ import {
 import { buildShareUrl, parseShareUrl } from './share';
 import { parseGpx, isClosedTrack } from './gpximport';
 import {
-  DEFAULT_SIGNIN_HINT, accountCode, accountEmail, accountName, accountSignedIn, accountSignedOut,
-  authorField, authorNameInput, bikeButtons, bottomTabButtons,
+  DEFAULT_SIGNIN_HINT, accountAvatar, accountCode, accountEmail, accountName, accountSignedIn,
+  accountSignedOut, authorField, authorNameInput, bikeButtons, bottomTabButtons,
   btnBookmarkLoop, btnBuildDone, btnCancelGenerate, btnCandidatesBack, btnClear, btnCloseLoop, btnExport,
   btnExportTcx, btnImportGpx,
   btnLocate, btnPublish, btnReverse, btnRoundtrip, btnSave, btnShare, btnSignin, btnSigninBack,
   btnSignout, btnUndo, btnUseLoop, btnVerify, buildAscend, buildDistance,
-  buildPoints, candidateDotsEl, codeRow, communityBikeButtons, communityDistMax,
-  communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons, communityList,
-  communityPanel, communitySortButtons, emailRow, gpxFileInput, hillsButtons,
-  loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, rangeTrack, rangeValue, roundtripMax,
-  roundtripMin, routeDetailMobile, routeDetailPanel, routeNameInput, savedList, screenBuild,
-  screenCandidates, screenGenerating, screenPlan, searchInput,
+  buildPoints, candidateDotsEl, codeRow, communityBikeButtons, communityDiscoverEl, communityDistMax,
+  communityDistMin, communityDistTrack, communityDistValue, communityHillsButtons, communityLibraryEl,
+  communityList, communityPanel, communitySegmentEl, communitySortButtons, emailRow, gpxFileInput,
+  hillsButtons, libraryTabButtons,
+  loopOptionsEl, mainTabButtons, mainTabs, plannerPanel, publishedList, rangeTrack, rangeValue,
+  roundtripMax, roundtripMin, routeDetailMobile, routeDetailPanel, routeNameInput, savedList,
+  screenBuild, screenCandidates, screenGenerating, screenPlan, searchInput,
   searchResults, signinHint, trafficSelect, windChipEl,
 } from './dom';
 // ./auth and ./community both pull in @supabase/supabase-js. They are loaded on
@@ -1179,6 +1181,21 @@ function clearWater(): void {
 
 initDisclosure('#community-filters-toggle', '#community-filters-body');
 
+initLibrarySegment(communitySegmentEl, (segment) => {
+  communityDiscoverEl.hidden = segment !== 'discover';
+  communityLibraryEl.hidden = segment !== 'library';
+  if (segment === 'library') renderPublishedList();
+});
+
+libraryTabButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    setActiveInGroup(libraryTabButtons, button);
+    const tab = button.dataset.libraryTab;
+    savedList.hidden = tab !== 'saved';
+    publishedList.hidden = tab !== 'published';
+  });
+});
+
 // --- Light/dark theme toggle -------------------------------------------------
 // The UI follows the OS by default; toggling sets an explicit, persisted
 // preference on <html data-theme>. The map basemap stays light either way.
@@ -1626,29 +1643,9 @@ function setClimbHighlight(climb: Climb | null): void {
 
 async function refreshSavedList(): Promise<void> {
   const routes = await listRoutes();
-  savedList.innerHTML = '';
-  for (const route of routes) {
-    const item = document.createElement('li');
-    item.className = 'saved-item';
-
-    const preview = buildRoutePreviewSvg(route.waypoints, route.closed ?? false);
-    preview.classList.add('saved-preview');
-
-    const label = document.createElement('button');
-    label.className = 'saved-name';
-    label.title = 'Load this route';
-    const bikeLabel =
-      route.bike === 'mtb' ? 'MTB' : route.bike.charAt(0).toUpperCase() + route.bike.slice(1);
-    label.innerHTML =
-      `<span class="saved-title">${escapeHtml(route.name)}</span>` +
-      `<span class="saved-meta">${(route.distanceMeters / 1000).toFixed(1)} km · ${bikeLabel}</span>`;
-    label.addEventListener('click', () => void loadSaved(route));
-
-    const remove = document.createElement('button');
-    remove.className = 'saved-delete';
-    remove.textContent = '✕';
-    remove.title = 'Delete';
-    remove.addEventListener('click', async () => {
+  renderSavedList(savedList, routes, {
+    onLoad: (route) => void loadSaved(route),
+    onDelete: async (route) => {
       try {
         await deleteRoute(route.id!);
       } catch {
@@ -1656,11 +1653,8 @@ async function refreshSavedList(): Promise<void> {
         return;
       }
       await refreshSavedList();
-    });
-
-    item.append(preview, label, remove);
-    savedList.append(item);
-  }
+    },
+  });
 }
 
 async function loadSaved(route: SavedRoute): Promise<void> {
@@ -1873,6 +1867,7 @@ if (isSupabaseConfigured) {
           authorNameInput.value =
             localStorage.getItem(AUTHOR_KEY) ?? user.email?.split('@')[0] ?? '';
         }
+        accountAvatar.textContent = (authorNameInput.value || user.email || '?')[0].toUpperCase();
         // Clean up this owner's routes whose grace period has passed.
         void community.purgeExpiredRoutes();
       }
@@ -1886,6 +1881,9 @@ if (isSupabaseConfigured) {
       localStorage.setItem(AUTHOR_KEY, authorNameInput.value.trim());
     } catch {
       // Blocked storage just means the name is not remembered next visit.
+    }
+    if (currentUser) {
+      accountAvatar.textContent = (authorNameInput.value || currentUser.email || '?')[0].toUpperCase();
     }
   });
 
@@ -2100,16 +2098,22 @@ function renderCommunitySkeletons(count = 3): void {
   }
 }
 
-function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, number>): void {
-  communityList.innerHTML = '';
+function renderCommunityList(
+  routes: CommunityRoute[],
+  myRatings: Map<string, number>,
+  container: HTMLUListElement = communityList,
+): void {
+  container.innerHTML = '';
   if (routes.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'community-empty';
     empty.textContent =
-      communityRoutes.length === 0
-        ? 'No routes published yet. Plan one and hit Publish.'
-        : 'No routes match these filters.';
-    communityList.append(empty);
+      container === publishedList
+        ? "You haven't published any routes yet."
+        : communityRoutes.length === 0
+          ? 'No routes published yet. Plan one and hit Publish.'
+          : 'No routes match these filters.';
+    container.append(empty);
     return;
   }
   for (const route of routes) {
@@ -2191,8 +2195,14 @@ function renderCommunityList(routes: CommunityRoute[], myRatings: Map<string, nu
 
     const preview = buildRoutePreviewSvg(route.waypoints as [number, number][], route.closed);
     item.append(preview, body);
-    communityList.append(item);
+    container.append(item);
   }
+}
+
+/** Renders the Library's Published tab: routes owned by the signed-in user. */
+function renderPublishedList(): void {
+  const mine = currentUser ? communityRoutes.filter((r) => r.ownerId === currentUser!.id) : [];
+  renderCommunityList(mine, communityRatings, publishedList);
 }
 
 /** City (once reverse-geocoded) plus distance-from-you, for a route's location line. */

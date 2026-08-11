@@ -1574,20 +1574,22 @@ button.generate.is-loading::before {
   margin-top: 0;
 }
 
-#saved-list {
+#saved-list,
+#published-list {
   list-style: none;
   margin: 0.7rem 0 0;
   padding: 0;
 }
 
-#saved-list li {
+#saved-list li,
+#published-list li {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.15rem 0;
 }
 
-.saved-preview {
+.library-preview {
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
@@ -1597,7 +1599,7 @@ button.generate.is-loading::before {
   color: var(--color-accent-fg);
 }
 
-.saved-name {
+.library-name {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -1612,7 +1614,7 @@ button.generate.is-loading::before {
   cursor: pointer;
 }
 
-.saved-title {
+.library-title {
   font-size: 0.875rem;
   font-weight: 600;
   overflow: hidden;
@@ -1620,30 +1622,93 @@ button.generate.is-loading::before {
   white-space: nowrap;
 }
 
-.saved-meta {
+.library-meta {
   font-size: 0.75rem;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.saved-name:hover {
+.library-name:hover {
   background: var(--color-hover);
 }
 
-.saved-delete {
+.library-overflow {
   border: none;
   background: transparent;
   color: var(--color-faint);
   cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
+  display: flex;
   padding: 0.4rem;
   border-radius: var(--radius-xs);
 }
 
-.saved-delete:hover {
+.library-overflow:hover {
   color: var(--color-text);
   background: var(--color-hover);
+}
+
+/* --- Community/library segment and Saved/Published sub-tabs -------------- */
+.community-segment {
+  display: flex;
+  gap: 8px;
+  padding: 0 0 14px;
+}
+
+.segment-btn {
+  flex: 1;
+  height: 38px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--grad-raised);
+  color: var(--color-muted);
+  font-weight: 650;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.segment-btn.active {
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-bg);
+}
+
+.library-tabs {
+  display: flex;
+  gap: 22px;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.library-tab {
+  padding: 0 0 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.library-tab.active {
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom-color: var(--color-text);
+}
+
+.account-avatar {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-text);
+  color: var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
 }
 
 /* =============================================================================
@@ -1839,6 +1904,7 @@ button.primary:active:not(:disabled),
 }
 
 .account-who {
+  flex: 1;
   font-size: 0.875rem;
   color: var(--color-muted);
 }

@@ -166,84 +166,106 @@
         </div>
 
         <div id="tab-community" class="tab-panel" role="tabpanel" aria-label="Community" hidden>
-        <section class="group">
-          <span class="group-label">Your routes</span>
-          <button id="btn-publish" class="find-btn" type="button" hidden disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m8 7 4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Publish this route</button>
-          <button id="btn-import-gpx" class="find-btn" type="button"><svg class="btn-ico" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Import route (GPX/TCX)</button>
-          <input id="gpx-file-input" type="file" accept=".gpx,.tcx" hidden aria-hidden="true" />
-        </section>
 
-        <section class="group" id="save-section">
-          <span class="group-label">Save and export</span>
-          <label class="field">
-            Route name
-            <input id="route-name" type="text" placeholder="Name" />
-          </label>
-          <div class="save-actions">
-            <button id="btn-save" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12a1 1 0 0 1 1 1v16l-7-4-7 4V5a1 1 0 0 1 1-1Z"/></svg>Save</button>
-            <button id="btn-share" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>Share</button>
-            <button id="btn-export" class="primary" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>Export GPX</button>
-            <button id="btn-export-tcx" class="primary" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>Export TCX</button>
-          </div>
-          <ul id="saved-list"></ul>
-        </section>
+        <!-- The mockup's "Your library" screen has no bottom-nav icon of its
+             own (only Plan/Community), so it lives here as a segment inside
+             Community rather than a third destination. See librarySheet.ts. -->
+        <div id="community-segment" class="community-segment" role="tablist">
+          <button type="button" class="segment-btn active" data-segment="discover" aria-pressed="true">Discover</button>
+          <button type="button" class="segment-btn" data-segment="library" aria-pressed="false">Your library</button>
+        </div>
 
-        <section class="group" id="community-section">
-          <div id="account-signed-out">
-            <span class="save-row" id="email-row">
-              <input id="account-email" type="email" placeholder="you@example.com" autocomplete="email" aria-label="Email for a sign-in code" />
-              <button id="btn-signin" type="button">Sign in</button>
-            </span>
-            <span class="save-row" id="code-row" hidden>
-              <input id="account-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="12" placeholder="Sign-in code" aria-label="Sign-in code" />
-              <button id="btn-verify" type="button">Verify</button>
-            </span>
-            <p class="hint"><span id="signin-hint">Sign in with an emailed code to publish and rate routes. Browsing is open to everyone.</span> <button id="btn-signin-back" class="linklike" type="button" hidden>Use a different email</button></p>
-          </div>
-          <div id="account-signed-in" hidden>
-            <span class="account-who">Signed in as <strong id="account-name"></strong></span>
-            <button id="btn-signout" type="button">Sign out</button>
-          </div>
-          <label class="field" id="author-field" hidden>
-            Publish as
-            <input id="author-name" type="text" placeholder="Your name" autocomplete="name" maxlength="40" />
-          </label>
-          <button type="button" class="disclosure-toggle" id="community-filters-toggle" aria-expanded="false" aria-controls="community-filters-body">
-            <span class="group-label">Sort &amp; filter</span>
-            <span class="disclosure-chevron" aria-hidden="true"></span>
-          </button>
-          <div class="community-controls" id="community-filters-body" hidden>
-            <span class="field">Sort</span>
-            <div class="segmented" id="community-sort">
-              <button type="button" data-sort="newest" class="active" aria-pressed="true">Newest</button>
-              <button type="button" data-sort="top" aria-pressed="false">Top rated</button>
-              <button type="button" data-sort="near" aria-pressed="false">Near me</button>
+        <div id="community-discover">
+          <section class="group" id="community-section">
+            <button type="button" class="disclosure-toggle" id="community-filters-toggle" aria-expanded="false" aria-controls="community-filters-body">
+              <span class="group-label">Sort &amp; filter</span>
+              <span class="disclosure-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="community-controls" id="community-filters-body" hidden>
+              <span class="field">Sort</span>
+              <div class="segmented" id="community-sort">
+                <button type="button" data-sort="newest" class="active" aria-pressed="true">Newest</button>
+                <button type="button" data-sort="top" aria-pressed="false">Top rated</button>
+                <button type="button" data-sort="near" aria-pressed="false">Near me</button>
+              </div>
+              <span class="field">Bike</span>
+              <div class="segmented" id="community-bike">
+                <button type="button" data-bike="all" class="active" aria-pressed="true">All</button>
+                <button type="button" data-bike="race" aria-pressed="false">Race</button>
+                <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
+                <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
+              </div>
+              <span class="field">Hills</span>
+              <div class="segmented" id="community-hills">
+                <button type="button" data-hills="all" class="active" aria-pressed="true">All</button>
+                <button type="button" data-hills="flat" aria-pressed="false">Flat</button>
+                <button type="button" data-hills="hilly" aria-pressed="false">Hilly</button>
+              </div>
+              <span class="field" id="community-dist-field">
+                Distance
+                <span class="range-label"><span id="community-dist-value">Any length</span></span>
+              </span>
+              <div class="dual-range">
+                <div class="range-track" id="community-dist-track"></div>
+                <input id="community-dist-min" type="range" min="0" max="200" step="5" value="0" aria-label="Minimum route distance in km" />
+                <input id="community-dist-max" type="range" min="0" max="200" step="5" value="200" aria-label="Maximum route distance in km" />
+              </div>
             </div>
-            <span class="field">Bike</span>
-            <div class="segmented" id="community-bike">
-              <button type="button" data-bike="all" class="active" aria-pressed="true">All</button>
-              <button type="button" data-bike="race" aria-pressed="false">Race</button>
-              <button type="button" data-bike="gravel" aria-pressed="false">Gravel</button>
-              <button type="button" data-bike="mtb" aria-pressed="false">MTB</button>
+            <ul id="community-list"></ul>
+          </section>
+        </div>
+
+        <div id="community-library" hidden>
+          <section class="group">
+            <div class="library-tabs" role="tablist">
+              <button type="button" class="library-tab active" data-library-tab="saved" aria-pressed="true">Saved</button>
+              <button type="button" class="library-tab" data-library-tab="published" aria-pressed="false">Published</button>
             </div>
-            <span class="field">Hills</span>
-            <div class="segmented" id="community-hills">
-              <button type="button" data-hills="all" class="active" aria-pressed="true">All</button>
-              <button type="button" data-hills="flat" aria-pressed="false">Flat</button>
-              <button type="button" data-hills="hilly" aria-pressed="false">Hilly</button>
+            <ul id="saved-list"></ul>
+            <ul id="published-list" hidden></ul>
+            <button id="btn-import-gpx" class="find-btn" type="button"><svg class="btn-ico" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Import route (GPX/TCX)</button>
+            <input id="gpx-file-input" type="file" accept=".gpx,.tcx" hidden aria-hidden="true" />
+          </section>
+
+          <section class="group" id="save-section">
+            <span class="group-label">Save and export</span>
+            <button id="btn-publish" class="find-btn" type="button" hidden disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m8 7 4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Publish this route</button>
+            <label class="field">
+              Route name
+              <input id="route-name" type="text" placeholder="Name" />
+            </label>
+            <div class="save-actions">
+              <button id="btn-save" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12a1 1 0 0 1 1 1v16l-7-4-7 4V5a1 1 0 0 1 1-1Z"/></svg>Save</button>
+              <button id="btn-share" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>Share</button>
+              <button id="btn-export" class="primary" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>Export GPX</button>
+              <button id="btn-export-tcx" class="primary" disabled><svg class="btn-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>Export TCX</button>
             </div>
-            <span class="field" id="community-dist-field">
-              Distance
-              <span class="range-label"><span id="community-dist-value">Any length</span></span>
-            </span>
-            <div class="dual-range">
-              <div class="range-track" id="community-dist-track"></div>
-              <input id="community-dist-min" type="range" min="0" max="200" step="5" value="0" aria-label="Minimum route distance in km" />
-              <input id="community-dist-max" type="range" min="0" max="200" step="5" value="200" aria-label="Maximum route distance in km" />
+          </section>
+
+          <section class="group">
+            <span class="group-label">Account</span>
+            <div id="account-signed-out">
+              <span class="save-row" id="email-row">
+                <input id="account-email" type="email" placeholder="you@example.com" autocomplete="email" aria-label="Email for a sign-in code" />
+                <button id="btn-signin" type="button">Sign in</button>
+              </span>
+              <span class="save-row" id="code-row" hidden>
+                <input id="account-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="12" placeholder="Sign-in code" aria-label="Sign-in code" />
+                <button id="btn-verify" type="button">Verify</button>
+              </span>
+              <p class="hint"><span id="signin-hint">Sign in with an emailed code to publish and rate routes. Browsing is open to everyone.</span> <button id="btn-signin-back" class="linklike" type="button" hidden>Use a different email</button></p>
             </div>
-          </div>
-          <ul id="community-list"></ul>
-        </section>
+            <div id="account-signed-in" hidden>
+              <span class="account-avatar" id="account-avatar" aria-hidden="true"></span>
+              <span class="account-who">Signed in as <strong id="account-name"></strong></span>
+              <button id="btn-signout" type="button">Sign out</button>
+            </div>
+            <label class="field" id="author-field" hidden>
+              Publish as
+              <input id="author-name" type="text" placeholder="Your name" autocomplete="name" maxlength="40" />
+            </label>
+          </section>
+        </div>
         </div>
 
         </div>

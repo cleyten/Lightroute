@@ -46,6 +46,14 @@ export const btnShare = el<HTMLButtonElement>('#btn-share');
 export const routeNameInput = el<HTMLInputElement>('#route-name');
 export const savedList = el<HTMLUListElement>('#saved-list');
 
+// Community: Discover/Your-library segment (librarySheet.ts)
+export const communitySegmentEl = el<HTMLElement>('#community-segment');
+export const communityDiscoverEl = el<HTMLElement>('#community-discover');
+export const communityLibraryEl = el<HTMLElement>('#community-library');
+export const libraryTabButtons = all<HTMLButtonElement>('.library-tab');
+export const publishedList = el<HTMLUListElement>('#published-list');
+export const accountAvatar = el<HTMLElement>('#account-avatar');
+
 // Bike, traffic and hills
 export const bikeButtons = all<HTMLButtonElement>('#bike-type button');
 export const hillsButtons = all<HTMLButtonElement>('#hills-type button');
