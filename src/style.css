@@ -51,6 +51,12 @@
   --color-cafe: #8a5a2b;
   --color-water: #1f8fbf;
 
+  /* Surface breakdown bar (surface.ts). Cobbles stays constant across themes. */
+  --surface-paved: #4a4a4a;
+  --surface-cobbles: #c9822b;
+  --surface-unpaved: #8a6f47;
+  --surface-unknown: #c4c4c4;
+
   /* Shape — 8px spacing system, 10–14px control radii, 20px panel. */
   --radius-panel: 20px;
   --radius-lg: 14px;
@@ -78,8 +84,24 @@
   --shadow-tile: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.07);
   --inset-field: inset 0 1px 2px rgba(0, 0, 0, 0.06);
 
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
-    Roboto, Helvetica, Arial, sans-serif;
+  /* Type — Archivo for display/UI text, IBM Plex Mono for every number (stats,
+     distances, grade badges) so figures read as data, not prose. Self-hosted
+     via @fontsource (imported in main.ts) rather than a Google Fonts link, so
+     they build into the PWA bundle and get precached like everything else. */
+  --font-display: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    system-ui, Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+
+  /* Spacing — 4px base, used by the new row/card/sheet layouts below. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  font-family: var(--font-display);
   color-scheme: light dark;
 }
 
@@ -97,7 +119,7 @@
     --color-border: rgba(255, 255, 255, 0.1);
     --color-border-strong: rgba(255, 255, 255, 0.18);
     --color-track: rgba(255, 255, 255, 0.22);
-    --color-accent: #3f68ff;
+    --color-accent: #4d74ff;
     --color-accent-hi: #5a7dff;
     --color-accent-fg: #8fa8ff;
     --color-accent-tint: rgba(143, 168, 255, 0.13);
@@ -107,6 +129,9 @@
     --color-climb: #e8823f;
     --color-cafe: #c39058;
     --color-water: #57c1e8;
+    --surface-paved: #6e6e72;
+    --surface-unpaved: #a08662;
+    --surface-unknown: #4a4a4e;
     --shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.06),
       0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.6);
     --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);
@@ -138,7 +163,7 @@
   --color-border: rgba(255, 255, 255, 0.1);
   --color-border-strong: rgba(255, 255, 255, 0.18);
   --color-track: rgba(255, 255, 255, 0.22);
-  --color-accent: #3f68ff;
+  --color-accent: #4d74ff;
   --color-accent-hi: #5a7dff;
   --color-accent-fg: #8fa8ff;
   --color-accent-tint: rgba(143, 168, 255, 0.13);
@@ -148,6 +173,9 @@
   --color-climb: #e8823f;
   --color-cafe: #c39058;
   --color-water: #57c1e8;
+  --surface-paved: #6e6e72;
+  --surface-unpaved: #a08662;
+  --surface-unknown: #4a4a4e;
   --shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.06),
     0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.6);
   --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);

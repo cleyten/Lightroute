@@ -1,6 +1,19 @@
 import maplibregl from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
+// Self-hosted so the fonts are part of the build and get precached with
+// everything else (see vite.config.ts's workbox comment on why offline
+// matters here); weights match exactly what style.css actually uses.
+import '@fontsource/archivo/400.css';
+import '@fontsource/archivo/500.css';
+import '@fontsource/archivo/600.css';
+import '@fontsource/archivo/700.css';
+import '@fontsource/archivo/800.css';
+import '@fontsource/archivo/900.css';
+import '@fontsource/archivo/900-italic.css';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import '@fontsource/ibm-plex-mono/600.css';
 import './style.css';
 import { fetchRoute, RouteCancelledError, type LngLat } from './routing';
 import { downloadGpx } from './gpx';

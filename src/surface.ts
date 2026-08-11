@@ -172,11 +172,14 @@ export function surfaceBreakdown(messages: string[][]): SurfaceTotals | null {
   return totals.totalMeters > 0 ? totals : null;
 }
 
+// Colors are CSS custom properties, not literal hex, so the bar (which sets
+// them as inline styles) still follows the light/dark theme swap defined in
+// style.css instead of freezing to the light-mode hex at render time.
 const LEGEND: { key: keyof Omit<SurfaceTotals, 'totalMeters'>; label: string; color: string }[] = [
-  { key: 'paved', label: 'Paved', color: '#4a4a4a' },
-  { key: 'cobbles', label: 'Cobbles', color: '#c9822b' },
-  { key: 'unpaved', label: 'Unpaved', color: '#8a6f47' },
-  { key: 'unknown', label: 'Unknown', color: '#c4c4c4' },
+  { key: 'paved', label: 'Paved', color: 'var(--surface-paved)' },
+  { key: 'cobbles', label: 'Cobbles', color: 'var(--surface-cobbles)' },
+  { key: 'unpaved', label: 'Unpaved', color: 'var(--surface-unpaved)' },
+  { key: 'unknown', label: 'Unknown', color: 'var(--surface-unknown)' },
 ];
 
 export function renderSurfaceBar(container: HTMLElement, totals: SurfaceTotals): void {
